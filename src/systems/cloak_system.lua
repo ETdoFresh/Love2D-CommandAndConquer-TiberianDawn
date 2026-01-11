@@ -59,7 +59,7 @@ end
 
 -- Update cloak system
 function CloakSystem:update(dt)
-    local entities = self.world:get_entities_with_component("cloak")
+    local entities = self.world:get_entities_with("cloak")
 
     for _, entity in ipairs(entities) do
         self:update_entity(entity, dt)

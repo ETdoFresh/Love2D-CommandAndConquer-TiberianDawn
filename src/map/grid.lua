@@ -28,6 +28,21 @@ function Grid.new(width, height)
     return self
 end
 
+-- Initialize/resize the grid to new dimensions
+function Grid:init(width, height)
+    self.width = width or self.width
+    self.height = height or self.height
+    self.cells = {}
+
+    -- Initialize all cells
+    for y = 0, self.height - 1 do
+        for x = 0, self.width - 1 do
+            local index = y * self.width + x
+            self.cells[index] = Cell.new(x, y)
+        end
+    end
+end
+
 -- Check if coordinates are valid
 function Grid:is_valid(x, y)
     return x >= 0 and x < self.width and y >= 0 and y < self.height
