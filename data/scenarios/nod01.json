@@ -1,0 +1,76 @@
+{
+  "name": "Nod Mission 1: Silencing Nikoomba",
+  "intro": "nod1",
+  "brief": "NOD1",
+  "win_movie": "nod1win",
+  "lose_movie": "nod1lose",
+  "player": "BadGuy",
+  "build_level": 1,
+  "theater": "DESERT",
+  "map_x": 5,
+  "map_y": 5,
+  "map_width": 45,
+  "map_height": 45,
+
+  "houses": {
+    "BadGuy": {
+      "credits": 1500,
+      "edge": "South",
+      "max_unit": 50,
+      "max_building": 20
+    },
+    "Neutral": {
+      "credits": 0,
+      "edge": "North",
+      "max_unit": 10,
+      "max_building": 5
+    }
+  },
+
+  "structures": [
+    {"house": "Neutral", "type": "V19", "health": 256, "cell_x": 25, "cell_y": 10},
+    {"house": "Neutral", "type": "V20", "health": 256, "cell_x": 27, "cell_y": 12}
+  ],
+
+  "units": [],
+
+  "infantry": [
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 20, "cell_y": 40, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 21, "cell_y": 40, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 22, "cell_y": 40, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 20, "cell_y": 41, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "Neutral", "type": "C1", "health": 256, "cell_x": 26, "cell_y": 11, "subcell": 0, "mission": "Sleep", "facing": 128, "trigger": "Kill1"}
+  ],
+
+  "triggers": [
+    {
+      "name": "Kill1",
+      "house": "BadGuy",
+      "event": 7,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Lose1",
+      "house": "BadGuy",
+      "event": 10,
+      "event_param": 0,
+      "action": 2,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [],
+
+  "waypoints": [
+    {"x": 5120, "y": 10240},
+    {"x": 6656, "y": 2816}
+  ],
+
+  "cell_triggers": []
+}
