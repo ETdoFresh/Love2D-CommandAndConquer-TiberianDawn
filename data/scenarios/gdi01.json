@@ -33,8 +33,8 @@
   ],
 
   "units": [
-    {"house": "GoodGuy", "type": "HMMV", "health": 256, "cell_x": 12, "cell_y": 25, "facing": 64, "mission": "Guard"},
-    {"house": "GoodGuy", "type": "HMMV", "health": 256, "cell_x": 12, "cell_y": 27, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 12, "cell_y": 25, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 12, "cell_y": 27, "facing": 64, "mission": "Guard"},
     {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 10, "cell_y": 26, "facing": 64, "mission": "Guard"}
   ],
 

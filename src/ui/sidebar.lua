@@ -174,15 +174,26 @@ function Sidebar:refresh_items()
 end
 
 function Sidebar:update(dt)
-    -- Update credits display
+    -- Update credits from harvest system or game
     if self.harvest_system then
-        self.credits = self.harvest_system:get_credits(self.house)
+        local credits = self.harvest_system:get_credits(self.house)
+        if credits then
+            self.credits = credits
+        end
     end
 
     -- Update power display
     if self.power_system then
-        self.power_produced, self.power_consumed = self.power_system:get_power(self.house)
+        local produced, consumed = self.power_system:get_power(self.house)
+        if produced then
+            self.power_produced = produced
+            self.power_consumed = consumed or 0
+        end
     end
+end
+
+function Sidebar:set_credits(credits)
+    self.credits = credits
 end
 
 function Sidebar:draw()

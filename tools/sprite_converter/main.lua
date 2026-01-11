@@ -183,8 +183,8 @@ local function main(args)
     return 0
 end
 
--- Run if executed directly
-if arg then
+-- Run if executed directly (standalone Lua, not Love2D)
+if arg and arg[0] and arg[0]:match("main%.lua$") then
     os.exit(main(arg))
 end
 

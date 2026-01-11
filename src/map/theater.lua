@@ -116,7 +116,13 @@ function Theater:create_placeholder_tiles()
 
         for y = 0, Constants.CELL_PIXEL_H - 1 do
             for x = 0, Constants.CELL_PIXEL_W - 1 do
-                image_data:setPixel(x, y, color[1], color[2], color[3], 1)
+                -- Add grid lines for visibility
+                local r, g, b = color[1], color[2], color[3]
+                if x == 0 or y == 0 then
+                    -- Darker grid lines
+                    r, g, b = r * 0.7, g * 0.7, b * 0.7
+                end
+                image_data:setPixel(x, y, r, g, b, 1)
             end
         end
 

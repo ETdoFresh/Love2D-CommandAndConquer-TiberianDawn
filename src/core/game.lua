@@ -252,86 +252,53 @@ function Game:start_game()
     -- Create some test entities
     self:create_test_entities()
 
+    -- Center camera on first player unit
+    self:center_camera_on_player()
+
     Events.emit(Events.EVENTS.GAME_START)
+end
+
+-- Center camera on first player-owned unit
+function Game:center_camera_on_player()
+    if not self.render_system or not self.world then return end
+
+    local entities = self.world:get_all_entities()
+    for _, entity in ipairs(entities) do
+        local owner = entity:get("owner")
+        local transform = entity:get("transform")
+        if owner and owner.house == self.player_house and transform then
+            -- Convert lepton position to pixels
+            local px = transform.x / Constants.PIXEL_LEPTON_W
+            local py = transform.y / Constants.PIXEL_LEPTON_H
+
+            -- Center camera (offset by half screen)
+            local screen_w, screen_h = love.graphics.getDimensions()
+            local cam_x = px - screen_w / 2
+            local cam_y = py - screen_h / 2
+
+            -- Clamp to map bounds if we have grid info
+            if self.grid then
+                local max_x = self.grid.width * Constants.CELL_PIXEL_W - screen_w
+                local max_y = self.grid.height * Constants.CELL_PIXEL_H - screen_h
+                cam_x = math.max(0, math.min(cam_x, max_x))
+                cam_y = math.max(0, math.min(cam_y, max_y))
+            end
+
+            self.render_system:set_camera(cam_x, cam_y)
+            return
+        end
+    end
 end
 
 -- Create test entities for development
 function Game:create_test_entities()
-    local Component = ECS.Component
+    -- Keep it very simple for now
+    self.player_credits = 5000
 
-    -- Create a few test units
-    for i = 1, 5 do
-        local entity = self.world:create_entity()
-
-        -- Position randomly on map
-        local cell_x = 10 + i * 3
-        local cell_y = 10
-
-        entity:add("transform", Component.create("transform", {
-            x = cell_x * Constants.LEPTON_PER_CELL + Constants.LEPTON_PER_CELL / 2,
-            y = cell_y * Constants.LEPTON_PER_CELL + Constants.LEPTON_PER_CELL / 2,
-            cell_x = cell_x,
-            cell_y = cell_y,
-            facing = 0
-        }))
-
-        entity:add("renderable", Component.create("renderable", {
-            visible = true,
-            layer = Constants.LAYER.GROUND,
-            color = {0.2, 0.6, 0.2, 1}  -- Green for GDI
-        }))
-
-        entity:add("selectable", Component.create("selectable"))
-
-        entity:add("mobile", Component.create("mobile", {
-            speed = 20,  -- Leptons per tick
-            locomotor = "track"
-        }))
-
-        entity:add("health", Component.create("health", {
-            hp = 100,
-            max_hp = 100
-        }))
-
-        entity:add("owner", Component.create("owner", {
-            house = Constants.HOUSE.GOOD,
-            color = Constants.PLAYER_COLOR.GOLD
-        }))
-
-        entity:add("vehicle", Component.create("vehicle", {
-            vehicle_type = "MTANK"
-        }))
-
-        entity:add_tag("unit")
-        entity:add_tag("vehicle")
-
-        self.world:add_entity(entity)
+    -- Set camera to origin
+    if self.render_system then
+        self.render_system:set_camera(0, 0)
     end
-
-    -- Create an enemy unit
-    local enemy = self.world:create_entity()
-    enemy:add("transform", Component.create("transform", {
-        x = 30 * Constants.LEPTON_PER_CELL + Constants.LEPTON_PER_CELL / 2,
-        y = 15 * Constants.LEPTON_PER_CELL + Constants.LEPTON_PER_CELL / 2,
-        cell_x = 30,
-        cell_y = 15
-    }))
-    enemy:add("renderable", Component.create("renderable", {
-        visible = true,
-        layer = Constants.LAYER.GROUND,
-        color = {0.8, 0.2, 0.2, 1}  -- Red for Nod
-    }))
-    enemy:add("selectable", Component.create("selectable"))
-    enemy:add("health", Component.create("health", {
-        hp = 80,
-        max_hp = 100
-    }))
-    enemy:add("owner", Component.create("owner", {
-        house = Constants.HOUSE.BAD,
-        color = Constants.PLAYER_COLOR.RED
-    }))
-    enemy:add_tag("unit")
-    self.world:add_entity(enemy)
 end
 
 -- Update game
@@ -342,6 +309,7 @@ function Game:update(dt)
     -- Update sidebar in any playing state
     if self.state == Game.STATE.PLAYING or self.state == Game.STATE.PAUSED then
         if self.sidebar then
+            self.sidebar:set_credits(self.player_credits)
             self.sidebar:update(dt)
         end
     end
@@ -387,7 +355,11 @@ end
 -- Draw game
 function Game:draw()
     if self.state == Game.STATE.PLAYING or self.state == Game.STATE.PAUSED then
-        -- Draw terrain
+        -- Debug: Always draw a test background
+        love.graphics.setColor(0.15, 0.25, 0.15, 1)
+        love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+
+        -- Draw terrain first (under everything)
         self:draw_terrain()
 
         -- Draw entities
@@ -440,37 +412,43 @@ end
 
 -- Draw terrain
 function Game:draw_terrain()
+    -- Draw a dark green background first (no transforms)
+    love.graphics.setColor(0.1, 0.2, 0.1, 1)
+    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+
+    -- Simple terrain draw - just colored rectangles for now
     love.graphics.push()
     love.graphics.scale(self.render_system.scale, self.render_system.scale)
     love.graphics.translate(-self.render_system.camera_x, -self.render_system.camera_y)
 
-    -- Draw visible cells
-    local start_x = self.render_system.view_x
-    local start_y = self.render_system.view_y
-    local end_x = start_x + self.render_system.view_width
-    local end_y = start_y + self.render_system.view_height
+    -- Calculate visible cells
+    local screen_w, screen_h = love.graphics.getDimensions()
+    local cam_cell_x = math.floor(self.render_system.camera_x / Constants.CELL_PIXEL_W)
+    local cam_cell_y = math.floor(self.render_system.camera_y / Constants.CELL_PIXEL_H)
+    local cells_x = math.ceil(screen_w / Constants.CELL_PIXEL_W) + 2
+    local cells_y = math.ceil(screen_h / Constants.CELL_PIXEL_H) + 2
 
-    for y = start_y, end_y do
-        for x = start_x, end_x do
+    for y = math.max(0, cam_cell_y), math.min(self.grid.height - 1, cam_cell_y + cells_y) do
+        for x = math.max(0, cam_cell_x), math.min(self.grid.width - 1, cam_cell_x + cells_x) do
             local cell = self.grid:get_cell(x, y)
             if cell then
                 local px = x * Constants.CELL_PIXEL_W
                 local py = y * Constants.CELL_PIXEL_H
 
-                -- Draw terrain tile
-                local tile = self.theater:get_tile(cell.template_type, cell.template_icon)
-                if tile then
-                    love.graphics.setColor(1, 1, 1, 1)
-                    love.graphics.draw(tile, px, py)
-                end
+                -- Draw terrain as colored rectangle
+                local r = 0.3 + (x % 2) * 0.05
+                local g = 0.5 + (y % 2) * 0.05
+                love.graphics.setColor(r, g, 0.2, 1)
+                love.graphics.rectangle("fill", px, py, Constants.CELL_PIXEL_W, Constants.CELL_PIXEL_H)
 
-                -- Draw overlay (tiberium, etc.)
-                if cell.overlay >= 0 then
-                    local overlay = self.theater:get_overlay(cell.overlay)
-                    if overlay then
-                        love.graphics.setColor(1, 1, 1, 0.7)
-                        love.graphics.draw(overlay, px, py)
-                    end
+                -- Grid outline
+                love.graphics.setColor(0.2, 0.35, 0.15, 1)
+                love.graphics.rectangle("line", px, py, Constants.CELL_PIXEL_W, Constants.CELL_PIXEL_H)
+
+                -- Draw tiberium overlay
+                if cell.overlay and cell.overlay >= 0 then
+                    love.graphics.setColor(0.2, 0.9, 0.3, 0.8)
+                    love.graphics.rectangle("fill", px + 4, py + 4, 16, 16)
                 end
             end
         end
@@ -655,17 +633,21 @@ end
 -- Draw debug info
 function Game:draw_debug()
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print(string.format("FPS: %d | Tick: %d | Entities: %d",
+    love.graphics.print(string.format("FPS: %d | Tick: %d | Entities: %d | Credits: $%d",
         love.timer.getFPS(),
         self.tick_count,
-        self.world:entity_count()
+        self.world:entity_count(),
+        self.player_credits
     ), 10, 10)
 
-    love.graphics.print(string.format("Selected: %d",
-        self.selection_system:get_selection_count()
+    love.graphics.print(string.format("Selected: %d | Camera: %.0f, %.0f | Scale: %.2f",
+        self.selection_system:get_selection_count(),
+        self.render_system.camera_x,
+        self.render_system.camera_y,
+        self.render_system.scale
     ), 10, 30)
 
-    love.graphics.print("WASD: Pan camera | Click: Select | Right-click: Move", 10, 50)
+    love.graphics.print("WASD: Pan camera | Click: Select | Right-click: Move | +/-: Zoom", 10, 50)
 end
 
 -- Input handling
@@ -678,6 +660,8 @@ function Game:keypressed(key)
         self:handle_campaign_select_input(key)
     elseif self.state == Game.STATE.SKIRMISH_SETUP then
         self:handle_skirmish_setup_input(key)
+    elseif self.state == Game.STATE.MULTIPLAYER_LOBBY then
+        self:handle_multiplayer_lobby_input(key)
     elseif self.state == Game.STATE.PLAYING then
         self:handle_playing_input(key)
     elseif self.state == Game.STATE.PAUSED then
@@ -777,6 +761,13 @@ function Game:handle_skirmish_setup_input(key)
     end
 end
 
+-- Handle multiplayer lobby input
+function Game:handle_multiplayer_lobby_input(key)
+    if key == "escape" then
+        self.state = Game.STATE.MENU
+    end
+end
+
 -- Handle playing input
 function Game:handle_playing_input(key)
     if key == "escape" then
@@ -795,10 +786,13 @@ function Game:handle_playing_input(key)
     elseif key == "f9" then
         -- Quick load
         self:load_game("quicksave.sav")
+    elseif key == "home" then
+        -- Reset camera to origin
+        self.render_system:set_camera(0, 0)
     end
 
-    -- Camera controls
-    local camera_speed = 200
+    -- Camera controls (24 pixels = 1 cell)
+    local camera_speed = 48  -- 2 cells per keypress
     if key == "w" then
         self.render_system:set_camera(
             self.render_system.camera_x,
@@ -1052,6 +1046,12 @@ end
 
 function Game:mousepressed(x, y, button)
     if self.state == Game.STATE.PLAYING then
+        -- Check sidebar first
+        if self.show_sidebar and self.sidebar then
+            if self.sidebar:mousepressed(x, y, button) then
+                return  -- Sidebar handled the click
+            end
+        end
         self.selection_system:on_mouse_pressed(x, y, button, self.render_system)
     end
 end
@@ -1074,10 +1074,51 @@ function Game:mousereleased(x, y, button)
 end
 
 function Game:handle_right_click(screen_x, screen_y)
+    local world_x, world_y = self.render_system:screen_to_world(screen_x, screen_y)
+
+    -- Check if placing a building from sidebar
+    if self.sidebar and self.sidebar:get_selected_item() then
+        local item = self.sidebar:get_selected_item()
+        local cell_x = math.floor(world_x / Constants.CELL_PIXEL_W)
+        local cell_y = math.floor(world_y / Constants.CELL_PIXEL_H)
+
+        -- Check if this is a building or unit
+        local building_data = self.production_system.building_data[item]
+        local unit_data = self.production_system.unit_data[item]
+
+        if building_data then
+            -- Place building
+            local cost = building_data.cost or 0
+            if self.player_credits >= cost then
+                local entity = self.production_system:create_building(item, self.player_house, cell_x, cell_y)
+                if entity then
+                    self.world:add_entity(entity)
+                    self.player_credits = self.player_credits - cost
+                    self.sidebar:clear_selection()
+                    print(string.format("Built %s at (%d,%d)", item, cell_x, cell_y))
+                end
+            end
+        elseif unit_data then
+            -- Create unit at location
+            local cost = unit_data.cost or 0
+            if self.player_credits >= cost then
+                local dest_x = cell_x * Constants.LEPTON_PER_CELL + Constants.LEPTON_PER_CELL / 2
+                local dest_y = cell_y * Constants.LEPTON_PER_CELL + Constants.LEPTON_PER_CELL / 2
+                local entity = self.production_system:create_unit(item, self.player_house, dest_x, dest_y)
+                if entity then
+                    self.world:add_entity(entity)
+                    self.player_credits = self.player_credits - cost
+                    self.sidebar:clear_selection()
+                    print(string.format("Created %s at (%d,%d)", item, cell_x, cell_y))
+                end
+            end
+        end
+        return
+    end
+
+    -- Normal movement command
     local selected = self.selection_system:get_selected_entities()
     if #selected == 0 then return end
-
-    local world_x, world_y = self.render_system:screen_to_world(screen_x, screen_y)
 
     -- Convert to leptons
     local dest_x = world_x * Constants.PIXEL_LEPTON_W
@@ -1240,7 +1281,7 @@ end
 -- Clean up
 function Game:quit()
     if self.world then
-        self.world:clear()
+        self.world:reset()  -- Full reset on quit
     end
     Events.emit(Events.EVENTS.GAME_END)
 end

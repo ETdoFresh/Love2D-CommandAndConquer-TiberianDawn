@@ -238,9 +238,19 @@ function FogSystem:is_entity_visible(entity)
 end
 
 -- Draw fog overlay
+-- Note: This is called explicitly from game.lua with render_system, NOT from world:draw()
 function FogSystem:draw(render_system)
     if not self.fog_enabled and not self.shroud_enabled then
         return
+    end
+
+    -- Guard: fog_system:draw() is called with render_system, not entities
+    -- If called from world:draw() with entities table, silently return
+    if type(render_system) == "table" and render_system[1] then
+        return  -- Called with entities array, skip
+    end
+    if not render_system or not render_system.camera_x then
+        return  -- Invalid render_system, skip
     end
 
     love.graphics.push()
@@ -254,6 +264,10 @@ function FogSystem:draw(render_system)
 
     local house_vis = self.visibility[self.player_house]
 
+    -- Debug: Track how many cells we're drawing fog for
+    self._debug_unseen_count = 0
+    self._debug_fogged_count = 0
+
     for y = start_y, end_y do
         if house_vis[y] then
             for x = start_x, end_x do
@@ -264,6 +278,7 @@ function FogSystem:draw(render_system)
                 if state == FogSystem.VISIBILITY.UNSEEN then
                     -- Black shroud
                     if self.shroud_enabled then
+                        self._debug_unseen_count = self._debug_unseen_count + 1
                         love.graphics.setColor(0, 0, 0, 1)
                         love.graphics.rectangle("fill", px, py,
                             Constants.CELL_PIXEL_W, Constants.CELL_PIXEL_H)
@@ -271,6 +286,7 @@ function FogSystem:draw(render_system)
                 elseif state == FogSystem.VISIBILITY.FOGGED then
                     -- Semi-transparent fog
                     if self.fog_enabled then
+                        self._debug_fogged_count = self._debug_fogged_count + 1
                         love.graphics.setColor(0, 0, 0, 0.5)
                         love.graphics.rectangle("fill", px, py,
                             Constants.CELL_PIXEL_W, Constants.CELL_PIXEL_H)

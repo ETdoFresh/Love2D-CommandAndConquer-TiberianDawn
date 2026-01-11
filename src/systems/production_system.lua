@@ -136,9 +136,35 @@ function ProductionSystem:spawn_unit(factory, item)
     return nil
 end
 
+-- Get color for a house/faction
+function ProductionSystem:get_house_color(house)
+    if house == Constants.HOUSE.GOOD then
+        return {0.9, 0.8, 0.2, 1}  -- GDI Gold/Yellow
+    elseif house == Constants.HOUSE.BAD then
+        return {0.8, 0.2, 0.2, 1}  -- NOD Red
+    elseif house == Constants.HOUSE.NEUTRAL then
+        return {0.6, 0.6, 0.6, 1}  -- Neutral Gray
+    elseif house == Constants.HOUSE.MULTI1 then
+        return {0.2, 0.6, 0.9, 1}  -- Blue
+    elseif house == Constants.HOUSE.MULTI2 then
+        return {0.2, 0.8, 0.2, 1}  -- Green
+    elseif house == Constants.HOUSE.MULTI3 then
+        return {0.9, 0.5, 0.1, 1}  -- Orange
+    elseif house == Constants.HOUSE.MULTI4 then
+        return {0.6, 0.2, 0.8, 1}  -- Purple
+    elseif house == Constants.HOUSE.MULTI5 then
+        return {0.2, 0.8, 0.8, 1}  -- Cyan
+    elseif house == Constants.HOUSE.MULTI6 then
+        return {0.8, 0.4, 0.6, 1}  -- Pink
+    else
+        return {1, 1, 1, 1}  -- Default white
+    end
+end
+
 function ProductionSystem:create_unit(unit_type, house, x, y)
     local data = self.unit_data[unit_type]
     if not data then
+        print("WARNING: Unknown unit type: " .. tostring(unit_type))
         return nil
     end
 
@@ -153,11 +179,15 @@ function ProductionSystem:create_unit(unit_type, house, x, y)
         facing = 0
     }))
 
-    -- Renderable
+    -- Renderable with house color
+    local color = self:get_house_color(house)
+    print(string.format("Creating unit %s for house %s, color: r=%.1f g=%.1f b=%.1f",
+        unit_type, tostring(house), color[1], color[2], color[3]))
     entity:add("renderable", Component.create("renderable", {
         visible = true,
         layer = Constants.LAYER.GROUND,
-        sprite = data.sprite
+        sprite = data.sprite,
+        color = color
     }))
 
     -- Selectable
@@ -245,8 +275,12 @@ end
 function ProductionSystem:create_building(building_type, house, cell_x, cell_y)
     local data = self.building_data[building_type]
     if not data then
+        print("WARNING: Unknown building type: " .. tostring(building_type))
         return nil
     end
+    local color = self:get_house_color(house)
+    print(string.format("Creating building %s for house %s at (%d,%d), color: r=%.1f g=%.1f b=%.1f",
+        building_type, tostring(house), cell_x, cell_y, color[1], color[2], color[3]))
 
     local entity = require("src.ecs.entity").new()
 
@@ -262,13 +296,15 @@ function ProductionSystem:create_building(building_type, house, cell_x, cell_y)
         facing = 0
     }))
 
-    -- Renderable
+    -- Renderable with house color
+    local color = self:get_house_color(house)
     entity:add("renderable", Component.create("renderable", {
         visible = true,
         layer = Constants.LAYER.GROUND,
         sprite = data.sprite,
         scale_x = data.size[1],
-        scale_y = data.size[2]
+        scale_y = data.size[2],
+        color = color
     }))
 
     -- Selectable

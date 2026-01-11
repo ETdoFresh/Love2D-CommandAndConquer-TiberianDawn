@@ -71,6 +71,9 @@ function RenderSystem:set_hd_mode(use_hd)
 end
 
 function RenderSystem:update(dt, entities)
+    -- DEBUG
+    self.last_update_count = entities and #entities or 0
+
     -- Clear layer lists
     for layer_id in pairs(self.layers) do
         self.layers[layer_id] = {}
@@ -136,11 +139,11 @@ function RenderSystem:draw_entity(entity)
     love.graphics.setColor(unpack(renderable.color))
 
     -- Draw sprite or placeholder
-    if renderable.sprite then
-        -- TODO: Draw actual sprite with frame
+    if renderable.sprite and type(renderable.sprite) ~= "string" then
+        -- Draw actual sprite (must be a Love2D Drawable, not a string name)
         love.graphics.draw(renderable.sprite, px, py)
     else
-        -- Draw placeholder rectangle
+        -- Draw placeholder rectangle (also used when sprite is just a name string)
         self:draw_placeholder(entity, px, py)
     end
 
@@ -159,24 +162,69 @@ function RenderSystem:draw_placeholder(entity, px, py)
     local x = px - w / 2
     local y = py - h / 2
 
+    -- Get entity house for color
+    local house = nil
+    if entity:has("owner") then
+        house = entity:get("owner").house
+    end
+
+    -- Determine entity type
+    local is_building = entity:has("building")
+    local is_infantry = entity:has("infantry")
+    local is_vehicle = entity:has("mobile") and not is_infantry
+
     -- Flash effect
     if renderable.flash then
         love.graphics.setColor(1, 1, 1, 0.8)
     end
 
-    -- Draw filled rectangle
-    love.graphics.rectangle("fill", x, y, w, h)
-
-    -- Draw border
-    love.graphics.setColor(0, 0, 0, 1)
-    love.graphics.rectangle("line", x, y, w, h)
+    -- Draw different shapes based on entity type
+    if is_building then
+        -- Buildings: filled rectangle with thicker border
+        love.graphics.rectangle("fill", x, y, w, h)
+        love.graphics.setColor(0.2, 0.2, 0.2, 1)
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", x, y, w, h)
+        love.graphics.setLineWidth(1)
+    elseif is_infantry then
+        -- Infantry: small circle
+        local radius = math.min(w, h) / 3
+        love.graphics.circle("fill", px, py, radius)
+        love.graphics.setColor(0, 0, 0, 1)
+        love.graphics.circle("line", px, py, radius)
+    elseif is_vehicle then
+        -- Vehicles: diamond shape
+        local cx, cy = px, py
+        local hw, hh = w / 2, h / 2
+        local vertices = {
+            cx, cy - hh,      -- top
+            cx + hw, cy,      -- right
+            cx, cy + hh,      -- bottom
+            cx - hw, cy       -- left
+        }
+        love.graphics.polygon("fill", vertices)
+        love.graphics.setColor(0, 0, 0, 1)
+        love.graphics.polygon("line", vertices)
+    else
+        -- Default: rectangle
+        love.graphics.rectangle("fill", x, y, w, h)
+        love.graphics.setColor(0, 0, 0, 1)
+        love.graphics.rectangle("line", x, y, w, h)
+    end
 
     -- Draw selection indicator if selected
     if entity:has("selectable") then
         local selectable = entity:get("selectable")
         if selectable.selected then
             love.graphics.setColor(0, 1, 0, 1)
-            love.graphics.rectangle("line", x - 2, y - 2, w + 4, h + 4)
+            love.graphics.setLineWidth(2)
+            if is_infantry then
+                local radius = math.min(w, h) / 3
+                love.graphics.circle("line", px, py, radius + 3)
+            else
+                love.graphics.rectangle("line", x - 2, y - 2, w + 4, h + 4)
+            end
+            love.graphics.setLineWidth(1)
         end
     end
 

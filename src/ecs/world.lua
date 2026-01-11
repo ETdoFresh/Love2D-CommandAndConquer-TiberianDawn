@@ -216,7 +216,7 @@ function World:emit(event_name, ...)
     self.events:emit(event_name, ...)
 end
 
--- Clear world
+-- Clear world (only entities, preserves systems)
 function World:clear()
     -- Remove all entities
     for _, entity in pairs(self.entities) do
@@ -224,6 +224,15 @@ function World:clear()
     end
     self.entities = {}
     self.to_remove = {}
+
+    -- Note: Systems are preserved - only entities are cleared
+    -- This allows scenario loading without losing render/update systems
+end
+
+-- Full reset including systems (for complete game restart)
+function World:reset()
+    -- Clear entities first
+    self:clear()
 
     -- Cleanup systems
     for _, system in ipairs(self.systems) do

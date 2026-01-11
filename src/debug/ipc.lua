@@ -198,11 +198,28 @@ function IPC:process_command(command)
             response.error = err
         end
 
+    elseif cmd == "click" then
+        -- click <x> <y> [button] - Simulate mouse click
+        local x = tonumber(parts[2])
+        local y = tonumber(parts[3])
+        local button = tonumber(parts[4]) or 1
+        if x and y then
+            if self.game then
+                self.game:mousepressed(x, y, button)
+                self.game:mousereleased(x, y, button)
+            end
+            response.message = string.format("Clicked at (%d, %d) button %d", x, y, button)
+        else
+            response.success = false
+            response.error = "Usage: click <x> <y> [button]"
+        end
+
     elseif cmd == "help" then
         response.commands = {
             "input <key> - Simulate key press",
             "gamepad <button> - Simulate gamepad button",
             "type <text> - Type text string",
+            "click <x> <y> [button] - Simulate mouse click",
             "screenshot [path] - Take screenshot",
             "state - Get game state JSON",
             "pause - Pause game",
