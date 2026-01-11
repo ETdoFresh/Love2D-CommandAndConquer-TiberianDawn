@@ -17,13 +17,18 @@ local tool_mode = false
 
 function love.load(arg)
     -- Check for tool mode (extract, convert-shp, convert-aud)
-    local tool_commands = {extract = true, ["convert-shp"] = true, ["convert-aud"] = true, help = true}
+    local tool_commands = {extract = true, ["convert-shp"] = true, ["convert-aud"] = true, help = true, test = true}
     if arg and #arg > 0 and tool_commands[arg[1]] then
         tool_mode = true
-        local ToolRunner = require("run_tool")
-        ToolRunner.run(arg)
-        print("")
-        print("Press any key to exit or close the window...")
+        if arg[1] == "test" then
+            local test = require("test_tools")
+            test.love_load(arg)
+        else
+            local ToolRunner = require("run_tool")
+            ToolRunner.run(arg)
+        end
+        -- Exit immediately after tool completes
+        love.event.quit()
         return
     end
 

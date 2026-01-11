@@ -203,3 +203,7 @@ end
 function love.keypressed(key)
     love.event.quit()
 end
+
+return {
+    love_load = love.load
+}

@@ -215,12 +215,31 @@ function ToolRunner.show_help()
 end
 
 function ToolRunner.run(args)
+    -- Debug: print args
+    -- for i, v in ipairs(args) do print("arg[" .. i .. "] = " .. tostring(v)) end
+
     if #args == 0 then
         ToolRunner.show_help()
         return
     end
 
     local command = args[1]
+
+    -- Skip if command is "." (Love2D project path)
+    if command == "." then
+        command = args[2]
+        -- Shift args
+        local new_args = {}
+        for i = 2, #args do
+            new_args[i - 1] = args[i]
+        end
+        args = new_args
+    end
+
+    if not command then
+        ToolRunner.show_help()
+        return
+    end
 
     if command == "extract" then
         if #args < 3 then
