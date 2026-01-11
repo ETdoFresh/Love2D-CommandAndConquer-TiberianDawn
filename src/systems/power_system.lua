@@ -91,6 +91,39 @@ function PowerSystem:get_power_level(house)
     end
 end
 
+-- Get production speed multiplier based on power level
+-- In original C&C, low power slows production significantly
+function PowerSystem:get_production_multiplier(house)
+    local ratio = self:get_power_ratio(house)
+
+    if ratio >= 1.0 then
+        return 1.0  -- Full speed
+    elseif ratio >= 0.5 then
+        return 0.5  -- Half speed
+    else
+        return 0.25  -- Quarter speed (critical power)
+    end
+end
+
+-- Check if radar is functional (requires power)
+function PowerSystem:is_radar_active(house)
+    -- Radar requires at least 50% power to function
+    return self:get_power_ratio(house) >= 0.5
+end
+
+-- Get defensive structure fire rate multiplier
+function PowerSystem:get_defense_multiplier(house)
+    local ratio = self:get_power_ratio(house)
+
+    if ratio >= 1.0 then
+        return 1.0  -- Full fire rate
+    elseif ratio >= 0.5 then
+        return 0.75  -- 75% fire rate
+    else
+        return 0.5  -- 50% fire rate (critical)
+    end
+end
+
 -- Hook for when buildings are added/removed
 function PowerSystem:on_entity_added(entity)
     self:recalculate_power()

@@ -4,7 +4,8 @@
 
 local UI = {
     Sidebar = require("src.ui.sidebar"),
-    MainMenu = require("src.ui.main_menu")
+    MainMenu = require("src.ui.main_menu"),
+    Radar = require("src.ui.radar")
 }
 
 return UI

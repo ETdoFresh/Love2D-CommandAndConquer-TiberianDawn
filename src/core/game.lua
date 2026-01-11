@@ -9,6 +9,7 @@ local ECS = require("src.ecs")
 local Map = require("src.map")
 local Systems = require("src.systems")
 local Sidebar = require("src.ui.sidebar")
+local Radar = require("src.ui.radar")
 local Serialize = require("src.util.serialize")
 
 local Game = {}
@@ -74,6 +75,7 @@ function Game.new()
 
     -- UI elements
     self.sidebar = nil
+    self.radar = nil
     self.show_sidebar = true
 
     -- Timing
@@ -188,6 +190,15 @@ function Game:init()
     self.sidebar = Sidebar.new()
     self.sidebar:set_house(self.player_house)
 
+    -- Set callback for unit production from sidebar
+    self.sidebar:set_unit_click_callback(function(unit_type, item)
+        self:start_unit_production(unit_type)
+    end)
+
+    -- Create radar/minimap UI
+    self.radar = Radar.new()
+    self.radar:set_house(self.player_house)
+
     -- Create scenario loader
     local ScenarioLoader = require("src.scenario.loader")
     self.scenario_loader = ScenarioLoader.new(self.world, self.grid, self.production_system)
@@ -244,6 +255,17 @@ function Game:init_systems()
     -- Initialize sidebar with system references
     if self.sidebar then
         self.sidebar:init(self.world)
+    end
+
+    -- Initialize radar with world and grid references
+    if self.radar then
+        self.radar:init(self.world, self.grid)
+        -- Set click callback to move camera
+        self.radar:set_click_callback(function(x, y)
+            if self.render_system then
+                self.render_system:set_camera(x, y)
+            end
+        end)
     end
 end
 
@@ -339,6 +361,21 @@ function Game:create_test_entities()
         -- Construction Yard for the player at cell (3, 3)
         spawn_building("FACT", player, 3, 3)
 
+        -- Power Plant at cell (6, 3) (adjacent to FACT)
+        spawn_building("NUKE", player, 6, 3)
+
+        -- Barracks for infantry production at cell (8, 3) (adjacent to Power Plant)
+        spawn_building("PYLE", player, 8, 3)
+
+        -- Communications Center for radar at cell (10, 3) (adjacent to Barracks)
+        spawn_building("HQ", player, 10, 3)
+
+        -- Weapons Factory for vehicle production at cell (3, 6) (adjacent to FACT)
+        spawn_building("WEAP", player, 3, 6)
+
+        -- Refinery for credits/harvesting at cell (6, 6) (adjacent to Power Plant)
+        spawn_building("PROC", player, 6, 6)
+
         -- Medium Tank
         spawn_unit("MTNK", player, spawn_x, spawn_y)
         -- Humvee
@@ -387,11 +424,18 @@ function Game:update(dt)
     -- Always update gamepad input
     self:update_gamepad(dt)
 
-    -- Update sidebar in any playing state
+    -- Update sidebar and radar in any playing state
     if self.state == Game.STATE.PLAYING or self.state == Game.STATE.PAUSED then
         if self.sidebar then
             self.sidebar:set_credits(self.player_credits)
             self.sidebar:update(dt)
+
+            -- Update production progress display
+            self:update_production_display()
+        end
+
+        if self.radar then
+            self.radar:update(dt)
         end
     end
 
@@ -467,6 +511,26 @@ function Game:draw()
         if self.show_sidebar and self.sidebar then
             self.sidebar:set_position(love.graphics.getWidth() - self.sidebar.width, 0, love.graphics.getHeight())
             self.sidebar:draw()
+        end
+
+        -- Draw radar (position it above the sidebar at bottom-right)
+        if self.show_sidebar and self.radar then
+            local radar_x = love.graphics.getWidth() - self.radar.size - 10
+            local radar_y = love.graphics.getHeight() - self.radar.size - 10
+            self.radar:set_position(radar_x, radar_y)
+
+            -- Get camera and viewport info for radar display
+            local cam_x, cam_y = 0, 0
+            local vw, vh = love.graphics.getWidth(), love.graphics.getHeight()
+            if self.render_system then
+                cam_x = self.render_system.camera_x
+                cam_y = self.render_system.camera_y
+                -- Account for sidebar width in viewport
+                if self.sidebar then
+                    vw = vw - self.sidebar.width
+                end
+            end
+            self.radar:draw(cam_x, cam_y, vw, vh)
         end
 
         -- Draw debug info
@@ -1133,6 +1197,14 @@ function Game:mousepressed(x, y, button)
                 return  -- Sidebar handled the click
             end
         end
+
+        -- Check radar clicks
+        if self.show_sidebar and self.radar then
+            if self.radar:mousepressed(x, y, button) then
+                return  -- Radar handled the click
+            end
+        end
+
         self.selection_system:on_mouse_pressed(x, y, button, self.render_system)
     end
 end
@@ -1166,6 +1238,143 @@ function Game:player_has_buildings()
         end
     end
     return false
+end
+
+-- Find a factory that can build a specific unit type
+function Game:find_factory_for_unit(unit_type)
+    local unit_data = self.production_system.unit_data[unit_type]
+    if not unit_data then return nil end
+
+    local required_factory_type = unit_data.type  -- "infantry", "vehicle", "aircraft"
+
+    local entities = self.world:get_all_entities()
+    for _, entity in ipairs(entities) do
+        if entity:has("production") and entity:has("owner") then
+            local owner = entity:get("owner")
+            local production = entity:get("production")
+
+            if owner.house == self.player_house and
+               production.factory_type == required_factory_type then
+                return entity
+            end
+        end
+    end
+    return nil
+end
+
+-- Find the construction yard for building production
+function Game:find_construction_yard()
+    local entities = self.world:get_all_entities()
+    for _, entity in ipairs(entities) do
+        if entity:has("building") and entity:has("production") and entity:has("owner") then
+            local owner = entity:get("owner")
+            local building = entity:get("building")
+
+            if owner.house == self.player_house and building.structure_type == "FACT" then
+                return entity
+            end
+        end
+    end
+    return nil
+end
+
+-- Start production of a unit at the appropriate factory
+function Game:start_unit_production(unit_type)
+    local factory = self:find_factory_for_unit(unit_type)
+    if not factory then
+        print("No factory available for " .. unit_type)
+        return false
+    end
+
+    local unit_data = self.production_system.unit_data[unit_type]
+    local cost = unit_data.cost or 0
+
+    if self.player_credits < cost then
+        print("Not enough credits for " .. unit_type)
+        return false
+    end
+
+    local success, err = self.production_system:queue_unit(factory, unit_type)
+    if success then
+        self.player_credits = self.player_credits - cost
+        print(string.format("Started production of %s ($%d)", unit_type, cost))
+        return true
+    else
+        print("Cannot build " .. unit_type .. ": " .. (err or "unknown error"))
+        return false
+    end
+end
+
+-- Update sidebar production display
+function Game:update_production_display()
+    if not self.sidebar or not self.production_system then return end
+
+    -- Check building production (construction yard)
+    local cy = self:find_construction_yard()
+    if cy and cy:has("production") then
+        local production = cy:get("production")
+        if #production.queue > 0 then
+            local item = production.queue[1]
+            self.sidebar:set_production_state("building", item.name, production.progress)
+        else
+            self.sidebar:clear_production_state("building")
+        end
+    else
+        self.sidebar:clear_production_state("building")
+    end
+
+    -- Check unit production (find any active factory)
+    local unit_factory = nil
+    local entities = self.world:get_all_entities()
+    for _, entity in ipairs(entities) do
+        if entity:has("production") and entity:has("owner") then
+            local owner = entity:get("owner")
+            local production = entity:get("production")
+
+            if owner.house == self.player_house and
+               production.factory_type ~= nil and
+               production.factory_type ~= "building" and
+               #production.queue > 0 then
+                unit_factory = entity
+                break
+            end
+        end
+    end
+
+    if unit_factory then
+        local production = unit_factory:get("production")
+        local item = production.queue[1]
+        self.sidebar:set_production_state("unit", item.name, production.progress)
+    else
+        self.sidebar:clear_production_state("unit")
+    end
+end
+
+-- Start production of a building at the construction yard
+function Game:start_building_production(building_type)
+    local cy = self:find_construction_yard()
+    if not cy then
+        print("No Construction Yard available")
+        return false
+    end
+
+    local building_data = self.production_system.building_data[building_type]
+    local cost = building_data.cost or 0
+
+    if self.player_credits < cost then
+        print("Not enough credits for " .. building_type)
+        return false
+    end
+
+    local success, err = self.production_system:queue_building(cy, building_type)
+    if success then
+        self.player_credits = self.player_credits - cost
+        print(string.format("Started production of %s ($%d)", building_type, cost))
+        return true
+    else
+        print("Cannot build " .. building_type .. ": " .. (err or "unknown error"))
+        return false
+    end
 end
 
 function Game:handle_right_click(screen_x, screen_y)
@@ -1236,14 +1445,138 @@ function Game:handle_right_click(screen_x, screen_y)
     local dest_x = world_x * Constants.PIXEL_LEPTON_W
     local dest_y = world_y * Constants.PIXEL_LEPTON_H
 
-    -- Issue move command to all selected units
+    -- Check for command modifiers
+    local ctrl_held = love.keyboard.isDown("lctrl", "rctrl")
+    local a_key_held = love.keyboard.isDown("a")
+
+    -- Check if there's a target entity under the click
+    local target_entity = self:get_entity_at_position(dest_x, dest_y)
+
+    if ctrl_held and target_entity then
+        -- Force-fire: Attack the target regardless of allegiance
+        self:issue_force_attack(selected, target_entity)
+        return
+    end
+
+    if ctrl_held and not target_entity then
+        -- Force-fire on ground: Attack ground position
+        self:issue_attack_ground(selected, dest_x, dest_y)
+        return
+    end
+
+    if a_key_held then
+        -- Attack-move: Move to destination but engage enemies along the way
+        self:issue_attack_move(selected, dest_x, dest_y)
+        return
+    end
+
+    -- Normal move command
     for _, entity in ipairs(selected) do
         if entity:has("mobile") then
             self.movement_system:move_to(entity, dest_x, dest_y)
+            -- Clear any attack target when issuing move
+            if entity:has("combat") then
+                entity:get("combat").target = nil
+            end
+            -- Set mission to move
+            if entity:has("mission") then
+                entity:get("mission").mission_type = Constants.MISSION.MOVE
+            end
         end
     end
 
     Events.emit(Events.EVENTS.COMMAND_MOVE, selected, dest_x, dest_y)
+end
+
+-- Get entity at a position (for targeting)
+function Game:get_entity_at_position(lx, ly)
+    local click_radius = Constants.LEPTON_PER_CELL / 2
+    local best_entity = nil
+    local best_dist = click_radius
+
+    local entities = self.world:get_entities_with("transform", "health")
+    for _, entity in ipairs(entities) do
+        local transform = entity:get("transform")
+        local dx = transform.x - lx
+        local dy = transform.y - ly
+        local dist = math.sqrt(dx * dx + dy * dy)
+
+        if dist < best_dist then
+            best_dist = dist
+            best_entity = entity
+        end
+    end
+
+    return best_entity
+end
+
+-- Issue force attack command (attack regardless of allegiance)
+function Game:issue_force_attack(units, target)
+    for _, entity in ipairs(units) do
+        if entity:has("combat") then
+            local combat = entity:get("combat")
+            combat.target = target.id
+            combat.force_fire = true  -- Flag to allow attacking anything
+
+            -- Set mission to attack
+            if entity:has("mission") then
+                entity:get("mission").mission_type = Constants.MISSION.ATTACK
+            end
+
+            -- Move towards target if mobile
+            if entity:has("mobile") then
+                local target_transform = target:get("transform")
+                self.movement_system:move_to(entity, target_transform.x, target_transform.y)
+            end
+        end
+    end
+
+    Events.emit(Events.EVENTS.COMMAND_ATTACK, units, target)
+end
+
+-- Issue attack ground command (attack a position)
+function Game:issue_attack_ground(units, dest_x, dest_y)
+    for _, entity in ipairs(units) do
+        if entity:has("combat") then
+            local combat = entity:get("combat")
+            combat.target = nil
+            combat.attack_ground_x = dest_x
+            combat.attack_ground_y = dest_y
+            combat.force_fire = true
+
+            -- Set mission to attack
+            if entity:has("mission") then
+                entity:get("mission").mission_type = Constants.MISSION.ATTACK
+            end
+
+            -- Move in range if mobile
+            if entity:has("mobile") then
+                self.movement_system:move_to(entity, dest_x, dest_y)
+            end
+        end
+    end
+
+    Events.emit(Events.EVENTS.COMMAND_ATTACK_GROUND, units, dest_x, dest_y)
+end
+
+-- Issue attack-move command (move but engage enemies)
+function Game:issue_attack_move(units, dest_x, dest_y)
+    for _, entity in ipairs(units) do
+        if entity:has("mobile") then
+            local mobile = entity:get("mobile")
+            self.movement_system:move_to(entity, dest_x, dest_y)
+
+            -- Set attack-move flag
+            mobile.attack_move = true
+
+            -- Set mission to hunt (will engage enemies while moving)
+            if entity:has("mission") then
+                entity:get("mission").mission_type = Constants.MISSION.HUNT
+            end
+        end
+    end
+
+    Events.emit(Events.EVENTS.COMMAND_ATTACK_MOVE, units, dest_x, dest_y)
 end
 
 function Game:wheelmoved(x, y)

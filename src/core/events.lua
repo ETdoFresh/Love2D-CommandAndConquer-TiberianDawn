@@ -147,6 +147,8 @@ M.EVENTS = {
     -- Commands
     COMMAND_MOVE = "command:move",
     COMMAND_ATTACK = "command:attack",
+    COMMAND_ATTACK_MOVE = "command:attack_move",
+    COMMAND_ATTACK_GROUND = "command:attack_ground",
     COMMAND_STOP = "command:stop",
     COMMAND_GUARD = "command:guard",
 

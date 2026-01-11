@@ -44,6 +44,8 @@ function Sidebar.new()
     self.unit_progress = 0
     self.building_ready = false
     self.unit_ready = false
+    self.building_in_production = nil  -- Name of building being built
+    self.unit_in_production = nil      -- Name of unit being built
 
     -- House info
     self.house = Constants.HOUSE.GOOD
@@ -196,6 +198,32 @@ function Sidebar:set_credits(credits)
     self.credits = credits
 end
 
+-- Set production state for display
+function Sidebar:set_production_state(production_type, item_name, progress)
+    if production_type == "building" then
+        self.building_in_production = item_name
+        self.building_progress = progress or 0
+        self.building_ready = progress >= 100
+    else
+        self.unit_in_production = item_name
+        self.unit_progress = progress or 0
+        self.unit_ready = progress >= 100
+    end
+end
+
+-- Clear production state
+function Sidebar:clear_production_state(production_type)
+    if production_type == "building" then
+        self.building_in_production = nil
+        self.building_progress = 0
+        self.building_ready = false
+    else
+        self.unit_in_production = nil
+        self.unit_progress = 0
+        self.unit_ready = false
+    end
+end
+
 function Sidebar:draw()
     local x = self.x
     local y = self.y
@@ -217,13 +245,58 @@ function Sidebar:draw()
     local power_y = y + 24
     self:draw_power_bar(x + 4, power_y, self.width - 8)
 
+    -- Production progress display
+    local prod_y = power_y + 16
+    self:draw_production_status(x + 4, prod_y, self.width - 8)
+
     -- Tabs
-    local tabs_y = power_y + 20
+    local tabs_y = prod_y + 28
     self:draw_tabs(x, tabs_y)
 
     -- Items
     local items_y = tabs_y + Sidebar.TABS_HEIGHT + 4
     self:draw_items(x, items_y)
+end
+
+function Sidebar:draw_production_status(x, y, width)
+    -- Show what's currently being produced
+    local item_name = nil
+    local progress = 0
+
+    if self.active_tab == Sidebar.TAB.BUILDINGS then
+        item_name = self.building_in_production
+        progress = self.building_progress
+    else
+        item_name = self.unit_in_production
+        progress = self.unit_progress
+    end
+
+    if item_name then
+        -- Draw production bar background
+        love.graphics.setColor(0.2, 0.2, 0.2, 1)
+        love.graphics.rectangle("fill", x, y, width, 10)
+
+        -- Progress fill
+        local fill_width = (progress / 100) * width
+        if progress >= 100 then
+            love.graphics.setColor(0.2, 0.9, 0.2, 1)  -- Green when ready
+        else
+            love.graphics.setColor(0.2, 0.6, 0.9, 1)  -- Blue while building
+        end
+        love.graphics.rectangle("fill", x, y, fill_width, 10)
+
+        -- Border
+        love.graphics.setColor(0.5, 0.5, 0.5, 1)
+        love.graphics.rectangle("line", x, y, width, 10)
+
+        -- Item name
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.printf(item_name, x, y + 12, width, "center")
+    else
+        -- No production
+        love.graphics.setColor(0.4, 0.4, 0.4, 1)
+        love.graphics.printf("Ready", x, y + 4, width, "center")
+    end
 end
 
 function Sidebar:draw_power_bar(x, y, width)
@@ -238,22 +311,41 @@ function Sidebar:draw_power_bar(x, y, width)
     if self.power_consumed > 0 then
         ratio = self.power_produced / self.power_consumed
     end
-    ratio = math.min(1.0, ratio)
+    local display_ratio = math.min(1.0, ratio)
 
-    -- Power level color
+    -- Power level color and status text
+    local status_text = ""
     if ratio >= 1.0 then
         love.graphics.setColor(0.2, 0.8, 0.2, 1)
+        status_text = "PWR OK"
     elseif ratio >= 0.5 then
         love.graphics.setColor(0.8, 0.8, 0.2, 1)
+        status_text = "LOW PWR"
     else
         love.graphics.setColor(0.8, 0.2, 0.2, 1)
+        status_text = "NO PWR"
     end
 
-    love.graphics.rectangle("fill", x, y, width * ratio, bar_height)
+    love.graphics.rectangle("fill", x, y, width * display_ratio, bar_height)
 
     -- Border
     love.graphics.setColor(0.5, 0.5, 0.5, 1)
     love.graphics.rectangle("line", x, y, width, bar_height)
+
+    -- Power values text (produced/consumed)
+    love.graphics.setColor(0.8, 0.8, 0.8, 1)
+    local power_text = string.format("%d/%d", self.power_produced, self.power_consumed)
+    love.graphics.print(power_text, x + 2, y - 1, 0, 0.7, 0.7)
+
+    -- Status indicator on the right
+    if ratio < 1.0 then
+        -- Flash warning text when power is low
+        local flash = (math.floor(love.timer.getTime() * 3) % 2 == 0)
+        if flash then
+            love.graphics.setColor(1, 0.2, 0.2, 1)
+            love.graphics.printf(status_text, x, y - 1, width - 2, "right", 0, 0.7, 0.7)
+        end
+    end
 end
 
 function Sidebar:draw_tabs(x, y)
@@ -383,7 +475,18 @@ function Sidebar:mousepressed(mx, my, button)
                my >= by and my < by + button_h then
                 -- Clicked on this item
                 if self.credits >= item.cost then
-                    self.selected_item = item.name
+                    -- For buildings, select for placement
+                    -- For units, trigger production callback immediately
+                    if self.active_tab == Sidebar.TAB.BUILDINGS then
+                        self.selected_item = item.name
+                    else
+                        -- Units start production immediately via callback
+                        if self.on_unit_click then
+                            self.on_unit_click(item.name, item)
+                        else
+                            self.selected_item = item.name
+                        end
+                    end
                     return true
                 end
             end
@@ -397,6 +500,11 @@ function Sidebar:mousepressed(mx, my, button)
     end
 
     return true
+end
+
+-- Set callback for unit production
+function Sidebar:set_unit_click_callback(callback)
+    self.on_unit_click = callback
 end
 
 function Sidebar:wheelmoved(x, y)

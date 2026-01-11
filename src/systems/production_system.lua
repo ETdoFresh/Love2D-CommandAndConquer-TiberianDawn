@@ -86,8 +86,19 @@ function ProductionSystem:process_entity(dt, entity)
 
     local item = production.queue[1]
 
-    -- Update progress
-    production.progress = production.progress + (100 / (item.build_time * Constants.TICKS_PER_SECOND))
+    -- Get power multiplier (low power slows production)
+    local power_multiplier = 1.0
+    if entity:has("owner") then
+        local owner = entity:get("owner")
+        local power_system = self.world:get_system("power")
+        if power_system then
+            power_multiplier = power_system:get_production_multiplier(owner.house)
+        end
+    end
+
+    -- Update progress (apply power multiplier)
+    local progress_rate = (100 / (item.build_time * Constants.TICKS_PER_SECOND)) * power_multiplier
+    production.progress = production.progress + progress_rate
 
     -- Check if complete
     if production.progress >= 100 then
@@ -397,6 +408,14 @@ function ProductionSystem:queue_unit(factory, unit_type)
         end
     end
 
+    -- Check prerequisites (OR logic - need any of the factory buildings)
+    if data.prerequisite then
+        local has_prereqs, missing = self:has_prerequisites(factory_owner.house, data.prerequisite, true)
+        if not has_prereqs then
+            return false, missing
+        end
+    end
+
     -- Add to queue (single-item queue in original)
     if #production.queue > 0 then
         return false, "Already building"
@@ -412,6 +431,45 @@ function ProductionSystem:queue_unit(factory, unit_type)
 
     self:emit(Events.EVENTS.PRODUCTION_START, factory, unit_type)
     return true
+end
+
+-- Check if a house has required prerequisites for a building/unit
+-- For buildings: AND logic (all prerequisites required)
+-- For units: OR logic (any prerequisite factory is sufficient)
+function ProductionSystem:has_prerequisites(house, prerequisites, is_unit)
+    if not prerequisites or #prerequisites == 0 then
+        return true
+    end
+
+    -- Get all buildings owned by this house
+    local owned_buildings = {}
+    local buildings = self.world:get_entities_with("building", "owner")
+    for _, building in ipairs(buildings) do
+        local building_owner = building:get("owner")
+        if building_owner.house == house then
+            local building_data = building:get("building")
+            owned_buildings[building_data.structure_type] = true
+        end
+    end
+
+    if is_unit then
+        -- OR logic for units - having ANY prerequisite is sufficient
+        -- e.g., E1 needs PYLE OR HAND (either Barracks or Hand of Nod)
+        for _, prereq in ipairs(prerequisites) do
+            if owned_buildings[prereq] then
+                return true
+            end
+        end
+        return false, "Requires " .. table.concat(prerequisites, " or ")
+    else
+        -- AND logic for buildings - ALL prerequisites required
+        for _, prereq in ipairs(prerequisites) do
+            if not owned_buildings[prereq] then
+                return false, "Requires " .. prereq
+            end
+        end
+        return true
+    end
 end
 
 -- Queue a building for production
@@ -440,6 +498,14 @@ function ProductionSystem:queue_building(construction_yard, building_type)
         end
         if not can_build then
             return false, "House cannot build this structure"
+        end
+    end
+
+    -- Check prerequisites (AND logic - all buildings must be present)
+    if data.prerequisite then
+        local has_prereqs, missing = self:has_prerequisites(owner.house, data.prerequisite, false)
+        if not has_prereqs then
+            return false, missing
         end
     end
 

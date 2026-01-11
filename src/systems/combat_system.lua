@@ -106,8 +106,20 @@ function CombatSystem:attempt_attack(attacker, target)
     local transform = attacker:get("transform")
     local target_transform = target:get("transform")
 
-    -- Check rearm timer
-    if combat.rearm_timer > 0 then
+    -- Check rearm timer (apply power penalty for defensive buildings)
+    local rearm_remaining = combat.rearm_timer
+    if rearm_remaining > 0 then
+        -- Buildings fire slower when power is low
+        if attacker:has("building") and attacker:has("owner") then
+            local owner = attacker:get("owner")
+            local power_system = self.world:get_system("power")
+            if power_system then
+                local defense_mult = power_system:get_defense_multiplier(owner.house)
+                -- Lower multiplier = slower rearm (subtract less per tick)
+                rearm_remaining = rearm_remaining - defense_mult
+                combat.rearm_timer = math.max(0, rearm_remaining)
+            end
+        end
         return false
     end
 
