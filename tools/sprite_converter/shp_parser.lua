@@ -12,8 +12,17 @@
     - For each frame:
       - 3 bytes: offset (24-bit)
       - 1 byte: format flags
-    - Frame data (RLE compressed)
+    - Frame data (RLE/LCW compressed)
+
+    Frame formats:
+    - 0x00: Uncompressed
+    - 0x20: RLE compressed
+    - 0x40: LCW compressed
+    - 0x80: XOR delta (references previous frame)
 ]]
+
+local bit = require("bit")
+local band, bor, bxor, lshift, rshift = bit.band, bit.bor, bit.bxor, bit.lshift, bit.rshift
 
 local ShpParser = {}
 
@@ -33,6 +42,260 @@ end
 local function read_uint32(data, pos)
     local b1, b2, b3, b4 = data:byte(pos, pos + 3)
     return b1 + b2 * 256 + b3 * 65536 + b4 * 16777216, pos + 4
+end
+
+--[[
+    LCW Decompression (Format 80)
+    Reference: CnCTDRAMapEditor/Utility/WWCompression.cs LcwDecompress
+
+    Command codes:
+    - 0b0xxxxxxx: Short copy from output buffer (relative offset)
+    - 0x80:       End of stream
+    - 0b10xxxxxx: Copy raw bytes from input
+    - 0b11xxxxxx: Medium copy from output buffer
+    - 0xFE:       Long RLE fill
+    - 0xFF:       Long copy from output buffer
+]]
+local function lcw_decompress(data, pos, output_size)
+    local output = {}
+    for i = 1, output_size do
+        output[i] = 0
+    end
+
+    local write_pos = 1
+    local read_pos = pos
+    local data_len = #data
+
+    -- Check for relative mode flag (used for >64KB data)
+    local relative = false
+    if data:byte(read_pos) == 0 then
+        relative = true
+        read_pos = read_pos + 1
+    end
+
+    while write_pos <= output_size and read_pos <= data_len do
+        local flag = data:byte(read_pos)
+        read_pos = read_pos + 1
+
+        if band(flag, 0x80) ~= 0 then
+            -- High bit set
+            if band(flag, 0x40) ~= 0 then
+                -- 0b11xxxxxx commands
+                local cpysize = band(flag, 0x3F) + 3
+
+                if flag == 0xFE then
+                    -- Long RLE fill: 0xFE + length(2) + value(1)
+                    if read_pos + 2 > data_len then break end
+                    cpysize = data:byte(read_pos) + data:byte(read_pos + 1) * 256
+                    read_pos = read_pos + 2
+                    local value = data:byte(read_pos)
+                    read_pos = read_pos + 1
+
+                    cpysize = math.min(cpysize, output_size - write_pos + 1)
+                    for i = 1, cpysize do
+                        output[write_pos] = value
+                        write_pos = write_pos + 1
+                    end
+
+                elseif flag == 0xFF then
+                    -- Long copy from output: 0xFF + length(2) + offset(2)
+                    if read_pos + 3 > data_len then break end
+                    cpysize = data:byte(read_pos) + data:byte(read_pos + 1) * 256
+                    read_pos = read_pos + 2
+                    local offset = data:byte(read_pos) + data:byte(read_pos + 1) * 256
+                    read_pos = read_pos + 2
+
+                    local src_pos
+                    if relative then
+                        src_pos = write_pos - offset
+                    else
+                        src_pos = offset + 1  -- Convert to 1-based
+                    end
+
+                    cpysize = math.min(cpysize, output_size - write_pos + 1)
+                    for i = 1, cpysize do
+                        if src_pos >= 1 and src_pos <= output_size then
+                            output[write_pos] = output[src_pos]
+                        end
+                        write_pos = write_pos + 1
+                        src_pos = src_pos + 1
+                    end
+
+                else
+                    -- Medium copy from output: 0b11xxxxxx + offset(2)
+                    if read_pos + 1 > data_len then break end
+                    local offset = data:byte(read_pos) + data:byte(read_pos + 1) * 256
+                    read_pos = read_pos + 2
+
+                    local src_pos
+                    if relative then
+                        src_pos = write_pos - offset
+                    else
+                        src_pos = offset + 1  -- Convert to 1-based
+                    end
+
+                    cpysize = math.min(cpysize, output_size - write_pos + 1)
+                    for i = 1, cpysize do
+                        if src_pos >= 1 and src_pos <= output_size then
+                            output[write_pos] = output[src_pos]
+                        end
+                        write_pos = write_pos + 1
+                        src_pos = src_pos + 1
+                    end
+                end
+            else
+                -- 0b10xxxxxx commands
+                if flag == 0x80 then
+                    -- End of stream
+                    break
+                end
+
+                -- Short copy from input: copy (flag & 0x3F) bytes
+                local cpysize = band(flag, 0x3F)
+                cpysize = math.min(cpysize, output_size - write_pos + 1)
+                for i = 1, cpysize do
+                    if read_pos <= data_len then
+                        output[write_pos] = data:byte(read_pos)
+                        read_pos = read_pos + 1
+                        write_pos = write_pos + 1
+                    end
+                end
+            end
+        else
+            -- 0b0xxxxxxx: Short relative copy from output
+            local cpysize = rshift(flag, 4) + 3
+            if read_pos > data_len then break end
+            local offset = lshift(band(flag, 0x0F), 8) + data:byte(read_pos)
+            read_pos = read_pos + 1
+
+            cpysize = math.min(cpysize, output_size - write_pos + 1)
+            for i = 1, cpysize do
+                local src_pos = write_pos - offset
+                if src_pos >= 1 and src_pos <= output_size then
+                    output[write_pos] = output[src_pos]
+                end
+                write_pos = write_pos + 1
+            end
+        end
+    end
+
+    return output
+end
+
+--[[
+    XOR Delta Decompression (Format 40)
+    Applies XOR differences to a base frame
+
+    Command codes:
+    - 0x00:       End marker (when followed by 0x00 0x00) or XOR fill
+    - 0x01-0x7F:  XOR next N bytes
+    - 0x80:       Extended command prefix
+    - 0x81-0xFF:  Skip N-0x80 bytes
+]]
+local function xor_decompress(data, pos, base_frame, output_size)
+    local output = {}
+    -- Copy base frame
+    for i = 1, output_size do
+        output[i] = base_frame[i] or 0
+    end
+
+    local write_pos = 1
+    local read_pos = pos
+    local data_len = #data
+
+    while write_pos <= output_size and read_pos <= data_len do
+        local cmd = data:byte(read_pos)
+        read_pos = read_pos + 1
+
+        if cmd == 0 then
+            -- 0x00: Could be end marker or XOR fill
+            if read_pos > data_len then break end
+            local next_byte = data:byte(read_pos)
+
+            if next_byte == 0 then
+                -- End marker: 0x00 0x00
+                break
+            else
+                -- XOR fill: 0x00 + count + value
+                read_pos = read_pos + 1
+                if read_pos > data_len then break end
+                local count = next_byte
+                local value = data:byte(read_pos)
+                read_pos = read_pos + 1
+
+                for i = 1, count do
+                    if write_pos <= output_size then
+                        output[write_pos] = bxor(output[write_pos], value)
+                        write_pos = write_pos + 1
+                    end
+                end
+            end
+
+        elseif cmd >= 1 and cmd <= 0x7F then
+            -- XOR next cmd bytes
+            for i = 1, cmd do
+                if read_pos <= data_len and write_pos <= output_size then
+                    output[write_pos] = bxor(output[write_pos], data:byte(read_pos))
+                    read_pos = read_pos + 1
+                    write_pos = write_pos + 1
+                end
+            end
+
+        elseif cmd == 0x80 then
+            -- Extended command
+            if read_pos + 1 > data_len then break end
+            local count_lo = data:byte(read_pos)
+            local count_hi = data:byte(read_pos + 1)
+            read_pos = read_pos + 2
+
+            if count_lo == 0 and count_hi == 0 then
+                -- End marker: 0x80 0x00 0x00
+                break
+            end
+
+            local count = count_lo + band(count_hi, 0x3F) * 256
+            local cmd_type = band(count_hi, 0xC0)
+
+            if cmd_type == 0x00 or cmd_type == 0x80 then
+                -- Extended skip (0x00) or extended XOR (0x80)
+                if cmd_type == 0x00 then
+                    -- Skip
+                    write_pos = write_pos + count
+                else
+                    -- XOR next count bytes
+                    for i = 1, count do
+                        if read_pos <= data_len and write_pos <= output_size then
+                            output[write_pos] = bxor(output[write_pos], data:byte(read_pos))
+                            read_pos = read_pos + 1
+                            write_pos = write_pos + 1
+                        end
+                    end
+                end
+            elseif cmd_type == 0xC0 then
+                -- Extended XOR fill
+                if read_pos > data_len then break end
+                local value = data:byte(read_pos)
+                read_pos = read_pos + 1
+
+                for i = 1, count do
+                    if write_pos <= output_size then
+                        output[write_pos] = bxor(output[write_pos], value)
+                        write_pos = write_pos + 1
+                    end
+                end
+            else
+                -- cmd_type == 0x40: Extended skip (alternate)
+                write_pos = write_pos + count
+            end
+
+        else
+            -- 0x81-0xFF: Skip (cmd - 0x80) bytes
+            local skip = cmd - 0x80
+            write_pos = write_pos + skip
+        end
+    end
+
+    return output
 end
 
 -- Parse SHP file header
@@ -83,7 +346,8 @@ function ShpParser.parse(data)
 end
 
 -- Decode a single frame to pixel data
-function ShpParser.decode_frame(shp, frame_index)
+-- prev_frame: previous frame's pixels (needed for XOR delta format)
+function ShpParser.decode_frame(shp, frame_index, prev_frame)
     if frame_index < 1 or frame_index > shp.frame_count then
         return nil, "Invalid frame index"
     end
@@ -92,10 +356,11 @@ function ShpParser.decode_frame(shp, frame_index)
     local data = shp.raw_data
     local width = shp.width
     local height = shp.height
+    local pixel_count = width * height
 
     -- Create pixel buffer (palette indices)
     local pixels = {}
-    for i = 1, width * height do
+    for i = 1, pixel_count do
         pixels[i] = 0  -- Transparent by default
     end
 
@@ -103,12 +368,17 @@ function ShpParser.decode_frame(shp, frame_index)
     local format = frame.format
 
     if format == 0x80 then
-        -- Format 80: XOR with previous frame (skip for now)
+        -- Format 80: XOR with previous frame
+        if prev_frame then
+            pixels = xor_decompress(data, frame.offset, prev_frame, pixel_count)
+        end
         return pixels, nil
+
     elseif format == 0x40 then
         -- Format 40: LCW compressed
-        -- TODO: Implement LCW decompression
+        pixels = lcw_decompress(data, frame.offset, pixel_count)
         return pixels, nil
+
     elseif format == 0x20 then
         -- Format 20: RLE compressed
         local pos = frame.offset

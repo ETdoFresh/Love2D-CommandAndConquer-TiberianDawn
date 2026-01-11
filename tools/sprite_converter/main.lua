@@ -7,6 +7,7 @@
 
 local ShpParser = require("tools.sprite_converter.shp_parser")
 local Palette = require("tools.sprite_converter.palette")
+local PngEncoder = require("tools.sprite_converter.png_encoder")
 
 local function create_spritesheet(shp, palette, cols)
     cols = cols or 8  -- Frames per row
@@ -26,8 +27,10 @@ local function create_spritesheet(shp, palette, cols)
     end
 
     -- Decode and place each frame
+    local prev_frame = nil
     for frame_idx = 1, frame_count do
-        local frame_pixels = ShpParser.decode_frame(shp, frame_idx)
+        local frame_pixels = ShpParser.decode_frame(shp, frame_idx, prev_frame)
+        prev_frame = frame_pixels  -- Store for XOR delta frames
         if frame_pixels then
             -- Calculate position in spritesheet
             local col = (frame_idx - 1) % cols
@@ -77,9 +80,8 @@ local function create_spritesheet(shp, palette, cols)
 end
 
 local function write_png_data(sheet)
-    -- This creates raw RGBA data that could be used with Love2D's ImageData
-    -- For standalone use, we'd need a PNG encoder library
-    return string.char(unpack(sheet.pixels))
+    -- Encode as PNG using pure Lua encoder
+    return PngEncoder.encode(sheet.width, sheet.height, sheet.pixels)
 end
 
 local function main(args)
@@ -146,14 +148,17 @@ local function main(args)
 
     -- Write output
     print("Writing output...")
-    local raw_data = write_png_data(sheet)
+    local png_data = write_png_data(sheet)
 
-    -- For now, write raw RGBA data (would need PNG encoder for actual PNG)
-    local out_file = io.open(output_png .. ".rgba", "wb")
+    -- Write PNG file
+    local out_file = io.open(output_png, "wb")
     if out_file then
-        out_file:write(raw_data)
+        out_file:write(png_data)
         out_file:close()
-        print("Wrote raw RGBA data to: " .. output_png .. ".rgba")
+        print("Wrote PNG to: " .. output_png)
+    else
+        print("Error: Could not write to: " .. output_png)
+        return 1
     end
 
     -- Write metadata JSON
