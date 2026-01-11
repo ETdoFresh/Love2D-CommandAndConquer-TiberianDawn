@@ -66,13 +66,6 @@ local function lcw_decompress(data, pos, output_size)
     local read_pos = pos
     local data_len = #data
 
-    -- Check for relative mode flag (used for >64KB data)
-    local relative = false
-    if data:byte(read_pos) == 0 then
-        relative = true
-        read_pos = read_pos + 1
-    end
-
     while write_pos <= output_size and read_pos <= data_len do
         local flag = data:byte(read_pos)
         read_pos = read_pos + 1
@@ -99,18 +92,15 @@ local function lcw_decompress(data, pos, output_size)
 
                 elseif flag == 0xFF then
                     -- Long copy from output: 0xFF + length(2) + offset(2)
+                    -- Offset is ABSOLUTE from start of output buffer
                     if read_pos + 3 > data_len then break end
                     cpysize = data:byte(read_pos) + data:byte(read_pos + 1) * 256
                     read_pos = read_pos + 2
                     local offset = data:byte(read_pos) + data:byte(read_pos + 1) * 256
                     read_pos = read_pos + 2
 
-                    local src_pos
-                    if relative then
-                        src_pos = write_pos - offset
-                    else
-                        src_pos = offset + 1  -- Convert to 1-based
-                    end
+                    -- Absolute offset from start (1-based in Lua)
+                    local src_pos = offset + 1
 
                     cpysize = math.min(cpysize, output_size - write_pos + 1)
                     for i = 1, cpysize do
@@ -123,16 +113,13 @@ local function lcw_decompress(data, pos, output_size)
 
                 else
                     -- Medium copy from output: 0b11xxxxxx + offset(2)
+                    -- Offset is ABSOLUTE from start of output buffer
                     if read_pos + 1 > data_len then break end
                     local offset = data:byte(read_pos) + data:byte(read_pos + 1) * 256
                     read_pos = read_pos + 2
 
-                    local src_pos
-                    if relative then
-                        src_pos = write_pos - offset
-                    else
-                        src_pos = offset + 1  -- Convert to 1-based
-                    end
+                    -- Absolute offset from start (1-based in Lua)
+                    local src_pos = offset + 1
 
                     cpysize = math.min(cpysize, output_size - write_pos + 1)
                     for i = 1, cpysize do
@@ -150,8 +137,10 @@ local function lcw_decompress(data, pos, output_size)
                     break
                 end
 
-                -- Short copy from input: copy (flag & 0x3F) bytes
+                -- Copy from input: copy (flag & 0x3F) bytes directly
+                -- Note: Count is x, not x+1 (checked against original asm)
                 local cpysize = band(flag, 0x3F)
+                if cpysize == 0 then cpysize = 64 end  -- 0 means 64
                 cpysize = math.min(cpysize, output_size - write_pos + 1)
                 for i = 1, cpysize do
                     if read_pos <= data_len then
@@ -162,7 +151,8 @@ local function lcw_decompress(data, pos, output_size)
                 end
             end
         else
-            -- 0b0xxxxxxx: Short relative copy from output
+            -- 0b0xxxxxxx: Short RELATIVE copy from output
+            -- n=0xxxyyyy,yyyyyyyy: back y bytes and run x+3
             local cpysize = rshift(flag, 4) + 3
             if read_pos > data_len then break end
             local offset = lshift(band(flag, 0x0F), 8) + data:byte(read_pos)
@@ -298,7 +288,23 @@ local function xor_decompress(data, pos, base_frame, output_size)
     return output
 end
 
--- Parse SHP file header
+-- Parse SHP file (Tiberian Dawn format)
+-- Based on: https://moddingwiki.shikadi.net/wiki/Westwood_SHP_Format_(TD)
+--
+-- Header (14 bytes):
+--   Frames (2 bytes) - Number of frames
+--   XPos (2 bytes) - X offset (ignored)
+--   YPos (2 bytes) - Y offset (ignored)
+--   Width (2 bytes) - Width of frames
+--   Height (2 bytes) - Height of frames
+--   DeltaSize (2 bytes) - Largest decompression buffer needed
+--   Flags (2 bytes) - Palette and option flags
+--
+-- Frame Table (8 bytes per entry, Frames+2 entries):
+--   DataOffset (3 bytes) - Points to compressed frame data
+--   DataFormat (1 byte) - 0x80=LCW, 0x40=XOR Base, 0x20=XOR Chain
+--   ReferenceOffset (3 bytes) - Referenced frame offset or frame number
+--   ReferenceFormat (1 byte) - Reference compression format
 function ShpParser.parse(data)
     if #data < 14 then
         return nil, "File too small"
@@ -307,15 +313,17 @@ function ShpParser.parse(data)
     local pos = 1
     local shp = {}
 
+    -- Read header
     shp.frame_count, pos = read_uint16(data, pos)
-    shp.unknown1, pos = read_uint16(data, pos)
-    shp.unknown2, pos = read_uint16(data, pos)
+    shp.x_pos, pos = read_uint16(data, pos)
+    shp.y_pos, pos = read_uint16(data, pos)
     shp.width, pos = read_uint16(data, pos)
     shp.height, pos = read_uint16(data, pos)
-    shp.largest_frame, pos = read_uint32(data, pos)
+    shp.delta_size, pos = read_uint16(data, pos)
+    shp.flags, pos = read_uint16(data, pos)
 
     -- Validate
-    if shp.frame_count == 0 or shp.frame_count > 1000 then
+    if shp.frame_count == 0 or shp.frame_count > 2000 then
         return nil, "Invalid frame count: " .. shp.frame_count
     end
 
@@ -323,20 +331,26 @@ function ShpParser.parse(data)
         return nil, "Invalid dimensions: " .. shp.width .. "x" .. shp.height
     end
 
-    -- Read frame offsets
+    -- Read frame table (8 bytes per entry, Frames+2 entries)
     shp.frames = {}
-    for i = 1, shp.frame_count do
-        local offset, format_byte
-        offset, pos = read_uint24(data, pos)
-        format_byte = data:byte(pos)
+    for i = 1, shp.frame_count + 2 do
+        local data_offset, data_format, ref_offset, ref_format
+
+        data_offset, pos = read_uint24(data, pos)
+        data_format = data:byte(pos)
+        pos = pos + 1
+        ref_offset, pos = read_uint24(data, pos)
+        ref_format = data:byte(pos)
         pos = pos + 1
 
-        shp.frames[i] = {
-            offset = offset + 1,  -- Convert to 1-based
-            format = format_byte,
-            data = nil,
-            pixels = nil
-        }
+        if i <= shp.frame_count then
+            shp.frames[i] = {
+                offset = data_offset + 1,  -- Convert to 1-based
+                format = data_format,
+                ref_offset = ref_offset,
+                ref_format = ref_format
+            }
+        end
     end
 
     -- Store raw data for frame extraction
@@ -347,6 +361,7 @@ end
 
 -- Decode a single frame to pixel data
 -- prev_frame: previous frame's pixels (needed for XOR delta format)
+-- Format: 0x80=LCW, 0x40=XOR Base (refs LCW frame), 0x20=XOR Chain (refs XOR Base)
 function ShpParser.decode_frame(shp, frame_index, prev_frame)
     if frame_index < 1 or frame_index > shp.frame_count then
         return nil, "Invalid frame index"
@@ -364,8 +379,53 @@ function ShpParser.decode_frame(shp, frame_index, prev_frame)
         pixels[i] = 0  -- Transparent by default
     end
 
-    -- Get frame format
-    local format = frame.format
+    local format = frame.format or 0
+
+    if format == 0x80 then
+        -- LCW compressed frame
+        pixels = lcw_decompress(data, frame.offset, pixel_count)
+    elseif format == 0x40 or format == 0x20 then
+        -- XOR frames (0x40 = XOR Base, 0x20 = XOR Chain)
+        if prev_frame then
+            pixels = xor_decompress(data, frame.offset, prev_frame, pixel_count)
+        end
+    elseif format == 0x00 then
+        -- Uncompressed (raw pixel data)
+        local pos = frame.offset
+        for i = 1, pixel_count do
+            if pos <= #data then
+                pixels[i] = data:byte(pos)
+                pos = pos + 1
+            end
+        end
+    else
+        -- Unknown format - try LCW as fallback
+        pixels = lcw_decompress(data, frame.offset, pixel_count)
+    end
+
+    return pixels, nil
+end
+
+-- Legacy decode function kept for compatibility - redirects to new format
+function ShpParser.decode_frame_legacy(shp, frame_index, prev_frame)
+    if frame_index < 1 or frame_index > shp.frame_count then
+        return nil, "Invalid frame index"
+    end
+
+    local frame = shp.frames[frame_index]
+    local data = shp.raw_data
+    local width = shp.width
+    local height = shp.height
+    local pixel_count = width * height
+
+    -- Create pixel buffer (palette indices)
+    local pixels = {}
+    for i = 1, pixel_count do
+        pixels[i] = 0  -- Transparent by default
+    end
+
+    -- Get frame format (old style)
+    local format = frame.format or 0
 
     if format == 0x80 then
         -- Format 80: XOR with previous frame

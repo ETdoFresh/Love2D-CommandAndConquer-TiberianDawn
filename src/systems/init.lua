@@ -7,6 +7,7 @@ local Systems = {
     RenderSystem = require("src.systems.render_system"),
     SelectionSystem = require("src.systems.selection_system"),
     MovementSystem = require("src.systems.movement_system"),
+    AnimationSystem = require("src.systems.animation_system"),
 
     -- Combat
     CombatSystem = require("src.systems.combat_system"),

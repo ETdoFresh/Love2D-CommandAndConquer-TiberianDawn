@@ -16,13 +16,16 @@ local ipc = nil
 local tool_mode = false
 
 function love.load(arg)
-    -- Check for tool mode (extract, convert-shp, convert-aud)
-    local tool_commands = {extract = true, ["convert-shp"] = true, ["convert-aud"] = true, help = true, test = true}
+    -- Check for tool mode (extract, convert-shp, convert-aud, extract_assets)
+    local tool_commands = {extract = true, ["convert-shp"] = true, ["convert-aud"] = true, help = true, test = true, extract_assets = true}
     if arg and #arg > 0 and tool_commands[arg[1]] then
         tool_mode = true
         if arg[1] == "test" then
             local test = require("test_tools")
             test.love_load(arg)
+        elseif arg[1] == "extract_assets" then
+            local extract = require("tools.extract_assets")
+            extract.main()
         else
             local ToolRunner = require("run_tool")
             ToolRunner.run(arg)

@@ -142,6 +142,10 @@ function Game:init()
     self.movement_system:set_priority(20)
     self.world:add_system(self.movement_system)
 
+    self.animation_system = Systems.AnimationSystem.new()
+    self.animation_system:set_priority(85)  -- After movement, before render
+    self.world:add_system(self.animation_system)
+
     -- Create Phase 2 systems (Combat & AI)
     self.combat_system = Systems.CombatSystem.new()
     self.combat_system:set_priority(30)
@@ -298,6 +302,45 @@ function Game:create_test_entities()
     -- Set camera to origin
     if self.render_system then
         self.render_system:set_camera(0, 0)
+    end
+
+    -- Create some test units to show sprite rendering
+    if self.production_system and self.world then
+        -- Create GDI units (player house 1)
+        -- Position in leptons (256 leptons = 1 cell)
+        local spawn_x = 5 * Constants.LEPTON_PER_CELL
+        local spawn_y = 5 * Constants.LEPTON_PER_CELL
+        local cell_spacing = 2 * Constants.LEPTON_PER_CELL  -- 2 cells apart
+
+        -- Helper to create and add to world
+        local function spawn_unit(unit_type, house, x, y)
+            local e = self.production_system:create_unit(unit_type, house, x, y)
+            if e then self.world:add_entity(e) end
+        end
+
+        local function spawn_building(building_type, house, cell_x, cell_y)
+            local e = self.production_system:create_building(building_type, house, cell_x, cell_y)
+            if e then self.world:add_entity(e) end
+        end
+
+        -- Create player units (GDI = house 0)
+        local player = Constants.HOUSE.GOOD
+        local enemy = Constants.HOUSE.BAD
+
+        -- Medium Tank
+        spawn_unit("MTNK", player, spawn_x, spawn_y)
+        -- Humvee
+        spawn_unit("JEEP", player, spawn_x + cell_spacing, spawn_y)
+        -- APC
+        spawn_unit("APC", player, spawn_x + cell_spacing * 2, spawn_y)
+        -- Harvester
+        spawn_unit("HARV", player, spawn_x, spawn_y + cell_spacing)
+        -- Infantry
+        spawn_unit("E1", player, spawn_x + cell_spacing, spawn_y + cell_spacing)
+        spawn_unit("E2", player, spawn_x + cell_spacing + 128, spawn_y + cell_spacing)
+
+        -- Nod building at cell (15, 5)
+        spawn_building("HAND", enemy, 15, 5)
     end
 end
 

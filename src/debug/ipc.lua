@@ -243,11 +243,11 @@ function IPC:process_pending_inputs()
     -- Process keyboard inputs
     while #self.pending_keys > 0 do
         local key = table.remove(self.pending_keys, 1)
-        -- Simulate key press and release
+        -- Simulate key press - only call game.keypressed
+        -- (don't call love.keypressed as that would double the input)
         if self.game then
             self.game:keypressed(key)
         end
-        love.keypressed(key)
     end
 
     -- Process gamepad inputs

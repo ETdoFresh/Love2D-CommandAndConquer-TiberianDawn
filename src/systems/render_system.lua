@@ -5,6 +5,7 @@
 
 local System = require("src.ecs.system")
 local Constants = require("src.core.constants")
+local SpriteLoader = require("src.graphics.sprite_loader")
 
 local RenderSystem = setmetatable({}, {__index = System})
 RenderSystem.__index = RenderSystem
@@ -38,6 +39,12 @@ end
 function RenderSystem:init()
     -- Calculate initial viewport
     self:update_viewport()
+
+    -- Get sprite loader instance
+    self.sprite_loader = SpriteLoader.get_instance()
+
+    -- Preload sprites (optional, can be done lazily)
+    -- self.sprite_loader:preload_all()
 end
 
 function RenderSystem:update_viewport()
@@ -71,9 +78,6 @@ function RenderSystem:set_hd_mode(use_hd)
 end
 
 function RenderSystem:update(dt, entities)
-    -- DEBUG
-    self.last_update_count = entities and #entities or 0
-
     -- Clear layer lists
     for layer_id in pairs(self.layers) do
         self.layers[layer_id] = {}
@@ -132,18 +136,46 @@ function RenderSystem:draw_entity(entity)
     local py = transform.y / Constants.PIXEL_LEPTON_H
 
     -- Apply offset
-    px = px + renderable.offset_x
-    py = py + renderable.offset_y
+    px = px + (renderable.offset_x or 0)
+    py = py + (renderable.offset_y or 0)
 
     -- Apply color/tint
-    love.graphics.setColor(unpack(renderable.color))
+    local color = renderable.color or {1, 1, 1, 1}
+    love.graphics.setColor(unpack(color))
 
-    -- Draw sprite or placeholder
-    if renderable.sprite and type(renderable.sprite) ~= "string" then
-        -- Draw actual sprite (must be a Love2D Drawable, not a string name)
+    -- Check if we have a sprite name string that we can load
+    local sprite_name = renderable.sprite
+    local drawn = false
+
+    if sprite_name and type(sprite_name) == "string" and self.sprite_loader then
+        -- Try to draw using sprite loader
+        local frame = renderable.frame or 0
+        local rotation = transform.rotation or 0
+
+        -- Draw sprite using quad
+        local sheet = self.sprite_loader:get_sheet(sprite_name)
+        local quad = self.sprite_loader:get_quad(sprite_name, frame)
+        local meta = self.sprite_loader:get_metadata(sprite_name)
+
+        if sheet and quad and meta then
+            -- Center the sprite on position
+            local ox = meta.frame_width / 2
+            local oy = meta.frame_height / 2
+
+            -- Draw the sprite
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.draw(sheet, quad, px, py, rotation, 1, 1, ox, oy)
+
+            drawn = true
+        end
+    elseif renderable.sprite and type(renderable.sprite) ~= "string" then
+        -- Draw actual Love2D Drawable (legacy support)
         love.graphics.draw(renderable.sprite, px, py)
-    else
-        -- Draw placeholder rectangle (also used when sprite is just a name string)
+        drawn = true
+    end
+
+    -- Fall back to placeholder if sprite couldn't be drawn
+    if not drawn then
         self:draw_placeholder(entity, px, py)
     end
 

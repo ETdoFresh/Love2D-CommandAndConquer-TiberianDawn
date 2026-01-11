@@ -15,33 +15,48 @@
 
 local MixFormat = {}
 
--- CRC32 lookup table (precomputed)
-local crc_table = {}
-for i = 0, 255 do
-    local crc = i
-    for _ = 1, 8 do
-        if crc % 2 == 1 then
-            crc = bit.bxor(bit.rshift(crc, 1), 0xEDB88320)
-        else
-            crc = bit.rshift(crc, 1)
-        end
+-- C&C Tiberian Dawn uses a rolling hash for filename lookup
+-- Reference: OpenRA PackageEntry.cs HashFilename function
+-- Algorithm: Pad to 4-byte boundary, uppercase, then for each 4-byte chunk (little-endian),
+-- rotate result left by 1 and add chunk value
+function MixFormat.crc(str)
+    str = str:upper()  -- C&C uses uppercase filenames
+
+    -- Pad string to multiple of 4 bytes with null characters
+    local padding = (4 - (#str % 4)) % 4
+    local padded = str .. string.rep("\0", padding)
+
+    local result = 0
+
+    -- Process 4 bytes at a time (little-endian order - x86 memory layout)
+    for i = 1, #padded, 4 do
+        local b1 = padded:byte(i) or 0
+        local b2 = padded:byte(i + 1) or 0
+        local b3 = padded:byte(i + 2) or 0
+        local b4 = padded:byte(i + 3) or 0
+
+        -- Little-endian 32-bit value (as read from x86 memory)
+        local chunk = b1 + b2 * 256 + b3 * 65536 + b4 * 16777216
+
+        -- Rotate left by 1: (result << 1) | (result >> 31)
+        -- Use bor to combine shifted parts for proper rotation
+        local rotated = bit.bor(bit.lshift(result, 1), bit.rshift(result, 31))
+        -- Mask to 32-bit before addition to avoid overflow
+        rotated = bit.band(rotated, 0xFFFFFFFF)
+        -- Add chunk and mask to 32-bit
+        result = bit.band(rotated + chunk, 0xFFFFFFFF)
     end
-    crc_table[i] = crc
+
+    -- Convert to unsigned (mask off sign extension)
+    if result < 0 then
+        result = result + 0x100000000
+    end
+
+    return result
 end
 
--- Calculate CRC32 of a string (for filename lookup)
-function MixFormat.crc32(str)
-    str = str:lower()
-    local crc = 0xFFFFFFFF
-
-    for i = 1, #str do
-        local byte = str:byte(i)
-        local index = bit.band(bit.bxor(crc, byte), 0xFF)
-        crc = bit.bxor(bit.rshift(crc, 8), crc_table[index])
-    end
-
-    return bit.bxor(crc, 0xFFFFFFFF)
-end
+-- Legacy alias for compatibility
+MixFormat.crc32 = MixFormat.crc
 
 -- Read a little-endian 16-bit unsigned integer
 local function read_uint16(file)
@@ -143,7 +158,7 @@ end
 
 -- Extract a file by filename
 function MixFormat.extract_by_name(mix, filename)
-    local crc = MixFormat.crc32(filename)
+    local crc = MixFormat.crc(filename)
     return MixFormat.extract_by_crc(mix, crc)
 end
 
