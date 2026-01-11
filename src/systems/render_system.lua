@@ -1,0 +1,228 @@
+--[[
+    Render System - Draws entities to screen
+    Handles layered rendering and camera transformation
+]]
+
+local System = require("src.ecs.system")
+local Constants = require("src.core.constants")
+
+local RenderSystem = setmetatable({}, {__index = System})
+RenderSystem.__index = RenderSystem
+
+function RenderSystem.new()
+    local self = System.new("render", {"transform", "renderable"})
+    setmetatable(self, RenderSystem)
+
+    -- Camera/viewport settings
+    self.camera_x = 0
+    self.camera_y = 0
+    self.scale = 1
+    self.use_hd = false
+
+    -- Viewport bounds (in cells)
+    self.view_x = 0
+    self.view_y = 0
+    self.view_width = 0
+    self.view_height = 0
+
+    -- Render layers
+    self.layers = {
+        [Constants.LAYER.GROUND] = {},
+        [Constants.LAYER.AIR] = {},
+        [Constants.LAYER.TOP] = {}
+    }
+
+    return self
+end
+
+function RenderSystem:init()
+    -- Calculate initial viewport
+    self:update_viewport()
+end
+
+function RenderSystem:update_viewport()
+    local screen_w, screen_h = love.graphics.getDimensions()
+
+    -- Calculate visible cells based on scale
+    local cell_w = Constants.CELL_PIXEL_W * self.scale
+    local cell_h = Constants.CELL_PIXEL_H * self.scale
+
+    self.view_width = math.ceil(screen_w / cell_w) + 2
+    self.view_height = math.ceil(screen_h / cell_h) + 2
+end
+
+function RenderSystem:set_camera(x, y)
+    self.camera_x = x
+    self.camera_y = y
+
+    -- Update viewport cell bounds
+    self.view_x = math.floor(x / (Constants.CELL_PIXEL_W * self.scale))
+    self.view_y = math.floor(y / (Constants.CELL_PIXEL_H * self.scale))
+end
+
+function RenderSystem:set_scale(scale)
+    self.scale = scale
+    self:update_viewport()
+end
+
+function RenderSystem:set_hd_mode(use_hd)
+    self.use_hd = use_hd
+    -- TODO: Swap sprite sets
+end
+
+function RenderSystem:update(dt, entities)
+    -- Clear layer lists
+    for layer_id in pairs(self.layers) do
+        self.layers[layer_id] = {}
+    end
+
+    -- Sort entities into layers
+    for _, entity in ipairs(entities) do
+        local renderable = entity:get("renderable")
+        if renderable.visible then
+            local layer = renderable.layer or Constants.LAYER.GROUND
+            table.insert(self.layers[layer], entity)
+        end
+    end
+
+    -- Sort each layer by Y position (painter's algorithm)
+    for layer_id, layer_entities in pairs(self.layers) do
+        table.sort(layer_entities, function(a, b)
+            local ta = a:get("transform")
+            local tb = b:get("transform")
+            return ta.y < tb.y
+        end)
+    end
+end
+
+function RenderSystem:draw(entities)
+    love.graphics.push()
+
+    -- Apply camera transform
+    love.graphics.scale(self.scale, self.scale)
+    love.graphics.translate(-self.camera_x, -self.camera_y)
+
+    -- Draw each layer in order
+    self:draw_layer(Constants.LAYER.GROUND)
+    self:draw_layer(Constants.LAYER.AIR)
+    self:draw_layer(Constants.LAYER.TOP)
+
+    love.graphics.pop()
+end
+
+function RenderSystem:draw_layer(layer_id)
+    local layer_entities = self.layers[layer_id] or {}
+
+    for _, entity in ipairs(layer_entities) do
+        self:draw_entity(entity)
+    end
+end
+
+function RenderSystem:draw_entity(entity)
+    local transform = entity:get("transform")
+    local renderable = entity:get("renderable")
+
+    if not renderable.visible then return end
+
+    -- Convert lepton position to pixels
+    local px = transform.x / Constants.PIXEL_LEPTON_W
+    local py = transform.y / Constants.PIXEL_LEPTON_H
+
+    -- Apply offset
+    px = px + renderable.offset_x
+    py = py + renderable.offset_y
+
+    -- Apply color/tint
+    love.graphics.setColor(unpack(renderable.color))
+
+    -- Draw sprite or placeholder
+    if renderable.sprite then
+        -- TODO: Draw actual sprite with frame
+        love.graphics.draw(renderable.sprite, px, py)
+    else
+        -- Draw placeholder rectangle
+        self:draw_placeholder(entity, px, py)
+    end
+
+    -- Reset color
+    love.graphics.setColor(1, 1, 1, 1)
+end
+
+function RenderSystem:draw_placeholder(entity, px, py)
+    local renderable = entity:get("renderable")
+
+    -- Determine size based on entity type
+    local w = Constants.CELL_PIXEL_W * renderable.scale_x
+    local h = Constants.CELL_PIXEL_H * renderable.scale_y
+
+    -- Center the placeholder on position
+    local x = px - w / 2
+    local y = py - h / 2
+
+    -- Flash effect
+    if renderable.flash then
+        love.graphics.setColor(1, 1, 1, 0.8)
+    end
+
+    -- Draw filled rectangle
+    love.graphics.rectangle("fill", x, y, w, h)
+
+    -- Draw border
+    love.graphics.setColor(0, 0, 0, 1)
+    love.graphics.rectangle("line", x, y, w, h)
+
+    -- Draw selection indicator if selected
+    if entity:has("selectable") then
+        local selectable = entity:get("selectable")
+        if selectable.selected then
+            love.graphics.setColor(0, 1, 0, 1)
+            love.graphics.rectangle("line", x - 2, y - 2, w + 4, h + 4)
+        end
+    end
+
+    -- Draw health bar if has health
+    if entity:has("health") then
+        local health = entity:get("health")
+        local hp_ratio = health.hp / health.max_hp
+        local bar_w = w
+        local bar_h = 3
+        local bar_y = y - bar_h - 2
+
+        -- Background
+        love.graphics.setColor(0, 0, 0, 0.5)
+        love.graphics.rectangle("fill", x, bar_y, bar_w, bar_h)
+
+        -- Health bar
+        if hp_ratio > 0.5 then
+            love.graphics.setColor(0, 1, 0, 1)
+        elseif hp_ratio > 0.25 then
+            love.graphics.setColor(1, 1, 0, 1)
+        else
+            love.graphics.setColor(1, 0, 0, 1)
+        end
+        love.graphics.rectangle("fill", x, bar_y, bar_w * hp_ratio, bar_h)
+    end
+end
+
+-- Convert screen coordinates to world coordinates
+function RenderSystem:screen_to_world(screen_x, screen_y)
+    local world_x = (screen_x / self.scale) + self.camera_x
+    local world_y = (screen_y / self.scale) + self.camera_y
+    return world_x, world_y
+end
+
+-- Convert world coordinates to screen coordinates
+function RenderSystem:world_to_screen(world_x, world_y)
+    local screen_x = (world_x - self.camera_x) * self.scale
+    local screen_y = (world_y - self.camera_y) * self.scale
+    return screen_x, screen_y
+end
+
+-- Check if a world position is visible on screen
+function RenderSystem:is_visible(world_x, world_y)
+    local screen_w, screen_h = love.graphics.getDimensions()
+    local sx, sy = self:world_to_screen(world_x, world_y)
+    return sx >= 0 and sx < screen_w and sy >= 0 and sy < screen_h
+end
+
+return RenderSystem
