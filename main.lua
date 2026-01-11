@@ -10,7 +10,9 @@
 
 -- Global game instance
 local Game = require("src.core.game")
+local IPC = require("src.debug.ipc")
 local game = nil
+local ipc = nil
 
 function love.load()
     -- Set random seed
@@ -22,6 +24,9 @@ function love.load()
     -- Create and initialize game
     game = Game.new()
     game:init()
+
+    -- Initialize IPC system for CLI control
+    ipc = IPC.new(game)
 
     -- Print startup info
     print("===========================================")
@@ -53,6 +58,11 @@ function love.load()
 end
 
 function love.update(dt)
+    -- Update IPC system (check for commands)
+    if ipc then
+        ipc:update(dt)
+    end
+
     if game then
         game:update(dt)
     end
@@ -129,6 +139,11 @@ function love.joystickremoved(joystick)
 end
 
 function love.quit()
+    -- Cleanup IPC
+    if ipc then
+        ipc:cleanup()
+    end
+
     if game then
         game:quit()
     end
