@@ -13,8 +13,20 @@ local Game = require("src.core.game")
 local IPC = require("src.debug.ipc")
 local game = nil
 local ipc = nil
+local tool_mode = false
 
-function love.load()
+function love.load(arg)
+    -- Check for tool mode (extract, convert-shp, convert-aud)
+    local tool_commands = {extract = true, ["convert-shp"] = true, ["convert-aud"] = true, help = true}
+    if arg and #arg > 0 and tool_commands[arg[1]] then
+        tool_mode = true
+        local ToolRunner = require("run_tool")
+        ToolRunner.run(arg)
+        print("")
+        print("Press any key to exit or close the window...")
+        return
+    end
+
     -- Set random seed
     math.randomseed(os.time())
 
@@ -58,6 +70,8 @@ function love.load()
 end
 
 function love.update(dt)
+    if tool_mode then return end
+
     -- Update IPC system (check for commands)
     if ipc then
         ipc:update(dt)
@@ -69,12 +83,24 @@ function love.update(dt)
 end
 
 function love.draw()
+    if tool_mode then
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.print("Tool mode - see console for output", 20, 20)
+        love.graphics.print("Press any key to exit...", 20, 40)
+        return
+    end
+
     if game then
         game:draw()
     end
 end
 
 function love.keypressed(key)
+    if tool_mode then
+        love.event.quit()
+        return
+    end
+
     if key == "f11" then
         -- Toggle fullscreen
         love.window.setFullscreen(not love.window.getFullscreen())

@@ -179,6 +179,13 @@ function IPC:process_command(command)
         local code = command:sub(6) -- skip "eval "
         local fn, err = loadstring(code)
         if fn then
+            -- Set up environment with access to game
+            setfenv(fn, setmetatable({
+                game = self.game,
+                ipc = self,
+                love = love,
+                print = print
+            }, {__index = _G}))
             local ok, result = pcall(fn)
             if ok then
                 response.result = tostring(result)
