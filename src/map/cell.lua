@@ -5,6 +5,9 @@
 
 local Constants = require("src.core.constants")
 
+-- LuaJIT bit operations (compatible with Love2D)
+local bit = bit or bit32 or require("bit")
+
 local Cell = {}
 Cell.__index = Cell
 
@@ -92,7 +95,7 @@ end
 
 -- Check if infantry can occupy a sub-position
 function Cell:is_spot_free(spot_flag)
-    return (self.flags & spot_flag) == 0
+    return bit.band(self.flags, spot_flag) == 0
 end
 
 -- Get a free infantry spot
@@ -108,17 +111,17 @@ end
 
 -- Set a flag
 function Cell:set_flag(flag)
-    self.flags = self.flags | flag
+    self.flags = bit.bor(self.flags, flag)
 end
 
 -- Clear a flag
 function Cell:clear_flag(flag)
-    self.flags = self.flags & (~flag)
+    self.flags = bit.band(self.flags, bit.bnot(flag))
 end
 
 -- Check if flag is set
 function Cell:has_flag_set(flag)
-    return (self.flags & flag) ~= 0
+    return bit.band(self.flags, flag) ~= 0
 end
 
 -- Set visibility for a house

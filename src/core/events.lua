@@ -163,6 +163,11 @@ M.EVENTS = {
     -- Combat
     UNIT_ATTACKED = "combat:attacked",
     UNIT_KILLED = "combat:killed",
+    ENTITY_ATTACKED = "combat:entity_attacked",
+
+    -- Unit/Building lifecycle
+    UNIT_BUILT = "unit:built",
+    BUILDING_BUILT = "building:built",
 
     -- Economy
     CREDITS_CHANGED = "economy:credits",

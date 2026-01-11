@@ -37,8 +37,18 @@ function love.load()
     print("  Right click - Move command")
     print("  1-9 - Select control group")
     print("  Ctrl+1-9 - Assign control group")
-    print("  ESC - Pause")
-    print("  SPACE - Start game (from menu)")
+    print("  TAB - Toggle sidebar")
+    print("  ESC - Pause/Menu")
+    print("  F5 - Quick save")
+    print("  F9 - Quick load")
+    print("")
+    print("Gamepad Controls:")
+    print("  Left stick - Move cursor")
+    print("  Right stick - Pan camera")
+    print("  A button - Select/Confirm")
+    print("  X button - Move command")
+    print("  Start - Pause")
+    print("  LB/RB - Zoom out/in")
     print("")
 end
 
@@ -97,6 +107,24 @@ end
 function love.resize(w, h)
     if game then
         game:resize(w, h)
+    end
+end
+
+function love.gamepadpressed(joystick, button)
+    if game then
+        game:gamepadpressed(joystick, button)
+    end
+end
+
+function love.joystickadded(joystick)
+    print("Gamepad connected: " .. joystick:getName())
+end
+
+function love.joystickremoved(joystick)
+    print("Gamepad disconnected")
+    if game and game.gamepad == joystick then
+        game.gamepad = nil
+        game.use_gamepad_cursor = false
     end
 end
 
