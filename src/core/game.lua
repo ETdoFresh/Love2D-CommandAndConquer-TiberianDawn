@@ -320,12 +320,24 @@ function Game:create_test_entities()
 
         local function spawn_building(building_type, house, cell_x, cell_y)
             local e = self.production_system:create_building(building_type, house, cell_x, cell_y)
-            if e then self.world:add_entity(e) end
+            if e then
+                self.world:add_entity(e)
+                -- Mark cells as occupied
+                local building_data = self.production_system.building_data[building_type]
+                if building_data and self.grid then
+                    local size_x = building_data.size and building_data.size[1] or 1
+                    local size_y = building_data.size and building_data.size[2] or 1
+                    self.grid:place_building(cell_x, cell_y, size_x, size_y, e.id, house)
+                end
+            end
         end
 
         -- Create player units (GDI = house 0)
         local player = Constants.HOUSE.GOOD
         local enemy = Constants.HOUSE.BAD
+
+        -- Construction Yard for the player at cell (3, 3)
+        spawn_building("FACT", player, 3, 3)
 
         -- Medium Tank
         spawn_unit("MTNK", player, spawn_x, spawn_y)
@@ -341,6 +353,32 @@ function Game:create_test_entities()
 
         -- Nod building at cell (15, 5)
         spawn_building("HAND", enemy, 15, 5)
+
+        -- Create Tiberium fields
+        if self.grid then
+            -- Create a tiberium field near the player base
+            local tib_start_x, tib_start_y = 10, 8
+            for dy = 0, 4 do
+                for dx = 0, 5 do
+                    local cell = self.grid:get_cell(tib_start_x + dx, tib_start_y + dy)
+                    if cell then
+                        -- Random tiberium density (overlay 6-17)
+                        cell.overlay = 6 + math.random(0, 5)
+                    end
+                end
+            end
+
+            -- Create another tiberium field further away
+            local tib2_x, tib2_y = 20, 12
+            for dy = 0, 3 do
+                for dx = 0, 4 do
+                    local cell = self.grid:get_cell(tib2_x + dx, tib2_y + dy)
+                    if cell then
+                        cell.overlay = 6 + math.random(0, 8)
+                    end
+                end
+            end
+        end
     end
 end
 
@@ -1116,6 +1154,20 @@ function Game:mousereleased(x, y, button)
     end
 end
 
+-- Check if player has any buildings
+function Game:player_has_buildings()
+    local entities = self.world:get_all_entities()
+    for _, entity in ipairs(entities) do
+        if entity:has("building") and entity:has("owner") then
+            local owner = entity:get("owner")
+            if owner.house == self.player_house then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 function Game:handle_right_click(screen_x, screen_y)
     local world_x, world_y = self.render_system:screen_to_world(screen_x, screen_y)
 
@@ -1133,12 +1185,29 @@ function Game:handle_right_click(screen_x, screen_y)
             -- Place building
             local cost = building_data.cost or 0
             if self.player_credits >= cost then
-                local entity = self.production_system:create_building(item, self.player_house, cell_x, cell_y)
-                if entity then
-                    self.world:add_entity(entity)
-                    self.player_credits = self.player_credits - cost
-                    self.sidebar:clear_selection()
-                    print(string.format("Built %s at (%d,%d)", item, cell_x, cell_y))
+                -- Check placement validity (with adjacency requirement)
+                local size_x = building_data.size and building_data.size[1] or 1
+                local size_y = building_data.size and building_data.size[2] or 1
+
+                -- First building doesn't require adjacency (construction yard/MCV deploy)
+                local has_buildings = self:player_has_buildings()
+                local can_place, reason = self.grid:can_place_building(
+                    cell_x, cell_y, size_x, size_y,
+                    self.player_house, has_buildings
+                )
+
+                if can_place then
+                    local entity = self.production_system:create_building(item, self.player_house, cell_x, cell_y)
+                    if entity then
+                        self.world:add_entity(entity)
+                        -- Mark cells as occupied
+                        self.grid:place_building(cell_x, cell_y, size_x, size_y, entity.id, self.player_house)
+                        self.player_credits = self.player_credits - cost
+                        self.sidebar:clear_selection()
+                        print(string.format("Built %s at (%d,%d)", item, cell_x, cell_y))
+                    end
+                else
+                    print(string.format("Cannot place %s: %s", item, reason or "invalid location"))
                 end
             end
         elseif unit_data then

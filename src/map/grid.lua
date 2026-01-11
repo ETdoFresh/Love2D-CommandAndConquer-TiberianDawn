@@ -205,7 +205,8 @@ function Grid:reveal_area(center_x, center_y, radius, house)
 end
 
 -- Check if a building can be placed
-function Grid:can_place_building(x, y, width, height, house)
+function Grid:can_place_building(x, y, width, height, house, require_adjacent)
+    -- First check if all cells are clear
     for dy = 0, height - 1 do
         for dx = 0, width - 1 do
             local cell = self:get_cell(x + dx, y + dy)
@@ -218,21 +219,55 @@ function Grid:can_place_building(x, y, width, height, house)
             if cell:has_flag_set(Cell.FLAG.VEHICLE) then
                 return false, "Cell occupied by vehicle"
             end
-            -- Check terrain passability
-            -- TODO: Add terrain checking
+            -- Check for tiberium (can't build on tiberium)
+            if cell:has_tiberium() then
+                return false, "Cannot build on Tiberium"
+            end
         end
     end
+
+    -- Check adjacency to friendly buildings (if required)
+    if require_adjacent then
+        local is_adjacent = false
+
+        -- Check all cells around the building footprint
+        for dy = -1, height do
+            for dx = -1, width do
+                -- Skip interior cells
+                if dx >= 0 and dx < width and dy >= 0 and dy < height then
+                    goto continue
+                end
+
+                local cell = self:get_cell(x + dx, y + dy)
+                if cell and cell:has_flag_set(Cell.FLAG.BUILDING) then
+                    -- Found adjacent building - check owner
+                    if cell.owner == house or cell.owner == -1 then
+                        is_adjacent = true
+                        break
+                    end
+                end
+                ::continue::
+            end
+            if is_adjacent then break end
+        end
+
+        if not is_adjacent then
+            return false, "Must place adjacent to existing buildings"
+        end
+    end
+
     return true
 end
 
 -- Place a building (mark cells)
-function Grid:place_building(x, y, width, height, entity_id)
+function Grid:place_building(x, y, width, height, entity_id, house)
     for dy = 0, height - 1 do
         for dx = 0, width - 1 do
             local cell = self:get_cell(x + dx, y + dy)
             if cell then
                 cell:set_flag(Cell.FLAG.BUILDING)
                 cell.occupier = entity_id
+                cell.owner = house or -1
             end
         end
     end
