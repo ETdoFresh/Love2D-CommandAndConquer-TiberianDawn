@@ -380,29 +380,139 @@ function HarvestSystem:process_harvester(dt, entity)
     end
 end
 
+-- Dock states for harvester at refinery (matches original BUILDING.CPP)
+HarvestSystem.DOCK_STATE = {
+    APPROACHING = 0,   -- Moving to dock cell
+    DOCKING = 1,       -- Animation of entering dock
+    UNLOADING = 2,     -- Actively unloading tiberium
+    UNDOCKING = 3,     -- Animation of leaving dock
+    COMPLETE = 4       -- Ready to return to harvesting
+}
+
 function HarvestSystem:process_at_refinery(entity, harvester, refinery, owner)
-    -- Dock timer for animation
-    if harvester.dock_timer > 0 then
-        harvester.dock_timer = harvester.dock_timer - 1
-        return
+    -- Initialize dock state if not set
+    if not harvester.dock_state then
+        harvester.dock_state = HarvestSystem.DOCK_STATE.APPROACHING
     end
 
-    -- Unload tiberium
-    if harvester.tiberium_load > 0 then
-        local unload = math.min(harvester.tiberium_load, HarvestSystem.UNLOAD_RATE)
-        harvester.tiberium_load = harvester.tiberium_load - unload
+    local ref_transform = refinery:get("transform")
+    local transform = entity:get("transform")
 
-        -- Add credits
-        local credits_earned = unload * HarvestSystem.TIBERIUM_VALUE
-        self:add_credits(owner.house, credits_earned)
-    else
-        -- Done unloading, go back to harvesting
+    if harvester.dock_state == HarvestSystem.DOCK_STATE.APPROACHING then
+        -- Check if we've reached the dock cell (refinery entrance)
+        local dock_x, dock_y = self:get_refinery_dock_cell(refinery)
+        local harvester_cell_x = math.floor(transform.x / Constants.LEPTON_PER_CELL)
+        local harvester_cell_y = math.floor(transform.y / Constants.LEPTON_PER_CELL)
+
+        if harvester_cell_x == dock_x and harvester_cell_y == dock_y then
+            -- Arrived at dock, start docking animation
+            harvester.dock_state = HarvestSystem.DOCK_STATE.DOCKING
+            harvester.dock_timer = 15  -- ~1 second docking animation
+            Events.emit("HARVESTER_DOCKING", entity, refinery)
+        end
+        -- Otherwise, movement system will continue moving us to dock
+
+    elseif harvester.dock_state == HarvestSystem.DOCK_STATE.DOCKING then
+        -- Docking animation timer
+        if harvester.dock_timer > 0 then
+            harvester.dock_timer = harvester.dock_timer - 1
+        else
+            -- Docking complete, start unloading
+            harvester.dock_state = HarvestSystem.DOCK_STATE.UNLOADING
+            -- Mark refinery as occupied
+            if refinery:has("building") then
+                refinery:get("building").harvester_docked = entity.id
+            end
+        end
+
+    elseif harvester.dock_state == HarvestSystem.DOCK_STATE.UNLOADING then
+        -- Unload tiberium
+        if harvester.tiberium_load > 0 then
+            local unload = math.min(harvester.tiberium_load, HarvestSystem.UNLOAD_RATE)
+            harvester.tiberium_load = harvester.tiberium_load - unload
+
+            -- Add credits (check storage capacity)
+            local credits_earned = unload * HarvestSystem.TIBERIUM_VALUE
+            local current = self.credits[owner.house] or 0
+            local capacity = self.storage[owner.house] or 0
+
+            -- Only add up to storage capacity
+            if capacity > 0 and current + credits_earned > capacity then
+                credits_earned = math.max(0, capacity - current)
+            end
+
+            self:add_credits(owner.house, credits_earned)
+            Events.emit("HARVESTER_UNLOADING", entity, unload, credits_earned)
+        else
+            -- Done unloading, start undocking
+            harvester.dock_state = HarvestSystem.DOCK_STATE.UNDOCKING
+            harvester.dock_timer = 10  -- Undocking animation
+        end
+
+    elseif harvester.dock_state == HarvestSystem.DOCK_STATE.UNDOCKING then
+        if harvester.dock_timer > 0 then
+            harvester.dock_timer = harvester.dock_timer - 1
+        else
+            -- Undocking complete
+            harvester.dock_state = HarvestSystem.DOCK_STATE.COMPLETE
+            -- Clear refinery occupation
+            if refinery:has("building") then
+                refinery:get("building").harvester_docked = nil
+            end
+            Events.emit("HARVESTER_UNDOCKED", entity, refinery)
+        end
+
+    elseif harvester.dock_state == HarvestSystem.DOCK_STATE.COMPLETE then
+        -- Done at refinery, go back to harvesting
         harvester.refinery = nil
+        harvester.dock_state = nil
+        harvester.dock_timer = nil
 
         if entity:has("mission") then
             entity:get("mission").mission_type = Constants.MISSION.HARVEST
         end
     end
+end
+
+-- Get the dock cell position for a refinery (where harvester enters)
+-- Refinery dock is at the bottom-center of the building (original behavior)
+function HarvestSystem:get_refinery_dock_cell(refinery)
+    local transform = refinery:get("transform")
+    local building = refinery:get("building")
+
+    local cell_x = math.floor(transform.x / Constants.LEPTON_PER_CELL)
+    local cell_y = math.floor(transform.y / Constants.LEPTON_PER_CELL)
+
+    -- Refinery is 3x3, dock cell is at bottom center
+    local width = building and building.width or 3
+    local height = building and building.height or 3
+
+    return cell_x + math.floor(width / 2), cell_y + height
+end
+
+-- Check if a refinery is available for docking (not occupied)
+function HarvestSystem:is_refinery_available(refinery)
+    if not refinery or not refinery:is_alive() then
+        return false
+    end
+
+    local building = refinery:get("building")
+    if not building then
+        return false
+    end
+
+    -- Check if another harvester is docked
+    if building.harvester_docked then
+        local docked = self.world:get_entity(building.harvester_docked)
+        if docked and docked:is_alive() then
+            return false  -- Refinery is occupied
+        else
+            -- Docked harvester is dead, clear the reference
+            building.harvester_docked = nil
+        end
+    end
+
+    return true
 end
 
 function HarvestSystem:find_refinery(harvester_entity)
@@ -413,8 +523,13 @@ function HarvestSystem:find_refinery(harvester_entity)
         return nil
     end
 
-    local best_refinery = nil
-    local best_dist = math.huge
+    -- First try to find an available (unoccupied) refinery
+    local best_available = nil
+    local best_available_dist = math.huge
+
+    -- Also track the closest refinery even if occupied (fallback)
+    local best_any = nil
+    local best_any_dist = math.huge
 
     local buildings = self.world:get_entities_with("building", "owner", "transform")
 
@@ -430,15 +545,23 @@ function HarvestSystem:find_refinery(harvester_entity)
                 local dy = building_transform.y - transform.y
                 local dist = dx * dx + dy * dy
 
-                if dist < best_dist then
-                    best_dist = dist
-                    best_refinery = building
+                -- Track closest of any refinery
+                if dist < best_any_dist then
+                    best_any_dist = dist
+                    best_any = building
+                end
+
+                -- Track closest available refinery
+                if self:is_refinery_available(building) and dist < best_available_dist then
+                    best_available_dist = dist
+                    best_available = building
                 end
             end
         end
     end
 
-    return best_refinery
+    -- Prefer available refinery, fall back to any refinery (will queue)
+    return best_available or best_any
 end
 
 function HarvestSystem:find_tiberium(start_x, start_y)

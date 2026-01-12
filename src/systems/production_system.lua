@@ -31,6 +31,10 @@ function ProductionSystem.new()
     -- Production queues per house
     self.queues = {}  -- house_id -> {infantry = {}, vehicle = {}, aircraft = {}, building = {}}
 
+    -- Primary factory tracking per house per factory type (original C&C behavior)
+    -- Units spawn from primary factory, others can queue but don't spawn
+    self.primary_factories = {}  -- house_id -> {infantry = entity_id, vehicle = entity_id, aircraft = entity_id}
+
     return self
 end
 
@@ -128,20 +132,30 @@ function ProductionSystem:process_entity(dt, entity)
     if production.progress >= 100 then
         production.progress = 100
 
-        -- For units, spawn the unit
+        -- For units, spawn from primary factory only (original C&C behavior)
         if item.factory_type ~= "building" then
-            self:spawn_unit(entity, item)
+            -- Only spawn if this is the primary factory for this type
+            local owner = entity:get("owner")
+            local primary = self:get_primary_factory(owner.house, item.factory_type)
+
+            if primary and primary.id == entity.id then
+                self:spawn_unit(entity, item)
+                -- Remove from queue and reset
+                table.remove(production.queue, 1)
+                production.progress = 0
+            else
+                -- Not primary - unit is ready but won't spawn until we become primary
+                -- or the item is manually moved to primary factory's queue
+                production.waiting_for_primary = true
+            end
         else
             -- For buildings, mark as ready to place
             production.ready_to_place = true
             production.placing_type = item.name
+            -- Remove from queue
+            table.remove(production.queue, 1)
+            production.progress = 0
         end
-
-        -- Remove from queue
-        table.remove(production.queue, 1)
-
-        -- Reset progress
-        production.progress = 0
 
         -- Emit completion event
         self:emit(Events.EVENTS.PRODUCTION_COMPLETE, entity, item)
@@ -562,6 +576,123 @@ function ProductionSystem:set_unit_limits(max_units, max_buildings, max_infantry
     self.max_buildings = max_buildings or ProductionSystem.DEFAULT_MAX_BUILDINGS
     self.max_infantry = max_infantry or ProductionSystem.DEFAULT_MAX_INFANTRY
     self.max_aircraft = max_aircraft or ProductionSystem.DEFAULT_MAX_AIRCRAFT
+end
+
+-- Primary Factory Management (original C&C FACTORY.CPP behavior)
+-- Each house can have one primary factory per type (infantry, vehicle, aircraft)
+-- Units spawn from primary factory; if destroyed, auto-assigns next oldest factory
+
+function ProductionSystem:get_primary_factory(house, factory_type)
+    if not self.primary_factories[house] then
+        self.primary_factories[house] = {}
+    end
+
+    local primary_id = self.primary_factories[house][factory_type]
+    if primary_id then
+        local factory = self.world:get_entity(primary_id)
+        if factory and factory:is_alive() then
+            return factory
+        end
+        -- Primary is dead, clear and auto-assign
+        self.primary_factories[house][factory_type] = nil
+    end
+
+    -- Auto-assign primary if none exists
+    local factory = self:find_factory_of_type(house, factory_type)
+    if factory then
+        self:set_primary_factory(factory)
+        return factory
+    end
+
+    return nil
+end
+
+function ProductionSystem:set_primary_factory(factory)
+    if not factory:has("production") or not factory:has("owner") then
+        return false
+    end
+
+    local production = factory:get("production")
+    local owner = factory:get("owner")
+
+    if not self.primary_factories[owner.house] then
+        self.primary_factories[owner.house] = {}
+    end
+
+    -- Clear previous primary's flag
+    local old_primary_id = self.primary_factories[owner.house][production.factory_type]
+    if old_primary_id then
+        local old_factory = self.world:get_entity(old_primary_id)
+        if old_factory and old_factory:is_alive() and old_factory:has("production") then
+            old_factory:get("production").is_primary = false
+        end
+    end
+
+    -- Set new primary
+    self.primary_factories[owner.house][production.factory_type] = factory.id
+    production.is_primary = true
+
+    Events.emit("PRIMARY_FACTORY_SET", factory, owner.house, production.factory_type)
+    return true
+end
+
+function ProductionSystem:find_factory_of_type(house, factory_type)
+    local factories = self.world:get_entities_with("production", "owner")
+    local oldest_factory = nil
+    local oldest_id = math.huge
+
+    for _, factory in ipairs(factories) do
+        local production = factory:get("production")
+        local owner = factory:get("owner")
+
+        if owner.house == house and production.factory_type == factory_type and factory:is_alive() then
+            -- Use entity ID as creation order (lower = older)
+            if factory.id < oldest_id then
+                oldest_id = factory.id
+                oldest_factory = factory
+            end
+        end
+    end
+
+    return oldest_factory
+end
+
+-- Check if factory is primary for its type
+function ProductionSystem:is_primary_factory(factory)
+    if not factory:has("production") or not factory:has("owner") then
+        return false
+    end
+
+    local production = factory:get("production")
+    local owner = factory:get("owner")
+
+    if not self.primary_factories[owner.house] then
+        return false
+    end
+
+    return self.primary_factories[owner.house][production.factory_type] == factory.id
+end
+
+-- Called when a factory building is destroyed - reassigns primary
+function ProductionSystem:on_factory_destroyed(factory)
+    if not factory:has("production") or not factory:has("owner") then
+        return
+    end
+
+    local production = factory:get("production")
+    local owner = factory:get("owner")
+
+    -- Check if this was the primary factory
+    if self:is_primary_factory(factory) then
+        -- Clear current primary
+        self.primary_factories[owner.house][production.factory_type] = nil
+
+        -- Auto-assign new primary
+        local new_primary = self:find_factory_of_type(owner.house, production.factory_type)
+        if new_primary then
+            self:set_primary_factory(new_primary)
+        end
+    end
 end
 
 -- Queue a unit for production

@@ -181,9 +181,118 @@ function TriggerSystem:ensure_house_stats(house)
             units = 0,
             buildings = 0,
             power_output = 0,
-            power_drain = 0
+            power_drain = 0,
+            -- Per-type destruction tracking for campaign triggers
+            destroyed_building_types = {},  -- e.g., {PROC = 2, HAND = 1}
+            destroyed_unit_types = {},      -- e.g., {E1 = 5, MTNK = 2}
+            building_type_counts = {},      -- Current count of each building type
+            unit_type_counts = {}           -- Current count of each unit type
         }
     end
+end
+
+-- Track destruction of specific entity types (for campaign mission objectives)
+function TriggerSystem:track_entity_destroyed(entity, attacker)
+    local owner = entity:has("owner") and entity:get("owner")
+    if not owner then return end
+
+    local house = owner.house
+    self:ensure_house_stats(house)
+    local stats = self.house_stats[house]
+
+    if entity:has("building") then
+        local building = entity:get("building")
+        local btype = building.structure_type or building.building_type
+
+        if btype then
+            -- Track destroyed building type count
+            stats.destroyed_building_types[btype] = (stats.destroyed_building_types[btype] or 0) + 1
+
+            -- Decrement current count
+            stats.building_type_counts[btype] = math.max(0, (stats.building_type_counts[btype] or 1) - 1)
+
+            -- Check triggers for specific building destruction
+            self:check_event(TriggerSystem.EVENT.BUILDINGS_DESTROYED, house, btype)
+
+            -- Check if all buildings of this type are destroyed
+            if stats.building_type_counts[btype] == 0 then
+                self:check_event(TriggerSystem.EVENT.BUILDING_EXISTS, house, btype)
+            end
+        end
+
+    elseif entity:has("infantry") then
+        local infantry = entity:get("infantry")
+        local utype = infantry.infantry_type
+
+        if utype then
+            stats.destroyed_unit_types[utype] = (stats.destroyed_unit_types[utype] or 0) + 1
+            stats.unit_type_counts[utype] = math.max(0, (stats.unit_type_counts[utype] or 1) - 1)
+            self:check_event(TriggerSystem.EVENT.UNITS_DESTROYED, house, utype)
+        end
+
+    elseif entity:has("vehicle") then
+        local vehicle = entity:get("vehicle")
+        local utype = vehicle.vehicle_type
+
+        if utype then
+            stats.destroyed_unit_types[utype] = (stats.destroyed_unit_types[utype] or 0) + 1
+            stats.unit_type_counts[utype] = math.max(0, (stats.unit_type_counts[utype] or 1) - 1)
+            self:check_event(TriggerSystem.EVENT.UNITS_DESTROYED, house, utype)
+        end
+    end
+end
+
+-- Track entity creation (for counting current unit/building types)
+function TriggerSystem:track_entity_created(entity)
+    local owner = entity:has("owner") and entity:get("owner")
+    if not owner then return end
+
+    local house = owner.house
+    self:ensure_house_stats(house)
+    local stats = self.house_stats[house]
+
+    if entity:has("building") then
+        local building = entity:get("building")
+        local btype = building.structure_type or building.building_type
+
+        if btype then
+            stats.building_type_counts[btype] = (stats.building_type_counts[btype] or 0) + 1
+        end
+
+    elseif entity:has("infantry") then
+        local infantry = entity:get("infantry")
+        local utype = infantry.infantry_type
+
+        if utype then
+            stats.unit_type_counts[utype] = (stats.unit_type_counts[utype] or 0) + 1
+        end
+
+    elseif entity:has("vehicle") then
+        local vehicle = entity:get("vehicle")
+        local utype = vehicle.vehicle_type
+
+        if utype then
+            stats.unit_type_counts[utype] = (stats.unit_type_counts[utype] or 0) + 1
+        end
+    end
+end
+
+-- Get count of destroyed entities of a specific type
+function TriggerSystem:get_destroyed_count(house, entity_type, is_building)
+    self:ensure_house_stats(house)
+    local stats = self.house_stats[house]
+
+    if is_building then
+        return stats.destroyed_building_types[entity_type] or 0
+    else
+        return stats.destroyed_unit_types[entity_type] or 0
+    end
+end
+
+-- Check if a specific building type still exists for a house
+function TriggerSystem:building_type_exists(house, building_type)
+    self:ensure_house_stats(house)
+    return (self.house_stats[house].building_type_counts[building_type] or 0) > 0
 end
 
 -- Convert house string to constant
@@ -537,13 +646,16 @@ function TriggerSystem:on_entity_destroyed(entity, attacker)
     -- Update house stats
     if entity_house then
         self:ensure_house_stats(entity_house)
-        if entity:has_tag("building") then
+        if entity:has_tag("building") or entity:has("building") then
             self.house_stats[entity_house].buildings =
                 math.max(0, self.house_stats[entity_house].buildings - 1)
         elseif entity:has_tag("unit") then
             self.house_stats[entity_house].units =
                 math.max(0, self.house_stats[entity_house].units - 1)
         end
+
+        -- Track per-type destruction for campaign objectives
+        self:track_entity_destroyed(entity, attacker)
     end
 
     -- Check destroyed events

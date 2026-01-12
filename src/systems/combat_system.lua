@@ -770,6 +770,44 @@ CombatSystem.THREAT_PRIORITY = {
     DEFAULT = 15
 }
 
+-- Building importance for AI targeting (from original HOUSE.CPP)
+-- Higher values = more important to destroy
+CombatSystem.BUILDING_IMPORTANCE = {
+    -- Production buildings (highest priority)
+    WEAP = 80,   -- War Factory
+    FACT = 75,   -- Construction Yard
+    HAND = 70,   -- Hand of Nod
+    PYLE = 70,   -- Barracks
+    AFLD = 65,   -- Airfield
+    HPAD = 65,   -- Helipad
+
+    -- Power buildings (high priority - cripples base)
+    NUKE = 60,   -- Advanced Power Plant
+    POWR = 55,   -- Power Plant
+
+    -- Economic buildings
+    PROC = 50,   -- Refinery
+    SILO = 30,   -- Tiberium Silo
+
+    -- Tech buildings
+    EYE = 45,    -- Advanced Comm
+    HQ = 40,     -- Comm Center
+    TMPL = 35,   -- Temple of Nod
+
+    -- Defensive buildings (lower priority - distractions)
+    GTWR = 25,   -- Guard Tower
+    ATWR = 25,   -- Advanced Guard Tower
+    OBLI = 30,   -- Obelisk of Light
+    SAM = 20,    -- SAM Site
+    GUN = 15,    -- Gun Turret
+
+    -- Support
+    FIX = 20,    -- Repair Bay
+    NUK2 = 60,   -- Second Nuke? (if exists)
+
+    DEFAULT = 15
+}
+
 -- Find best target in range with proper threat prioritization
 function CombatSystem:find_target(entity, threat_mask)
     if not entity:has("combat") or not entity:has("transform") or not entity:has("owner") then
@@ -823,28 +861,51 @@ function CombatSystem:calculate_threat_score(attacker, target, distance)
     elseif target:has("aircraft") then
         score = score + CombatSystem.THREAT_PRIORITY.AIRCRAFT
     elseif target:has("building") then
-        score = score + CombatSystem.THREAT_PRIORITY.BUILDING
+        -- Buildings use importance table for strategic targeting
+        local building = target:get("building")
+        local btype = building.structure_type or building.building_type or "DEFAULT"
+        local importance = CombatSystem.BUILDING_IMPORTANCE[btype] or CombatSystem.BUILDING_IMPORTANCE.DEFAULT
+        score = score + CombatSystem.THREAT_PRIORITY.BUILDING + importance
     elseif target:has("mobile") then
         score = score + CombatSystem.THREAT_PRIORITY.VEHICLE
     else
         score = score + CombatSystem.THREAT_PRIORITY.DEFAULT
     end
 
-    -- Bonus if target is attacking us
+    -- Bonus if target is attacking us (highest priority - self defense)
     if target:has("combat") then
         local target_combat = target:get("combat")
         if target_combat.target == attacker.id then
             score = score + CombatSystem.THREAT_PRIORITY.ATTACKING_ME
+        elseif target_combat.target then
+            -- Check if attacking a nearby ally
+            local ally = self.world:get_entity(target_combat.target)
+            if ally and ally:has("owner") then
+                local ally_owner = ally:get("owner")
+                local attacker_owner = attacker:get("owner")
+                if ally_owner.house == attacker_owner.house then
+                    -- Target is attacking our ally
+                    score = score + CombatSystem.THREAT_PRIORITY.ATTACKING_ALLY
+                end
+            end
+        end
+    end
+
+    -- Check if target is actively firing (more threatening)
+    if target:has("combat") then
+        local target_combat = target:get("combat")
+        if target_combat.firing then
+            score = score + 15  -- Active shooter bonus
         end
     end
 
     -- Distance factor - closer targets score higher (normalize by range)
     local attacker_combat = attacker:get("combat")
-    local range = attacker_combat.attack_range or 5
-    local distance_factor = 1 - (distance / range)  -- 0 to 1, higher when closer
+    local range = attacker_combat.attack_range or (5 * Constants.LEPTON_PER_CELL)
+    local distance_factor = 1 - math.min(1, distance / range)  -- 0 to 1, higher when closer
     score = score + (distance_factor * 20)
 
-    -- Bonus for wounded targets (finish them off)
+    -- Bonus for wounded targets (finish them off - original behavior)
     if target:has("health") then
         local health = target:get("health")
         local hp_ratio = health.hp / health.max_hp
@@ -852,6 +913,26 @@ function CombatSystem:calculate_threat_score(attacker, target, distance)
             score = score + 15  -- Nearly dead, prioritize
         elseif hp_ratio < 0.5 then
             score = score + 10  -- Wounded
+        end
+    end
+
+    -- Penalty for cloaked targets we can't see well
+    if target:has("cloak") then
+        local cloak = target:get("cloak")
+        if cloak.state == 2 then  -- CLOAKED state
+            score = score - 30  -- Hard to target cloaked units
+        end
+    end
+
+    -- Bonus for high-value targets (tanks, artillery)
+    if target:has("vehicle") then
+        local vehicle = target:get("vehicle")
+        local vtype = vehicle.vehicle_type
+        -- Prioritize dangerous vehicles
+        if vtype == "MTNK" or vtype == "HTNK" or vtype == "STNK" then
+            score = score + 20  -- Tanks are high threats
+        elseif vtype == "MLRS" or vtype == "ARTY" or vtype == "MSAM" then
+            score = score + 25  -- Artillery/AA are high value
         end
     end
 
