@@ -225,18 +225,49 @@ function RenderSystem:draw_placeholder(entity, px, py)
         love.graphics.setColor(0, 0, 0, 1)
         love.graphics.circle("line", px, py, radius)
     elseif is_vehicle then
-        -- Vehicles: diamond shape
+        -- Vehicles: diamond shape with turret
         local cx, cy = px, py
         local hw, hh = w / 2, h / 2
+
+        -- Get body facing direction for hull orientation
+        local transform = entity:get("transform")
+        local body_angle = (transform.facing or 0) * (math.pi / 4)  -- 8 directions
+
+        -- Draw rotated diamond (hull)
+        local cos_b, sin_b = math.cos(body_angle), math.sin(body_angle)
         local vertices = {
-            cx, cy - hh,      -- top
-            cx + hw, cy,      -- right
-            cx, cy + hh,      -- bottom
-            cx - hw, cy       -- left
+            cx + (-hw * sin_b), cy + (-hh * cos_b),      -- top (relative)
+            cx + (hw * cos_b), cy + (-hw * sin_b),       -- right
+            cx + (hw * sin_b), cy + (hh * cos_b),        -- bottom
+            cx + (-hw * cos_b), cy + (hw * sin_b)        -- left
         }
         love.graphics.polygon("fill", vertices)
         love.graphics.setColor(0, 0, 0, 1)
         love.graphics.polygon("line", vertices)
+
+        -- Draw turret if entity has turret component
+        if entity:has("turret") then
+            local turret = entity:get("turret")
+            local turret_facing = turret.facing or 0
+
+            -- Convert 32-direction facing to angle
+            local turret_angle = turret_facing * (math.pi / 16)
+
+            -- Draw turret barrel
+            local barrel_len = math.min(w, h) * 0.6
+            local barrel_end_x = cx + math.sin(turret_angle) * barrel_len
+            local barrel_end_y = cy - math.cos(turret_angle) * barrel_len
+
+            -- Turret base
+            love.graphics.setColor(renderable.color[1] * 0.7, renderable.color[2] * 0.7, renderable.color[3] * 0.7, 1)
+            love.graphics.circle("fill", cx, cy, math.min(w, h) * 0.25)
+
+            -- Barrel
+            love.graphics.setColor(0.3, 0.3, 0.3, 1)
+            love.graphics.setLineWidth(3)
+            love.graphics.line(cx, cy, barrel_end_x, barrel_end_y)
+            love.graphics.setLineWidth(1)
+        end
     else
         -- Default: rectangle
         love.graphics.rectangle("fill", x, y, w, h)

@@ -172,6 +172,10 @@ function CombatSystem:fire_weapon(attacker, target, weapon)
     local transform = attacker:get("transform")
     local target_transform = target:get("transform")
 
+    -- Get projectile speed based on type
+    local proj_type = weapon.projectile or "default"
+    local speed = CombatSystem.PROJECTILE_SPEEDS[proj_type] or CombatSystem.PROJECTILE_SPEEDS.default
+
     -- Create projectile
     local projectile = {
         id = self.next_projectile_id,
@@ -182,19 +186,33 @@ function CombatSystem:fire_weapon(attacker, target, weapon)
         y = transform.y,
         target_x = target_transform.x,
         target_y = target_transform.y,
-        speed = 100,  -- Leptons per tick
+        speed = speed,
         damage = weapon.damage,
         warhead = weapon.warhead or "ap",
         homing = weapon.homing or false,
+        inaccurate = weapon.inaccurate or false,
         alive = true
     }
+
+    -- Add inaccuracy for artillery-type weapons
+    if projectile.inaccurate then
+        local scatter = Constants.LEPTON_PER_CELL * 2  -- 2 cell scatter
+        projectile.target_x = projectile.target_x + (math.random() - 0.5) * scatter
+        projectile.target_y = projectile.target_y + (math.random() - 0.5) * scatter
+    end
 
     self.next_projectile_id = self.next_projectile_id + 1
 
     -- For instant-hit weapons, apply damage immediately
-    if weapon.projectile == "invisible" or weapon.projectile == "laser" then
+    if weapon.projectile == "invisible" then
         self:apply_damage(target, projectile.damage, projectile.warhead, attacker)
         -- Emit attack event
+        self:emit(Events.EVENTS.UNIT_ATTACKED, attacker, target, weapon)
+    elseif weapon.projectile == "laser" then
+        -- Laser shows beam briefly then applies damage
+        projectile.lifetime = 8  -- Show laser for 8 ticks
+        table.insert(self.projectiles, projectile)
+        self:apply_damage(target, projectile.damage, projectile.warhead, attacker)
         self:emit(Events.EVENTS.UNIT_ATTACKED, attacker, target, weapon)
     else
         -- Add to projectile list
@@ -207,37 +225,51 @@ function CombatSystem:update_projectiles(dt)
 
     for i, proj in ipairs(self.projectiles) do
         if proj.alive then
-            -- Get target position (for homing)
-            local target = self.world:get_entity(proj.target)
-            if proj.homing and target and target:is_alive() then
-                local target_transform = target:get("transform")
-                proj.target_x = target_transform.x
-                proj.target_y = target_transform.y
-            end
-
-            -- Move projectile
-            local dx = proj.target_x - proj.x
-            local dy = proj.target_y - proj.y
-            local dist = math.sqrt(dx * dx + dy * dy)
-
-            if dist <= proj.speed then
-                -- Reached target
-                proj.x = proj.target_x
-                proj.y = proj.target_y
-                proj.alive = false
-
-                -- Apply damage to target
-                if target and target:is_alive() then
-                    local attacker = self.world:get_entity(proj.source)
-                    self:apply_damage(target, proj.damage, proj.warhead, attacker)
-                    self:emit(Events.EVENTS.UNIT_ATTACKED, attacker, target, proj.weapon)
+            -- Handle timed projectiles (laser beams)
+            if proj.lifetime then
+                proj.lifetime = proj.lifetime - 1
+                if proj.lifetime <= 0 then
+                    proj.alive = false
+                    table.insert(to_remove, i)
+                end
+            else
+                -- Get target position (for homing)
+                local target = self.world:get_entity(proj.target)
+                if proj.homing and target and target:is_alive() then
+                    local target_transform = target:get("transform")
+                    proj.target_x = target_transform.x
+                    proj.target_y = target_transform.y
                 end
 
-                table.insert(to_remove, i)
-            else
-                -- Move towards target
-                proj.x = proj.x + (dx / dist) * proj.speed
-                proj.y = proj.y + (dy / dist) * proj.speed
+                -- Move projectile
+                local dx = proj.target_x - proj.x
+                local dy = proj.target_y - proj.y
+                local dist = math.sqrt(dx * dx + dy * dy)
+
+                if dist <= proj.speed then
+                    -- Reached target
+                    proj.x = proj.target_x
+                    proj.y = proj.target_y
+                    proj.alive = false
+
+                    -- Apply damage to target (unless already applied for instant weapons)
+                    if not proj.damage_applied then
+                        if target and target:is_alive() then
+                            local attacker = self.world:get_entity(proj.source)
+                            self:apply_damage(target, proj.damage, proj.warhead, attacker)
+                            self:emit(Events.EVENTS.UNIT_ATTACKED, attacker, target, proj.weapon)
+                        elseif proj.inaccurate then
+                            -- Artillery can still damage nearby units even if target moved
+                            self:apply_splash_damage(proj)
+                        end
+                    end
+
+                    table.insert(to_remove, i)
+                else
+                    -- Move towards target
+                    proj.x = proj.x + (dx / dist) * proj.speed
+                    proj.y = proj.y + (dy / dist) * proj.speed
+                end
             end
         else
             table.insert(to_remove, i)
@@ -247,6 +279,34 @@ function CombatSystem:update_projectiles(dt)
     -- Remove dead projectiles
     for i = #to_remove, 1, -1 do
         table.remove(self.projectiles, to_remove[i])
+    end
+end
+
+-- Apply splash damage at projectile impact point (for artillery, explosives)
+function CombatSystem:apply_splash_damage(proj)
+    local splash_radius = proj.weapon.splash_radius or 1  -- In cells
+    local splash_damage = proj.weapon.splash_damage or (proj.damage * 0.5)
+
+    -- Find units near impact point
+    local targets = self.world:get_entities_with("transform", "health")
+    local attacker = self.world:get_entity(proj.source)
+
+    for _, target in ipairs(targets) do
+        if target:is_alive() then
+            local transform = target:get("transform")
+            local dx = transform.x - proj.target_x
+            local dy = transform.y - proj.target_y
+            local dist = math.sqrt(dx * dx + dy * dy) / Constants.LEPTON_PER_CELL
+
+            if dist <= splash_radius then
+                -- Damage falls off with distance
+                local damage_mult = 1 - (dist / splash_radius)
+                local damage = math.floor(splash_damage * damage_mult)
+                if damage > 0 then
+                    self:apply_damage(target, damage, proj.warhead, attacker)
+                end
+            end
+        end
     end
 end
 
@@ -487,7 +547,39 @@ function CombatSystem:get_projectiles()
     return self.projectiles
 end
 
--- Draw projectiles
+-- Projectile visual definitions (from BULLET.CPP)
+CombatSystem.PROJECTILE_VISUALS = {
+    shell = {color = {1, 0.8, 0, 1}, size = 2, trail = false, shape = "circle"},
+    rocket = {color = {1, 0.5, 0, 1}, size = 3, trail = true, shape = "triangle"},
+    sam = {color = {1, 0.3, 0, 1}, size = 3, trail = true, shape = "triangle"},
+    mlrs_rocket = {color = {1, 0.4, 0, 1}, size = 4, trail = true, shape = "triangle"},
+    grenade = {color = {0.3, 0.3, 0.3, 1}, size = 3, trail = false, shape = "circle"},
+    flame = {color = {1, 0.5, 0, 0.8}, size = 4, trail = true, shape = "flame"},
+    napalm = {color = {1, 0.3, 0, 0.9}, size = 5, trail = true, shape = "flame"},
+    chem = {color = {0.2, 0.9, 0.2, 0.8}, size = 4, trail = true, shape = "spray"},
+    artillery = {color = {0.4, 0.4, 0.4, 1}, size = 3, trail = false, shape = "circle"},
+    laser = {color = {1, 0, 0, 1}, size = 2, trail = false, shape = "line"},
+    nuke = {color = {1, 1, 0, 1}, size = 6, trail = true, shape = "triangle"},
+    ion_beam = {color = {0.5, 0.5, 1, 1}, size = 8, trail = false, shape = "beam"},
+    default = {color = {1, 1, 0, 1}, size = 2, trail = false, shape = "circle"}
+}
+
+-- Projectile speeds (leptons per tick) from BULLET.CPP
+CombatSystem.PROJECTILE_SPEEDS = {
+    shell = 120,
+    rocket = 80,
+    sam = 100,
+    mlrs_rocket = 60,
+    grenade = 60,
+    flame = 50,
+    napalm = 40,
+    chem = 50,
+    artillery = 80,
+    nuke = 40,
+    default = 100
+}
+
+-- Draw projectiles with proper visuals
 function CombatSystem:draw_projectiles(render_system)
     for _, proj in ipairs(self.projectiles) do
         if proj.alive then
@@ -495,8 +587,74 @@ function CombatSystem:draw_projectiles(render_system)
             local px = proj.x / Constants.PIXEL_LEPTON_W
             local py = proj.y / Constants.PIXEL_LEPTON_H
 
-            love.graphics.setColor(1, 0.8, 0, 1)
-            love.graphics.circle("fill", px, py, 2)
+            -- Get visual style for this projectile type
+            local proj_type = proj.weapon.projectile or "default"
+            local visual = CombatSystem.PROJECTILE_VISUALS[proj_type] or CombatSystem.PROJECTILE_VISUALS.default
+
+            love.graphics.setColor(unpack(visual.color))
+
+            -- Draw trail if applicable
+            if visual.trail then
+                local trail_len = 8
+                local dx = proj.target_x - proj.x
+                local dy = proj.target_y - proj.y
+                local dist = math.sqrt(dx * dx + dy * dy)
+                if dist > 0 then
+                    local tx = px - (dx / dist) * trail_len
+                    local ty = py - (dy / dist) * trail_len
+                    love.graphics.setColor(visual.color[1], visual.color[2], visual.color[3], 0.4)
+                    love.graphics.line(px, py, tx, ty)
+                    love.graphics.setColor(unpack(visual.color))
+                end
+            end
+
+            -- Draw projectile based on shape
+            if visual.shape == "circle" then
+                love.graphics.circle("fill", px, py, visual.size)
+            elseif visual.shape == "triangle" then
+                -- Oriented towards target
+                local dx = proj.target_x - proj.x
+                local dy = proj.target_y - proj.y
+                local angle = math.atan2(dy, dx)
+                local s = visual.size
+                love.graphics.polygon("fill",
+                    px + math.cos(angle) * s * 1.5, py + math.sin(angle) * s * 1.5,
+                    px + math.cos(angle + 2.5) * s, py + math.sin(angle + 2.5) * s,
+                    px + math.cos(angle - 2.5) * s, py + math.sin(angle - 2.5) * s
+                )
+            elseif visual.shape == "flame" then
+                -- Animated flame effect
+                local flicker = math.sin(love.timer.getTime() * 20) * 0.5 + 0.5
+                love.graphics.setColor(1, 0.5 + flicker * 0.3, 0, 0.8)
+                love.graphics.circle("fill", px, py, visual.size + flicker * 2)
+                love.graphics.setColor(1, 0.8, 0.2, 0.6)
+                love.graphics.circle("fill", px, py, visual.size * 0.6)
+            elseif visual.shape == "spray" then
+                -- Chemical spray effect
+                for i = 1, 3 do
+                    local offset_x = (math.random() - 0.5) * 6
+                    local offset_y = (math.random() - 0.5) * 6
+                    love.graphics.circle("fill", px + offset_x, py + offset_y, visual.size * 0.5)
+                end
+            elseif visual.shape == "line" then
+                -- Laser line from source
+                local source = self.world:get_entity(proj.source)
+                if source and source:has("transform") then
+                    local st = source:get("transform")
+                    local sx = st.x / Constants.PIXEL_LEPTON_W
+                    local sy = st.y / Constants.PIXEL_LEPTON_H
+                    love.graphics.setLineWidth(2)
+                    love.graphics.line(sx, sy, px, py)
+                    love.graphics.setLineWidth(1)
+                end
+            elseif visual.shape == "beam" then
+                -- Ion cannon beam
+                love.graphics.setLineWidth(4)
+                love.graphics.line(px, 0, px, py)
+                love.graphics.setLineWidth(1)
+            else
+                love.graphics.circle("fill", px, py, visual.size)
+            end
         end
     end
     love.graphics.setColor(1, 1, 1, 1)

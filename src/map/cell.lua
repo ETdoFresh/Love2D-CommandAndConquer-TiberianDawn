@@ -11,7 +11,7 @@ local bit = bit or bit32 or require("bit")
 local Cell = {}
 Cell.__index = Cell
 
--- Cell flags for occupancy
+-- Cell flags for occupancy (from original C&C CELL.H)
 Cell.FLAG = {
     CENTER = 1,     -- Center position occupied
     NW = 2,         -- Northwest position (infantry)
@@ -20,7 +20,8 @@ Cell.FLAG = {
     SE = 16,        -- Southeast position (infantry)
     VEHICLE = 32,   -- Vehicle present
     MONOLITH = 64,  -- Immovable blockage
-    BUILDING = 128  -- Building present
+    BUILDING = 128, -- Building present
+    WALL = 256      -- Wall segment present (extends base for adjacency)
 }
 
 -- Create a new cell

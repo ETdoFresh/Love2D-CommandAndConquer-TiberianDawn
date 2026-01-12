@@ -204,9 +204,14 @@ function Grid:reveal_area(center_x, center_y, radius, house)
     end
 end
 
--- Check if a building can be placed
-function Grid:can_place_building(x, y, width, height, house, require_adjacent)
-    -- First check if all cells are clear
+-- Check if a building can be placed (faithful to original C&C adjacency rules)
+-- In original C&C:
+-- - Construction Yard (from MCV) can be placed anywhere
+-- - All other buildings must be adjacent to existing friendly buildings
+-- - Walls can extend the base "footprint" for adjacency purposes
+-- - Buildings must be on clear, passable terrain (no tiberium, no water, etc.)
+function Grid:can_place_building(x, y, width, height, house, require_adjacent, building_type)
+    -- First check if all cells are clear and passable
     for dy = 0, height - 1 do
         for dx = 0, width - 1 do
             local cell = self:get_cell(x + dx, y + dy)
@@ -223,27 +228,47 @@ function Grid:can_place_building(x, y, width, height, house, require_adjacent)
             if cell:has_tiberium() then
                 return false, "Cannot build on Tiberium"
             end
+            -- Check for water/impassable terrain
+            if cell.terrain == "water" or cell.terrain == "rock" then
+                return false, "Cannot build on this terrain"
+            end
         end
     end
 
     -- Check adjacency to friendly buildings (if required)
+    -- Original C&C requires adjacency to base buildings (including walls)
     if require_adjacent then
         local is_adjacent = false
+        local adjacent_to_base = false
 
-        -- Check all cells around the building footprint
+        -- Check all 8-connected cells around the building footprint
+        -- This includes corners (like original C&C)
         for dy = -1, height do
             for dx = -1, width do
-                -- Skip interior cells
+                -- Skip interior cells (the building footprint itself)
                 if dx >= 0 and dx < width and dy >= 0 and dy < height then
                     goto continue
                 end
 
                 local cell = self:get_cell(x + dx, y + dy)
-                if cell and cell:has_flag_set(Cell.FLAG.BUILDING) then
-                    -- Found adjacent building - check owner
-                    if cell.owner == house or cell.owner == -1 then
-                        is_adjacent = true
-                        break
+                if cell then
+                    -- Check for adjacent building owned by same house
+                    if cell:has_flag_set(Cell.FLAG.BUILDING) then
+                        if cell.owner == house then
+                            is_adjacent = true
+                            -- Check if it's a "base" building (Construction Yard extends base)
+                            -- In original, adjacency to ANY friendly building counts
+                            adjacent_to_base = true
+                            break
+                        end
+                    end
+
+                    -- Walls also count for adjacency (like original)
+                    if cell:has_flag_set(Cell.FLAG.WALL) then
+                        if cell.owner == house or cell.owner == nil or cell.owner == -1 then
+                            is_adjacent = true
+                            break
+                        end
                     end
                 end
                 ::continue::
@@ -252,11 +277,46 @@ function Grid:can_place_building(x, y, width, height, house, require_adjacent)
         end
 
         if not is_adjacent then
-            return false, "Must place adjacent to existing buildings"
+            return false, "Must place adjacent to existing base"
         end
     end
 
     return true
+end
+
+-- Check if a location is valid for placing a specific building type
+-- This adds building-specific placement rules
+function Grid:can_place_building_type(x, y, building_data, house, world)
+    local width = building_data.size and building_data.size[1] or 1
+    local height = building_data.size and building_data.size[2] or 1
+    local building_type = building_data.name or "unknown"
+
+    -- Special buildings that can be placed without adjacency:
+    -- - Construction Yard (placed by MCV deployment, not built)
+    -- - First building of a faction (if no Construction Yard exists)
+    local require_adjacent = true
+
+    -- Check if this is the first building or a Construction Yard
+    if building_type == "FACT" then
+        -- Construction Yard from MCV doesn't need adjacency
+        require_adjacent = false
+    elseif world then
+        -- Check if this house has any buildings yet
+        local has_buildings = false
+        local buildings = world:get_entities_with("building", "owner")
+        for _, building in ipairs(buildings) do
+            local owner = building:get("owner")
+            if owner.house == house then
+                has_buildings = true
+                break
+            end
+        end
+        if not has_buildings then
+            require_adjacent = false
+        end
+    end
+
+    return self:can_place_building(x, y, width, height, house, require_adjacent, building_type)
 end
 
 -- Place a building (mark cells)
