@@ -341,6 +341,12 @@ function RenderSystem:draw_placeholder(entity, px, py)
                 love.graphics.rectangle("line", x - 2, y - 2, w + 4, h + 4)
             end
             love.graphics.setLineWidth(1)
+
+            -- Draw "D" indicator for deployable units (MCV)
+            if entity:has("deployable") then
+                love.graphics.setColor(1, 1, 0, 1)
+                love.graphics.print("D", x + w + 4, y)
+            end
         end
     end
 

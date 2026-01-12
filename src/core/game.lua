@@ -1421,21 +1421,35 @@ function Game:get_speed_name()
     return "Normal"
 end
 
--- Draw building placement preview when player has a building selected from sidebar
+-- Draw building placement preview when player has a building ready to place
 function Game:draw_building_placement_preview()
-    if not self.sidebar then return end
+    if not self.production_system then return end
 
-    local selected_item = self.sidebar:get_selected_item()
+    -- First check if there's a building ready from production queue
+    local selected_item = nil
+    local cy = self:find_construction_yard()
+    if cy and cy:has("production") then
+        local production = cy:get("production")
+        if production.ready_to_place and production.placing_type then
+            selected_item = production.placing_type
+        end
+    end
+
+    -- Fall back to sidebar selection (sandbox mode)
+    if not selected_item and self.sidebar then
+        selected_item = self.sidebar:get_selected_item()
+    end
+
     if not selected_item then return end
 
-    local building_data = self.production_system and self.production_system.building_data[selected_item]
+    local building_data = self.production_system.building_data[selected_item]
     if not building_data then return end
 
     -- Get mouse position
     local mx, my = love.mouse.getPosition()
 
     -- Check if mouse is over sidebar area - don't draw preview there
-    if mx >= self.sidebar.x then return end
+    if self.sidebar and mx >= self.sidebar.x then return end
 
     -- Convert screen position to world position
     local world_x = (mx / self.render_system.scale) + self.render_system.camera_x
@@ -1728,6 +1742,12 @@ function Game:handle_playing_input(key)
             self.special_weapons:cancel_targeting()
             return
         end
+
+        -- Cancel building placement mode
+        if self:cancel_building_placement() then
+            return
+        end
+
         self.state = Game.STATE.PAUSED
         return
     elseif key == "h" then
@@ -2075,6 +2095,46 @@ function Game:player_has_buildings()
         end
     end
     return false
+end
+
+-- Cancel building placement mode - returns true if there was something to cancel
+function Game:cancel_building_placement()
+    local cancelled = false
+
+    -- Check construction yard for ready-to-place building
+    local cy = self:find_construction_yard()
+    if cy and cy:has("production") then
+        local production = cy:get("production")
+        if production.ready_to_place and production.placing_type then
+            -- Cancel the placement - building goes back to "ready" state but player needs to click sidebar again
+            -- In original C&C, ESC cancels placement and refunds half the cost
+            local building_type = production.placing_type
+            local building_data = self.production_system.building_data[building_type]
+            local refund = building_data and math.floor((building_data.cost or 0) / 2) or 0
+
+            production.ready_to_place = false
+            production.placing_type = nil
+
+            -- Refund half credits
+            if refund > 0 then
+                self.player_credits = self.player_credits + refund
+                if self.harvest_system then
+                    self.harvest_system:add_credits(self.player_house, refund)
+                end
+                print(string.format("Cancelled %s placement, refunded $%d", building_type, refund))
+            end
+
+            cancelled = true
+        end
+    end
+
+    -- Also clear sidebar selection (sandbox mode)
+    if self.sidebar and self.sidebar:get_selected_item() then
+        self.sidebar:clear_selection()
+        cancelled = true
+    end
+
+    return cancelled
 end
 
 -- Find a factory that can build a specific unit type
