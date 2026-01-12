@@ -182,9 +182,17 @@ function RenderSystem:draw_entity(entity)
             local ox = meta.frame_width / 2
             local oy = meta.frame_height / 2
 
-            -- Draw the sprite
+            -- Draw the sprite (vehicle body)
             love.graphics.setColor(1, 1, 1, 1)
             love.graphics.draw(sheet, quad, px, py, rotation, 1, 1, ox, oy)
+
+            -- Draw turret if vehicle has one
+            if renderable.has_turret and renderable.turret_frame then
+                local turret_quad = self.sprite_loader:get_quad(sprite_name, renderable.turret_frame)
+                if turret_quad then
+                    love.graphics.draw(sheet, turret_quad, px, py, 0, 1, 1, ox, oy)
+                end
+            end
 
             drawn = true
         end

@@ -631,4 +631,55 @@ function TriggerSystem:reset()
     self.victory = false
 end
 
+-- Initialize house stats from existing entities on scenario load
+-- This must be called after all entities are created
+function TriggerSystem:init_house_stats_from_entities()
+    if not self.world then return end
+
+    -- Reset all house stats first
+    self.house_stats = {}
+
+    -- Get all entities with owner component
+    local entities = self.world:get_all_entities()
+
+    for _, entity in ipairs(entities) do
+        if entity:has("owner") then
+            local owner = entity:get("owner")
+            local house = owner.house
+
+            -- Ensure stats exist for this house
+            self:ensure_house_stats(house)
+
+            -- Count buildings vs units
+            if entity:has("building") then
+                self.house_stats[house].buildings = self.house_stats[house].buildings + 1
+            elseif entity:has("mobile") or entity:has("infantry") or entity:has("vehicle") or entity:has("aircraft") then
+                self.house_stats[house].units = self.house_stats[house].units + 1
+            end
+        end
+    end
+
+    -- Also get power and credits from systems
+    if self.power_system then
+        for house, _ in pairs(self.house_stats) do
+            local produced, consumed = self.power_system:get_power(house)
+            self.house_stats[house].power_output = produced or 0
+            self.house_stats[house].power_drain = consumed or 0
+        end
+    end
+
+    if self.harvest_system then
+        for house, _ in pairs(self.house_stats) do
+            local credits = self.harvest_system:get_credits(house)
+            self.house_stats[house].credits = credits or 0
+        end
+    end
+end
+
+-- Get statistics for a house (for trigger conditions)
+function TriggerSystem:get_house_stats(house)
+    self:ensure_house_stats(house)
+    return self.house_stats[house]
+end
+
 return TriggerSystem

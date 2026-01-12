@@ -271,10 +271,69 @@ AISystem.mission_handlers[Constants.MISSION.HUNT] = function(self, entity, missi
         if target then
             combat.target = target.id
         else
-            -- No targets visible, wander or patrol
-            -- TODO: Implement patrol behavior
+            -- No targets visible, patrol/wander behavior
+            self:patrol_behavior(entity, mission)
         end
     end
+end
+
+-- Patrol behavior for units with no visible targets
+function AISystem:patrol_behavior(entity, mission)
+    if not entity:has("mobile") or not entity:has("transform") then
+        return
+    end
+
+    local mobile = entity:get("mobile")
+    local transform = entity:get("transform")
+
+    -- Only patrol if not already moving
+    if mobile.is_moving then
+        return
+    end
+
+    -- Initialize patrol state if needed
+    if not mission.patrol_timer then
+        mission.patrol_timer = 0
+        mission.patrol_delay = Random.range(30, 90)  -- 2-6 seconds random delay
+    end
+
+    -- Increment timer
+    mission.patrol_timer = mission.patrol_timer + 1
+
+    -- Wait for patrol delay before moving
+    if mission.patrol_timer < mission.patrol_delay then
+        return
+    end
+
+    -- Reset patrol timer
+    mission.patrol_timer = 0
+    mission.patrol_delay = Random.range(30, 90)
+
+    -- Pick a random direction to patrol
+    local movement_system = self.world:get_system("movement")
+    if not movement_system then return end
+
+    -- Get unit sight range for patrol distance
+    local sight_range = 5
+    if self.fog_system then
+        sight_range = self.fog_system:get_sight_range(entity)
+    end
+
+    -- Pick random offset within patrol range
+    local patrol_dist = Random.range(2, sight_range) * Constants.LEPTON_PER_CELL
+    local angle = Random.float_range(0, math.pi * 2)
+
+    local dest_x = transform.x + math.cos(angle) * patrol_dist
+    local dest_y = transform.y + math.sin(angle) * patrol_dist
+
+    -- Clamp to map bounds
+    local map_width = (self.grid and self.grid.width or 64) * Constants.LEPTON_PER_CELL
+    local map_height = (self.grid and self.grid.height or 64) * Constants.LEPTON_PER_CELL
+    dest_x = math.max(Constants.LEPTON_PER_CELL, math.min(dest_x, map_width - Constants.LEPTON_PER_CELL))
+    dest_y = math.max(Constants.LEPTON_PER_CELL, math.min(dest_y, map_height - Constants.LEPTON_PER_CELL))
+
+    -- Move to patrol destination
+    movement_system:move_to(entity, dest_x, dest_y)
 end
 
 -- HARVEST: Collect tiberium
@@ -324,16 +383,40 @@ AISystem.mission_handlers[Constants.MISSION.RETURN] = function(self, entity, mis
 
     local harvester = entity:get("harvester")
     local mobile = entity:get("mobile")
+    local owner = entity:has("owner") and entity:get("owner") or nil
 
-    -- Check if at refinery
+    -- Check if at refinery (not moving)
     if not mobile.is_moving then
         -- Unload at refinery
         if harvester.tiberium_load > 0 then
-            -- TODO: Transfer tiberium to house credits
-            harvester.tiberium_load = 0
+            -- Get harvest system and transfer tiberium to house credits
+            local harvest_system = self.world:get_system("harvest")
+            if harvest_system and owner then
+                -- Calculate credits based on tiberium load
+                local HarvestSystem = require("src.systems.harvest_system")
+                local unload_amount = math.min(harvester.tiberium_load, HarvestSystem.UNLOAD_RATE)
+                local credits_earned = unload_amount * HarvestSystem.TIBERIUM_VALUE
+
+                -- Transfer credits
+                harvest_system:add_credits(owner.house, credits_earned)
+
+                -- Reduce harvester load
+                harvester.tiberium_load = harvester.tiberium_load - unload_amount
+
+                -- Emit event for audio feedback
+                Events.emit("HARVESTER_UNLOADING", entity, unload_amount, credits_earned)
+
+                -- If still has load, continue unloading next tick
+                if harvester.tiberium_load > 0 then
+                    return
+                end
+            else
+                -- No harvest system, just clear the load
+                harvester.tiberium_load = 0
+            end
         end
 
-        -- Go back to harvesting
+        -- All tiberium unloaded, go back to harvesting
         self:set_mission(entity, Constants.MISSION.HARVEST)
     end
 end

@@ -61,6 +61,11 @@ function TeamSystem:set_waypoints(waypoints)
     self.scenario_waypoints = waypoints or {}
 end
 
+-- Set production system reference (for spawning reinforcements)
+function TeamSystem:set_production_system(production_system)
+    self.production_system = production_system
+end
+
 -- Register event listeners
 function TeamSystem:register_events()
     Events.on("CREATE_TEAM", function(team_type_name)
@@ -74,6 +79,123 @@ function TeamSystem:register_events()
     Events.on("ALL_TO_HUNT", function(house)
         self:all_to_hunt(house)
     end)
+
+    Events.on("REINFORCEMENT", function(team_type_name, waypoint_name)
+        self:spawn_reinforcement(team_type_name, waypoint_name)
+    end)
+end
+
+-- Spawn reinforcement team at specified waypoint or map edge
+function TeamSystem:spawn_reinforcement(team_type_name, waypoint_name)
+    local team_type = self.team_types[team_type_name]
+    if not team_type then
+        print("TeamSystem: Unknown team type for reinforcement: " .. tostring(team_type_name))
+        return nil
+    end
+
+    if not self.production_system then
+        print("TeamSystem: No production system for spawning reinforcements")
+        return nil
+    end
+
+    -- Determine spawn location
+    local spawn_x, spawn_y = 0, 0
+    local map_width = 64 * Constants.LEPTON_PER_CELL
+    local map_height = 64 * Constants.LEPTON_PER_CELL
+
+    if waypoint_name and self.scenario_waypoints then
+        -- Use specified waypoint
+        local waypoint = self.scenario_waypoints[waypoint_name]
+        if waypoint then
+            spawn_x = waypoint.x * Constants.LEPTON_PER_CELL
+            spawn_y = waypoint.y * Constants.LEPTON_PER_CELL
+        else
+            -- Waypoint not found, use map edge based on house
+            spawn_x, spawn_y = self:get_edge_spawn_point(team_type.house)
+        end
+    else
+        -- Default to map edge based on house (enemy from north/east, friendly from south/west)
+        spawn_x, spawn_y = self:get_edge_spawn_point(team_type.house)
+    end
+
+    -- Convert house string to constant
+    local house = team_type.house
+    if type(house) == "string" then
+        if house == "BadGuy" or house == "BAD" then
+            house = Constants.HOUSE.BAD
+        elseif house == "GoodGuy" or house == "GOOD" then
+            house = Constants.HOUSE.GOOD
+        else
+            house = Constants.HOUSE.NEUTRAL
+        end
+    end
+
+    -- Create team structure
+    local team = {
+        id = self.next_team_id,
+        type_name = team_type_name,
+        house = house,
+        mission = team_type.mission,
+        waypoints = team_type.waypoints,
+        roundabout = team_type.roundabout,
+        suicide = team_type.suicide,
+        members = {},
+        current_waypoint = 1,
+        target = nil,
+        formed = true
+    }
+    self.next_team_id = self.next_team_id + 1
+
+    -- Spawn each unit type in the team
+    local spawn_offset = 0
+    for _, requirement in ipairs(team_type.members) do
+        local unit_type = requirement.type
+        local count = requirement.count or 1
+
+        for i = 1, count do
+            -- Calculate offset for this unit
+            local offset_x = (spawn_offset % 4) * Constants.LEPTON_PER_CELL
+            local offset_y = math.floor(spawn_offset / 4) * Constants.LEPTON_PER_CELL
+            spawn_offset = spawn_offset + 1
+
+            local unit_x = spawn_x + offset_x
+            local unit_y = spawn_y + offset_y
+
+            -- Create the unit
+            local entity = self.production_system:create_unit(unit_type, house, unit_x, unit_y)
+            if entity then
+                entity.team_id = team.id
+                table.insert(team.members, entity.id)
+
+                -- Emit reinforcement spawn event
+                Events.emit("UNIT_REINFORCED", entity, team_type_name)
+            end
+        end
+    end
+
+    -- Store team and assign mission
+    self.active_teams[team.id] = team
+    self:assign_team_mission(team)
+
+    -- Play reinforcement audio
+    Events.emit("PLAY_SPEECH", "Reinforcements have arrived")
+
+    return team
+end
+
+-- Get spawn point at map edge based on house
+function TeamSystem:get_edge_spawn_point(house)
+    local map_width = 64 * Constants.LEPTON_PER_CELL
+    local map_height = 64 * Constants.LEPTON_PER_CELL
+
+    -- Enemy (BAD) spawns from north or east, friendly (GOOD) from south or west
+    if house == "BadGuy" or house == "BAD" or house == Constants.HOUSE.BAD then
+        -- Spawn from north edge (top of map)
+        return map_width / 2, Constants.LEPTON_PER_CELL * 2
+    else
+        -- Spawn from south edge (bottom of map)
+        return map_width / 2, map_height - Constants.LEPTON_PER_CELL * 4
+    end
 end
 
 -- Load team definitions from scenario

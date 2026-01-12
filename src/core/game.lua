@@ -241,6 +241,9 @@ function Game:init()
     -- Link movement system to team system for coordinated waypoint movement
     self.team_system:set_movement_system(self.movement_system)
 
+    -- Link production system to team system for spawning reinforcements
+    self.team_system:set_production_system(self.production_system)
+
     -- Create special weapons system
     self.special_weapons = Systems.SpecialWeapons.new(self.world, self.combat_system)
 
@@ -1279,6 +1282,10 @@ function Game:start_mission_from_briefing()
         local success = self.scenario_loader:load_scenario(scenario_path)
         if success then
             self.state = Game.STATE.PLAYING
+            -- Initialize trigger system house statistics from loaded entities
+            if self.trigger_system then
+                self.trigger_system:init_house_stats_from_entities()
+            end
             -- Center camera on player start position
             self:center_camera_on_player()
             -- Show objectives briefly at mission start
@@ -1496,16 +1503,46 @@ function Game:draw_building_placement_preview()
     local screen_w = size_x * Constants.CELL_PIXEL_W * self.render_system.scale
     local screen_h = size_y * Constants.CELL_PIXEL_H * self.render_system.scale
 
-    -- Draw ghost building
-    if can_place then
-        -- Green tint - valid placement
-        love.graphics.setColor(0.2, 0.8, 0.2, 0.5)
-    else
-        -- Red tint - invalid placement
-        love.graphics.setColor(0.8, 0.2, 0.2, 0.5)
+    -- Draw per-cell validity for multi-cell buildings
+    local cell_w = Constants.CELL_PIXEL_W * self.render_system.scale
+    local cell_h = Constants.CELL_PIXEL_H * self.render_system.scale
+
+    for dy = 0, size_y - 1 do
+        for dx = 0, size_x - 1 do
+            local check_x = cell_x + dx
+            local check_y = cell_y + dy
+            local cell = self.grid:get_cell(check_x, check_y)
+
+            -- Check individual cell validity
+            local cell_valid = true
+            if not cell then
+                cell_valid = false
+            elseif cell:is_occupied() then
+                cell_valid = false
+            elseif cell.terrain and cell.terrain > 0 then
+                cell_valid = false  -- Has terrain obstacle
+            end
+
+            local cx = screen_x + dx * cell_w
+            local cy = screen_y + dy * cell_h
+
+            if cell_valid then
+                love.graphics.setColor(0.2, 0.8, 0.2, 0.4)
+            else
+                love.graphics.setColor(0.8, 0.2, 0.2, 0.6)
+            end
+            love.graphics.rectangle("fill", cx, cy, cell_w, cell_h)
+        end
     end
 
-    -- Draw filled rectangle for building footprint
+    -- Draw overall validity overlay
+    if can_place then
+        -- Green tint - valid placement
+        love.graphics.setColor(0.2, 0.8, 0.2, 0.2)
+    else
+        -- Red tint - invalid placement (adjacency or other issue)
+        love.graphics.setColor(0.8, 0.2, 0.2, 0.2)
+    end
     love.graphics.rectangle("fill", screen_x, screen_y, screen_w, screen_h)
 
     -- Draw border
@@ -1524,9 +1561,6 @@ function Game:draw_building_placement_preview()
     else
         love.graphics.setColor(1, 0.3, 0.3, 0.5)
     end
-
-    local cell_w = Constants.CELL_PIXEL_W * self.render_system.scale
-    local cell_h = Constants.CELL_PIXEL_H * self.render_system.scale
 
     for dx = 1, size_x - 1 do
         love.graphics.line(screen_x + dx * cell_w, screen_y, screen_x + dx * cell_w, screen_y + screen_h)

@@ -258,7 +258,22 @@ function AnimationSystem:update_vehicle(entity)
     -- Calculate frame from facing
     renderable.frame = AnimationData.get_vehicle_frame(sprite_name, facing)
 
-    -- TODO: Handle turret separately if entity has turret component
+    -- Handle turret separately if entity has turret component
+    if entity:has("turret") then
+        local turret = entity:get("turret")
+        local turret_facing = turret.facing or 0
+
+        -- Get turret frame from animation data
+        local turret_frame = AnimationData.get_turret_frame(sprite_name, turret_facing)
+        if turret_frame then
+            renderable.turret_frame = turret_frame
+            renderable.has_turret = true
+        else
+            renderable.has_turret = false
+        end
+    else
+        renderable.has_turret = false
+    end
 end
 
 function AnimationSystem:update_building(entity)
