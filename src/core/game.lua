@@ -23,6 +23,7 @@ Game.STATE = {
     CAMPAIGN_SELECT = "campaign_select",
     SKIRMISH_SETUP = "skirmish_setup",
     MULTIPLAYER_LOBBY = "multiplayer_lobby",
+    BRIEFING = "briefing",
     PLAYING = "playing",
     PAUSED = "paused",
     EDITOR = "editor",
@@ -589,6 +590,14 @@ function Game:update(dt)
             self.render_system.camera_y + love.graphics.getHeight() / 2
         )
     end
+
+    -- Update message timer
+    if self.message_timer > 0 then
+        self.message_timer = self.message_timer - dt
+        if self.message_timer <= 0 then
+            self.current_message = nil
+        end
+    end
 end
 
 -- Game logic tick (15 FPS)
@@ -656,6 +665,12 @@ function Game:draw()
         -- Draw debug info
         self:draw_debug()
 
+        -- Draw in-game messages
+        self:draw_messages()
+
+        -- Draw special weapon targeting cursor
+        self:draw_targeting_cursor()
+
         -- Draw pause overlay
         if self.state == Game.STATE.PAUSED then
             self:draw_pause_overlay()
@@ -668,6 +683,8 @@ function Game:draw()
         self:draw_options()
     elseif self.state == Game.STATE.CAMPAIGN_SELECT then
         self:draw_campaign_select()
+    elseif self.state == Game.STATE.BRIEFING then
+        self:draw_briefing()
     elseif self.state == Game.STATE.SKIRMISH_SETUP then
         self:draw_skirmish_setup()
     elseif self.state == Game.STATE.MULTIPLAYER_LOBBY then
@@ -779,6 +796,12 @@ end
 function Game:draw_pause_overlay()
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
 
+    -- Check if mission ended - show result screen instead of pause
+    if self.mission_result then
+        self:draw_mission_result()
+        return
+    end
+
     -- Dim background
     love.graphics.setColor(0, 0, 0, 0.6)
     love.graphics.rectangle("fill", 0, 0, w, h)
@@ -791,6 +814,216 @@ function Game:draw_pause_overlay()
     love.graphics.setColor(0.7, 0.7, 0.7, 1)
     love.graphics.printf("Press ESC to resume",
         0, h/2 + 10, w, "center")
+end
+
+-- Draw mission result screen (victory or defeat)
+function Game:draw_mission_result()
+    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+
+    -- Darken background
+    love.graphics.setColor(0, 0, 0, 0.8)
+    love.graphics.rectangle("fill", 0, 0, w, h)
+
+    -- Draw result panel
+    local panel_w, panel_h = 500, 350
+    local panel_x = (w - panel_w) / 2
+    local panel_y = (h - panel_h) / 2
+
+    -- Panel background
+    love.graphics.setColor(0.1, 0.1, 0.15, 0.95)
+    love.graphics.rectangle("fill", panel_x, panel_y, panel_w, panel_h)
+
+    -- Panel border
+    if self.mission_result == "victory" then
+        love.graphics.setColor(0.2, 0.6, 0.2, 1)
+    else
+        love.graphics.setColor(0.6, 0.2, 0.2, 1)
+    end
+    love.graphics.setLineWidth(3)
+    love.graphics.rectangle("line", panel_x, panel_y, panel_w, panel_h)
+
+    -- Title
+    local title_y = panel_y + 30
+    if self.mission_result == "victory" then
+        love.graphics.setColor(0.3, 1, 0.3, 1)
+        love.graphics.printf("MISSION ACCOMPLISHED", panel_x, title_y, panel_w, "center")
+    else
+        love.graphics.setColor(1, 0.3, 0.3, 1)
+        love.graphics.printf("MISSION FAILED", panel_x, title_y, panel_w, "center")
+    end
+
+    -- Mission statistics
+    love.graphics.setColor(0.8, 0.8, 0.8, 1)
+    local stats_y = title_y + 60
+
+    -- Calculate statistics
+    local player_units = 0
+    local enemy_units = 0
+    local player_buildings = 0
+    local enemy_buildings = 0
+
+    if self.world then
+        for _, entity in ipairs(self.world:get_all_entities()) do
+            local owner = entity:get("owner")
+            local unit_type = entity:get("unit_type")
+            local building = entity:get("building")
+
+            if owner then
+                if owner.house == self.player_house then
+                    if building then
+                        player_buildings = player_buildings + 1
+                    elseif unit_type then
+                        player_units = player_units + 1
+                    end
+                else
+                    if building then
+                        enemy_buildings = enemy_buildings + 1
+                    elseif unit_type then
+                        enemy_units = enemy_units + 1
+                    end
+                end
+            end
+        end
+    end
+
+    local stats = {
+        {label = "Your Units Remaining", value = player_units},
+        {label = "Your Buildings Remaining", value = player_buildings},
+        {label = "Enemy Units Remaining", value = enemy_units},
+        {label = "Enemy Buildings Remaining", value = enemy_buildings},
+        {label = "Game Time", value = string.format("%d:%02d", math.floor(self.tick_count / 15 / 60), math.floor(self.tick_count / 15) % 60)}
+    }
+
+    for i, stat in ipairs(stats) do
+        local y = stats_y + (i - 1) * 28
+        love.graphics.setColor(0.7, 0.7, 0.7, 1)
+        love.graphics.printf(stat.label .. ":", panel_x + 40, y, 250, "left")
+        love.graphics.setColor(1, 0.9, 0.5, 1)
+        love.graphics.printf(tostring(stat.value), panel_x + 300, y, 150, "left")
+    end
+
+    -- Menu options
+    local menu_y = panel_y + panel_h - 100
+    local menu_items = {}
+
+    if self.mode == Game.MODE.CAMPAIGN and self.mission_result == "victory" then
+        menu_items = {"Continue Campaign", "Replay Mission", "Main Menu"}
+    else
+        menu_items = {"Replay Mission", "Main Menu"}
+    end
+
+    -- Initialize result_menu_index if not set
+    if not self.result_menu_index then
+        self.result_menu_index = 1
+    end
+
+    for i, item in ipairs(menu_items) do
+        local y = menu_y + (i - 1) * 30
+        if i == self.result_menu_index then
+            love.graphics.setColor(1, 0.9, 0.3, 1)
+            love.graphics.printf("> " .. item .. " <", panel_x, y, panel_w, "center")
+        else
+            love.graphics.setColor(0.6, 0.6, 0.6, 1)
+            love.graphics.printf(item, panel_x, y, panel_w, "center")
+        end
+    end
+
+    -- Store menu items for input handling
+    self.result_menu_items = menu_items
+end
+
+-- Handle mission result menu input
+function Game:handle_result_input(key)
+    if not self.mission_result or not self.result_menu_items then return false end
+
+    if key == "up" then
+        self.result_menu_index = self.result_menu_index - 1
+        if self.result_menu_index < 1 then
+            self.result_menu_index = #self.result_menu_items
+        end
+        return true
+    elseif key == "down" then
+        self.result_menu_index = self.result_menu_index + 1
+        if self.result_menu_index > #self.result_menu_items then
+            self.result_menu_index = 1
+        end
+        return true
+    elseif key == "return" or key == "space" then
+        local selected = self.result_menu_items[self.result_menu_index]
+        if selected == "Continue Campaign" then
+            self:advance_campaign()
+        elseif selected == "Replay Mission" then
+            self:replay_mission()
+        elseif selected == "Main Menu" then
+            self:return_to_menu()
+        end
+        return true
+    end
+
+    return false
+end
+
+-- Advance to next campaign mission
+function Game:advance_campaign()
+    -- Clear result state
+    self.mission_result = nil
+    self.mission_result_message = nil
+    self.result_menu_index = 1
+
+    -- Increment mission number and load next
+    if self.current_mission then
+        local faction = self.current_mission:match("^(%a+)")
+        local num = tonumber(self.current_mission:match("(%d+)$")) or 1
+        self.current_mission = faction .. string.format("%02d", num + 1)
+    end
+
+    -- Return to campaign select for now (could auto-load next mission)
+    self.state = Game.STATE.CAMPAIGN_SELECT
+end
+
+-- Replay current mission
+function Game:replay_mission()
+    -- Clear result state
+    self.mission_result = nil
+    self.mission_result_message = nil
+    self.result_menu_index = 1
+
+    -- Reload current scenario
+    if self.current_mission and self.scenario_loader then
+        self:reset_game_state()
+        self.scenario_loader:load_scenario("data/scenarios/" .. self.current_mission .. ".json")
+        self.state = Game.STATE.PLAYING
+    end
+end
+
+-- Return to main menu
+function Game:return_to_menu()
+    -- Clear all game state
+    self.mission_result = nil
+    self.mission_result_message = nil
+    self.result_menu_index = 1
+    self:reset_game_state()
+    self.state = Game.STATE.MENU
+end
+
+-- Reset game state for new mission
+function Game:reset_game_state()
+    -- Clear world entities
+    if self.world then
+        self.world:clear()
+    end
+
+    -- Reset systems
+    if self.trigger_system then
+        self.trigger_system:reset()
+    end
+    if self.team_system then
+        self.team_system:reset()
+    end
+
+    -- Reset tick counter
+    self.tick_count = 0
+    self.tick_accumulator = 0
 end
 
 -- Draw options menu
@@ -827,6 +1060,153 @@ function Game:draw_options()
     love.graphics.setColor(0.5, 0.5, 0.5, 1)
     love.graphics.printf("Press ESC to return, H for HD toggle, F for Fog toggle",
         0, h - 50, w, "center")
+end
+
+-- Draw mission briefing screen
+function Game:draw_briefing()
+    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+
+    -- Dark background
+    love.graphics.setColor(0.02, 0.02, 0.05, 1)
+    love.graphics.rectangle("fill", 0, 0, w, h)
+
+    -- Get briefing data
+    local briefing = self.current_briefing or {}
+    local faction = briefing.faction or "GDI"
+    local mission_num = briefing.mission or 1
+    local title = briefing.title or string.format("%s Mission %d", faction, mission_num)
+    local text = briefing.text or "No briefing available."
+
+    -- Faction color
+    local faction_color = faction == "NOD" and {0.8, 0.2, 0.2, 1} or {0.9, 0.7, 0.2, 1}
+
+    -- Draw faction emblem area (placeholder)
+    love.graphics.setColor(faction_color)
+    love.graphics.rectangle("fill", 50, 50, 100, 100)
+    love.graphics.setColor(0, 0, 0, 1)
+    love.graphics.printf(faction, 50, 85, 100, "center")
+
+    -- Mission title
+    love.graphics.setColor(faction_color)
+    love.graphics.printf(title, 180, 70, w - 230, "left")
+
+    -- Briefing text box
+    local text_x = 50
+    local text_y = 180
+    local text_w = w - 100
+    local text_h = h - 300
+
+    -- Text background
+    love.graphics.setColor(0.05, 0.05, 0.1, 0.9)
+    love.graphics.rectangle("fill", text_x, text_y, text_w, text_h)
+
+    -- Text border
+    love.graphics.setColor(faction_color[1] * 0.5, faction_color[2] * 0.5, faction_color[3] * 0.5, 1)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", text_x, text_y, text_w, text_h)
+
+    -- Briefing text (with scrolling support if needed)
+    love.graphics.setColor(0.8, 0.8, 0.7, 1)
+    love.graphics.printf(text, text_x + 20, text_y + 20, text_w - 40, "left")
+
+    -- Objectives section
+    local obj_y = text_y + text_h + 20
+    love.graphics.setColor(faction_color)
+    love.graphics.printf("OBJECTIVES:", text_x, obj_y, text_w, "left")
+
+    local objectives = briefing.objectives or {"Destroy all enemy forces"}
+    love.graphics.setColor(0.7, 0.7, 0.7, 1)
+    for i, obj in ipairs(objectives) do
+        love.graphics.printf("- " .. obj, text_x + 20, obj_y + 20 + (i - 1) * 20, text_w - 40, "left")
+    end
+
+    -- Instructions
+    love.graphics.setColor(0.5, 0.5, 0.5, 1)
+    love.graphics.printf("Press ENTER to begin mission | ESC to return", 0, h - 40, w, "center")
+end
+
+-- Handle briefing screen input
+function Game:handle_briefing_input(key)
+    if key == "return" or key == "space" then
+        -- Start the mission
+        self:start_mission_from_briefing()
+    elseif key == "escape" then
+        -- Return to campaign select
+        self.state = Game.STATE.CAMPAIGN_SELECT
+    end
+end
+
+-- Start mission after briefing
+function Game:start_mission_from_briefing()
+    if not self.current_mission then
+        self.state = Game.STATE.CAMPAIGN_SELECT
+        return
+    end
+
+    -- Reset game state for new mission
+    self:reset_game_state()
+
+    -- Load the scenario
+    local scenario_path = "data/scenarios/" .. self.current_mission .. ".json"
+    if self.scenario_loader then
+        local success = self.scenario_loader:load_scenario(scenario_path)
+        if success then
+            self.state = Game.STATE.PLAYING
+            -- Center camera on player start position
+            self:center_camera_on_player()
+        else
+            -- Scenario doesn't exist yet - show error and return
+            self.current_message = "Scenario not yet available: " .. self.current_mission
+            self.message_timer = 3.0
+            self.state = Game.STATE.CAMPAIGN_SELECT
+        end
+    else
+        self.state = Game.STATE.CAMPAIGN_SELECT
+    end
+end
+
+-- Show briefing for a mission
+function Game:show_briefing(faction, mission_num)
+    self.current_mission = string.lower(faction) .. string.format("%02d", mission_num)
+    self.mode = Game.MODE.CAMPAIGN
+
+    -- Build briefing data
+    self.current_briefing = {
+        faction = faction,
+        mission = mission_num,
+        title = faction .. " Mission " .. mission_num,
+        text = self:get_mission_briefing_text(faction, mission_num),
+        objectives = self:get_mission_objectives(faction, mission_num)
+    }
+
+    self.state = Game.STATE.BRIEFING
+end
+
+-- Get mission briefing text (placeholder - would come from scenario files)
+function Game:get_mission_briefing_text(faction, mission_num)
+    local briefings = {
+        GDI = {
+            [1] = "Commander, welcome to the Global Defense Initiative. We have received reports of Nod activity in the region. Your first mission is to establish a foothold and eliminate all hostile forces. A small strike team has been deployed to the area. Good luck.",
+            [2] = "Intelligence reports indicate a Nod base in the area. We need you to locate and destroy their command center. Reinforcements will be available once you secure a position.",
+            [3] = "The Nod forces are expanding their operations. We must stop them before they gain a strategic advantage. Destroy all enemy structures and units in the area."
+        },
+        NOD = {
+            [1] = "Brother, the Brotherhood of Nod welcomes you. Kane has a special mission for you. Eliminate the GDI presence in this sector and secure the Tiberium fields for our use.",
+            [2] = "GDI forces have established a base near our operations. Kane demands their destruction. Show no mercy to the enemies of Nod.",
+            [3] = "The infidels must be purged from our lands. Destroy their base and recover any technology that may be useful to the Brotherhood."
+        }
+    }
+
+    local faction_briefings = briefings[faction] or briefings.GDI
+    return faction_briefings[mission_num] or "Mission briefing data not available."
+end
+
+-- Get mission objectives (placeholder - would come from scenario files)
+function Game:get_mission_objectives(faction, mission_num)
+    return {
+        "Destroy all enemy forces",
+        "Secure the area"
+    }
 end
 
 -- Draw campaign selection
@@ -915,6 +1295,70 @@ function Game:draw_debug()
     love.graphics.print("WASD: Pan camera | Click: Select | Right-click: Move | +/-: Zoom", 10, 50)
 end
 
+-- Draw in-game messages from triggers
+function Game:draw_messages()
+    if not self.current_message or self.message_timer <= 0 then
+        return
+    end
+
+    local w = love.graphics.getWidth()
+    local sidebar_w = self.sidebar and self.sidebar.width or 0
+
+    -- Message box at top center of game area
+    local msg_w = 400
+    local msg_h = 60
+    local msg_x = (w - sidebar_w - msg_w) / 2
+    local msg_y = 80
+
+    -- Background
+    love.graphics.setColor(0, 0, 0, 0.8)
+    love.graphics.rectangle("fill", msg_x, msg_y, msg_w, msg_h)
+
+    -- Border
+    love.graphics.setColor(0.6, 0.5, 0.2, 1)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", msg_x, msg_y, msg_w, msg_h)
+
+    -- Text
+    love.graphics.setColor(1, 0.9, 0.5, 1)
+    love.graphics.printf(self.current_message, msg_x + 10, msg_y + 20, msg_w - 20, "center")
+end
+
+-- Draw special weapon targeting cursor
+function Game:draw_targeting_cursor()
+    if not self.special_weapons or not self.special_weapons.targeting then
+        return
+    end
+
+    local mx, my = love.mouse.getPosition()
+
+    -- Get weapon data for targeting circle radius
+    local weapon_type = self.special_weapons.targeting
+    local weapon_data = self.special_weapons.DATA[weapon_type]
+    local radius = weapon_data and weapon_data.radius or 3
+
+    -- Convert cell radius to pixel radius at current scale
+    local pixel_radius = radius * Constants.CELL_PIXEL_W * self.render_system.scale
+
+    -- Draw targeting circle
+    love.graphics.setColor(1, 0, 0, 0.5)
+    love.graphics.setLineWidth(2)
+    love.graphics.circle("line", mx, my, pixel_radius)
+
+    -- Inner crosshair
+    love.graphics.setColor(1, 0, 0, 0.8)
+    love.graphics.line(mx - 15, my, mx + 15, my)
+    love.graphics.line(mx, my - 15, mx, my + 15)
+
+    -- Weapon name label
+    love.graphics.setColor(1, 0.3, 0.3, 1)
+    love.graphics.printf(weapon_type:upper(), mx - 50, my + pixel_radius + 10, 100, "center")
+
+    -- Instructions
+    love.graphics.setColor(0.8, 0.8, 0.8, 0.8)
+    love.graphics.printf("Right-click to fire | ESC to cancel", mx - 100, my + pixel_radius + 30, 200, "center")
+end
+
 -- Input handling
 function Game:keypressed(key)
     if self.state == Game.STATE.MENU then
@@ -923,6 +1367,8 @@ function Game:keypressed(key)
         self:handle_options_input(key)
     elseif self.state == Game.STATE.CAMPAIGN_SELECT then
         self:handle_campaign_select_input(key)
+    elseif self.state == Game.STATE.BRIEFING then
+        self:handle_briefing_input(key)
     elseif self.state == Game.STATE.SKIRMISH_SETUP then
         self:handle_skirmish_setup_input(key)
     elseif self.state == Game.STATE.MULTIPLAYER_LOBBY then
@@ -930,7 +1376,10 @@ function Game:keypressed(key)
     elseif self.state == Game.STATE.PLAYING then
         self:handle_playing_input(key)
     elseif self.state == Game.STATE.PAUSED then
-        if key == "escape" then
+        -- Check if in mission result screen first
+        if self.mission_result then
+            self:handle_result_input(key)
+        elseif key == "escape" then
             self.state = Game.STATE.PLAYING
         end
     end
@@ -1004,15 +1453,14 @@ function Game:handle_campaign_select_input(key)
         self.state = Game.STATE.MENU
     elseif key == "1" then
         self.player_house = Constants.HOUSE.GOOD
-        self.mode = Game.MODE.CAMPAIGN
-        self:start_campaign("gdi")
+        self:show_briefing("GDI", 1)
     elseif key == "2" then
         self.player_house = Constants.HOUSE.BAD
-        self.mode = Game.MODE.CAMPAIGN
-        self:start_campaign("nod")
+        self:show_briefing("NOD", 1)
     elseif key == "3" then
-        self.mode = Game.MODE.CAMPAIGN
-        self:start_campaign("covert_ops")
+        -- Covert Ops - start with GDI covert ops mission 1
+        self.player_house = Constants.HOUSE.GOOD
+        self:show_briefing("GDI", 1)  -- TODO: Covert ops missions
     end
 end
 
@@ -1036,6 +1484,11 @@ end
 -- Handle playing input
 function Game:handle_playing_input(key)
     if key == "escape" then
+        -- Cancel special weapon targeting first
+        if self.special_weapons and self.special_weapons.targeting then
+            self.special_weapons:cancel_targeting()
+            return
+        end
         self.state = Game.STATE.PAUSED
         return
     elseif key == "h" then
@@ -1528,6 +1981,15 @@ end
 
 function Game:handle_right_click(screen_x, screen_y)
     local world_x, world_y = self.render_system:screen_to_world(screen_x, screen_y)
+
+    -- Check if in special weapon targeting mode
+    if self.special_weapons and self.special_weapons.targeting then
+        -- Fire the weapon at clicked location
+        local target_x = world_x * Constants.PIXEL_LEPTON_W
+        local target_y = world_y * Constants.PIXEL_LEPTON_H
+        self.special_weapons:fire(self.player_house, self.special_weapons.targeting, target_x, target_y)
+        return
+    end
 
     -- Check if placing a building from sidebar
     if self.sidebar and self.sidebar:get_selected_item() then
