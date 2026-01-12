@@ -726,6 +726,9 @@ function Game:draw()
         -- Draw selection box (UI layer)
         self.selection_system:draw_selection_box()
 
+        -- Draw building placement preview
+        self:draw_building_placement_preview()
+
         -- Draw sidebar
         if self.show_sidebar and self.sidebar then
             self.sidebar:set_position(love.graphics.getWidth() - self.sidebar.width, 0, love.graphics.getHeight())
@@ -1411,6 +1414,99 @@ function Game:get_speed_name()
     elseif self.game_speed == Constants.GAME_SPEED.FASTEST then return "Fastest"
     end
     return "Normal"
+end
+
+-- Draw building placement preview when player has a building selected from sidebar
+function Game:draw_building_placement_preview()
+    if not self.sidebar then return end
+
+    local selected_item = self.sidebar:get_selected_item()
+    if not selected_item then return end
+
+    local building_data = self.production_system and self.production_system.building_data[selected_item]
+    if not building_data then return end
+
+    -- Get mouse position
+    local mx, my = love.mouse.getPosition()
+
+    -- Check if mouse is over sidebar area - don't draw preview there
+    if mx >= self.sidebar.x then return end
+
+    -- Convert screen position to world position
+    local world_x = (mx / self.render_system.scale) + self.render_system.camera_x
+    local world_y = (my / self.render_system.scale) + self.render_system.camera_y
+
+    -- Convert to cell coordinates
+    local cell_x = math.floor(world_x / Constants.CELL_PIXEL_W)
+    local cell_y = math.floor(world_y / Constants.CELL_PIXEL_H)
+
+    -- Get building size
+    local size_x = building_data.size and building_data.size[1] or 1
+    local size_y = building_data.size and building_data.size[2] or 1
+
+    -- Check if placement is valid
+    local has_buildings = self:player_has_buildings()
+    local can_place, reason = self.grid:can_place_building(
+        cell_x, cell_y, size_x, size_y,
+        self.player_house, has_buildings
+    )
+
+    -- Convert cell position back to screen coordinates
+    local screen_x = (cell_x * Constants.CELL_PIXEL_W - self.render_system.camera_x) * self.render_system.scale
+    local screen_y = (cell_y * Constants.CELL_PIXEL_H - self.render_system.camera_y) * self.render_system.scale
+    local screen_w = size_x * Constants.CELL_PIXEL_W * self.render_system.scale
+    local screen_h = size_y * Constants.CELL_PIXEL_H * self.render_system.scale
+
+    -- Draw ghost building
+    if can_place then
+        -- Green tint - valid placement
+        love.graphics.setColor(0.2, 0.8, 0.2, 0.5)
+    else
+        -- Red tint - invalid placement
+        love.graphics.setColor(0.8, 0.2, 0.2, 0.5)
+    end
+
+    -- Draw filled rectangle for building footprint
+    love.graphics.rectangle("fill", screen_x, screen_y, screen_w, screen_h)
+
+    -- Draw border
+    if can_place then
+        love.graphics.setColor(0.3, 1, 0.3, 0.9)
+    else
+        love.graphics.setColor(1, 0.3, 0.3, 0.9)
+    end
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", screen_x, screen_y, screen_w, screen_h)
+
+    -- Draw grid lines for each cell
+    love.graphics.setLineWidth(1)
+    if can_place then
+        love.graphics.setColor(0.3, 1, 0.3, 0.5)
+    else
+        love.graphics.setColor(1, 0.3, 0.3, 0.5)
+    end
+
+    local cell_w = Constants.CELL_PIXEL_W * self.render_system.scale
+    local cell_h = Constants.CELL_PIXEL_H * self.render_system.scale
+
+    for dx = 1, size_x - 1 do
+        love.graphics.line(screen_x + dx * cell_w, screen_y, screen_x + dx * cell_w, screen_y + screen_h)
+    end
+    for dy = 1, size_y - 1 do
+        love.graphics.line(screen_x, screen_y + dy * cell_h, screen_x + screen_w, screen_y + dy * cell_h)
+    end
+
+    -- Draw building name and status
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.print(selected_item, screen_x, screen_y - 16)
+
+    if not can_place and reason then
+        love.graphics.setColor(1, 0.5, 0.5, 1)
+        love.graphics.print(reason, screen_x, screen_y + screen_h + 4)
+    end
+
+    -- Reset color
+    love.graphics.setColor(1, 1, 1, 1)
 end
 
 -- Draw debug info

@@ -204,6 +204,7 @@ function RenderSystem:draw_placeholder(entity, px, py)
     local is_building = entity:has("building")
     local is_infantry = entity:has("infantry")
     local is_vehicle = entity:has("mobile") and not is_infantry
+    local is_effect = entity:has_tag and entity:has_tag("effect")
 
     -- Flash effect
     if renderable.flash then
@@ -211,7 +212,59 @@ function RenderSystem:draw_placeholder(entity, px, py)
     end
 
     -- Draw different shapes based on entity type
-    if is_building then
+    if is_effect then
+        -- Effects: animated explosion/death visual
+        local sprite_name = renderable.sprite or ""
+        local anim = entity:has("animation") and entity:get("animation")
+        local progress = 0
+        if entity.effect_lifetime and entity.effect_timer then
+            progress = entity.effect_timer / entity.effect_lifetime
+        elseif anim then
+            progress = anim.frame / 10  -- Approximate progress
+        end
+
+        -- Determine effect style based on sprite name
+        if sprite_name:find("infantry") then
+            -- Infantry death: red splat that fades
+            local alpha = 1 - progress
+            local radius = 6 + progress * 4
+            love.graphics.setColor(0.8, 0.1, 0.1, alpha)
+            love.graphics.circle("fill", px, py, radius)
+            love.graphics.setColor(0.5, 0, 0, alpha * 0.5)
+            love.graphics.circle("fill", px, py, radius * 0.6)
+        else
+            -- Explosion: expanding orange/yellow circle that fades
+            local alpha = 1 - progress
+            local max_radius = 12
+            if sprite_name:find("medium") then
+                max_radius = 18
+            elseif sprite_name:find("large") then
+                max_radius = 28
+            end
+            local radius = 4 + progress * max_radius
+
+            -- Outer orange glow
+            love.graphics.setColor(1, 0.5, 0, alpha * 0.6)
+            love.graphics.circle("fill", px, py, radius)
+
+            -- Inner yellow core
+            love.graphics.setColor(1, 0.9, 0.2, alpha)
+            love.graphics.circle("fill", px, py, radius * 0.5)
+
+            -- White hot center (early in explosion)
+            if progress < 0.3 then
+                love.graphics.setColor(1, 1, 1, (0.3 - progress) * 3)
+                love.graphics.circle("fill", px, py, radius * 0.25)
+            end
+
+            -- Smoke ring (later in explosion)
+            if progress > 0.4 then
+                local smoke_alpha = (progress - 0.4) * 0.8
+                love.graphics.setColor(0.3, 0.3, 0.3, smoke_alpha * (1 - progress))
+                love.graphics.circle("line", px, py, radius * 1.2)
+            end
+        end
+    elseif is_building then
         -- Buildings: filled rectangle with thicker border
         love.graphics.rectangle("fill", x, y, w, h)
         love.graphics.setColor(0.2, 0.2, 0.2, 1)

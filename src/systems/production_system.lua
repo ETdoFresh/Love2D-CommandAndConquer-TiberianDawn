@@ -772,6 +772,11 @@ function ProductionSystem:place_building(construction_yard, cell_x, cell_y, grid
             grid:place_building(cell_x, cell_y, data.size[1], data.size[2], building.id)
         end
 
+        -- Spawn free unit if building provides one (e.g., Refinery -> Harvester)
+        if data.free_unit then
+            self:spawn_free_unit(building, data.free_unit, owner.house, cell_x, cell_y, data.size)
+        end
+
         -- Clear production state
         production.ready_to_place = false
         production.placing_type = nil
@@ -782,6 +787,92 @@ function ProductionSystem:place_building(construction_yard, cell_x, cell_y, grid
     end
 
     return nil, "Failed to create building"
+end
+
+-- Spawn a free unit when a building is placed (e.g., Harvester from Refinery)
+function ProductionSystem:spawn_free_unit(building, unit_type, house, building_cell_x, building_cell_y, building_size)
+    -- Find spawn position adjacent to building
+    local spawn_x, spawn_y = self:find_unit_spawn_position(building_cell_x, building_cell_y, building_size)
+
+    if spawn_x and spawn_y then
+        -- Convert cell to lepton coordinates (center of cell)
+        local x = spawn_x * Constants.LEPTON_PER_CELL + Constants.LEPTON_PER_CELL / 2
+        local y = spawn_y * Constants.LEPTON_PER_CELL + Constants.LEPTON_PER_CELL / 2
+
+        local unit = self:create_unit(unit_type, house, x, y)
+        if unit then
+            self.world:add_entity(unit)
+
+            -- If this is a harvester, assign it to the refinery
+            if unit:has("harvester") then
+                local harvester = unit:get("harvester")
+                harvester.assigned_refinery = building.id
+            end
+
+            -- Emit event for free unit spawned
+            self:emit("FREE_UNIT_SPAWNED", unit, building)
+
+            print(string.format("Spawned free %s at cell (%d, %d) for %s",
+                unit_type, spawn_x, spawn_y,
+                building:has("building") and building:get("building").structure_type or "building"))
+
+            return unit
+        end
+    else
+        print(string.format("WARNING: Could not find spawn position for free %s near building at (%d, %d)",
+            unit_type, building_cell_x, building_cell_y))
+    end
+
+    return nil
+end
+
+-- Find a valid spawn position for a unit adjacent to a building
+function ProductionSystem:find_unit_spawn_position(building_cell_x, building_cell_y, building_size)
+    local grid = self.world and self.world.grid
+
+    -- Search positions around the building, prioritizing south (exit direction)
+    local size_x = building_size[1] or 1
+    local size_y = building_size[2] or 1
+
+    -- Try positions in this order: south, east, west, north
+    local search_order = {}
+
+    -- South edge (preferred for vehicle exit)
+    for dx = 0, size_x - 1 do
+        table.insert(search_order, {building_cell_x + dx, building_cell_y + size_y})
+    end
+
+    -- East edge
+    for dy = 0, size_y - 1 do
+        table.insert(search_order, {building_cell_x + size_x, building_cell_y + dy})
+    end
+
+    -- West edge
+    for dy = 0, size_y - 1 do
+        table.insert(search_order, {building_cell_x - 1, building_cell_y + dy})
+    end
+
+    -- North edge
+    for dx = 0, size_x - 1 do
+        table.insert(search_order, {building_cell_x + dx, building_cell_y - 1})
+    end
+
+    for _, pos in ipairs(search_order) do
+        local cx, cy = pos[1], pos[2]
+
+        -- Check if position is valid
+        if grid then
+            local cell = grid:get_cell(cx, cy)
+            if cell and cell:is_passable("drive") then
+                return cx, cy
+            end
+        else
+            -- No grid, just return first position
+            return cx, cy
+        end
+    end
+
+    return nil, nil
 end
 
 -- Get production progress (0-100)
