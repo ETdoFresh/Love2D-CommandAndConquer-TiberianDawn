@@ -18,7 +18,8 @@ Sidebar.TABS_HEIGHT = 20
 -- Tabs
 Sidebar.TAB = {
     BUILDINGS = 1,
-    UNITS = 2
+    UNITS = 2,
+    SPECIAL = 3  -- Special weapons tab (only shown if weapons available)
 }
 
 function Sidebar.new()
@@ -57,14 +58,21 @@ function Sidebar.new()
     self.production_system = nil
     self.harvest_system = nil
     self.power_system = nil
+    self.special_weapons_system = nil
+
+    -- Special weapons
+    self.special_weapons = {}
+    self.special_weapons_available = false
 
     return self
 end
 
 function Sidebar:init(world)
+    self.world = world
     self.production_system = world:get_system("production")
     self.harvest_system = world:get_system("harvest")
     self.power_system = world:get_system("power")
+    self.special_weapons_system = world:get_system("special_weapons")
 
     -- Subscribe to events
     Events.on(Events.EVENTS.CREDITS_CHANGED, function(house, credits)
@@ -191,6 +199,12 @@ function Sidebar:update(dt)
             self.power_produced = produced
             self.power_consumed = consumed or 0
         end
+    end
+
+    -- Update special weapons
+    if self.special_weapons_system then
+        self.special_weapons = self.special_weapons_system:get_available_weapons(self.house)
+        self.special_weapons_available = #self.special_weapons > 0
     end
 end
 
@@ -349,9 +363,10 @@ function Sidebar:draw_power_bar(x, y, width)
 end
 
 function Sidebar:draw_tabs(x, y)
-    local tab_width = self.width / 2
+    local num_tabs = self.special_weapons_available and 3 or 2
+    local tab_width = self.width / num_tabs
 
-    for i = 1, 2 do
+    for i = 1, num_tabs do
         local tab_x = x + (i - 1) * tab_width
 
         if self.active_tab == i then
@@ -366,12 +381,25 @@ function Sidebar:draw_tabs(x, y)
         love.graphics.rectangle("line", tab_x, y, tab_width, Sidebar.TABS_HEIGHT)
 
         love.graphics.setColor(1, 1, 1, 1)
-        local label = i == 1 and "BUILD" or "UNITS"
+        local label
+        if i == 1 then
+            label = "BUILD"
+        elseif i == 2 then
+            label = "UNITS"
+        else
+            label = "SPEC"
+        end
         love.graphics.printf(label, tab_x, y + 4, tab_width, "center")
     end
 end
 
 function Sidebar:draw_items(x, y)
+    -- Special weapons tab
+    if self.active_tab == Sidebar.TAB.SPECIAL then
+        self:draw_special_weapons(x, y)
+        return
+    end
+
     local items = self.active_tab == Sidebar.TAB.BUILDINGS and
                   self.building_items or self.unit_items
 
@@ -395,6 +423,69 @@ function Sidebar:draw_items(x, y)
             col = 0
             row = row + 1
         end
+    end
+end
+
+-- Draw special weapons buttons
+function Sidebar:draw_special_weapons(x, y)
+    local button_w = self.width - Sidebar.BUTTON_MARGIN * 2
+    local button_h = Sidebar.BUTTON_SIZE + 10
+
+    for i, weapon in ipairs(self.special_weapons) do
+        local by = y + (i - 1) * (button_h + Sidebar.BUTTON_MARGIN)
+
+        -- Background
+        if weapon.ready then
+            -- Ready to fire - flash
+            local flash = (math.floor(love.timer.getTime() * 3) % 2 == 0)
+            if flash then
+                love.graphics.setColor(0.3, 0.5, 0.3, 1)
+            else
+                love.graphics.setColor(0.4, 0.7, 0.4, 1)
+            end
+        else
+            love.graphics.setColor(0.2, 0.2, 0.25, 1)
+        end
+        love.graphics.rectangle("fill", x + Sidebar.BUTTON_MARGIN, by, button_w, button_h)
+
+        -- Cooldown bar
+        if not weapon.ready and weapon.max_cooldown > 0 then
+            local cooldown_pct = weapon.cooldown / weapon.max_cooldown
+            local bar_width = button_w * (1 - cooldown_pct)
+            love.graphics.setColor(0.3, 0.5, 0.7, 0.7)
+            love.graphics.rectangle("fill", x + Sidebar.BUTTON_MARGIN, by, bar_width, button_h)
+        end
+
+        -- Border
+        if weapon.ready then
+            love.graphics.setColor(0, 1, 0, 1)
+            love.graphics.setLineWidth(2)
+        else
+            love.graphics.setColor(0.4, 0.4, 0.4, 1)
+            love.graphics.setLineWidth(1)
+        end
+        love.graphics.rectangle("line", x + Sidebar.BUTTON_MARGIN, by, button_w, button_h)
+        love.graphics.setLineWidth(1)
+
+        -- Weapon name
+        love.graphics.setColor(1, 1, 1, weapon.ready and 1 or 0.6)
+        love.graphics.printf(weapon.name, x + Sidebar.BUTTON_MARGIN, by + 4, button_w, "center")
+
+        -- Status
+        if weapon.ready then
+            love.graphics.setColor(0.2, 1, 0.2, 1)
+            love.graphics.printf("READY", x + Sidebar.BUTTON_MARGIN, by + button_h - 14, button_w, "center")
+        else
+            love.graphics.setColor(0.7, 0.7, 0.7, 1)
+            local cooldown_sec = math.ceil(weapon.cooldown / 60)
+            love.graphics.printf(cooldown_sec .. "s", x + Sidebar.BUTTON_MARGIN, by + button_h - 14, button_w, "center")
+        end
+    end
+
+    -- If no weapons, show message
+    if #self.special_weapons == 0 then
+        love.graphics.setColor(0.5, 0.5, 0.5, 1)
+        love.graphics.printf("No special weapons\navailable", x + Sidebar.BUTTON_MARGIN, y + 20, button_w, "center")
     end
 end
 
@@ -502,11 +593,11 @@ function Sidebar:mousepressed(mx, my, button)
     -- Check tabs
     local tabs_y = self.y + 44
     if my >= tabs_y and my < tabs_y + Sidebar.TABS_HEIGHT then
-        local tab_width = self.width / 2
-        if mx < self.x + tab_width then
-            self.active_tab = Sidebar.TAB.BUILDINGS
-        else
-            self.active_tab = Sidebar.TAB.UNITS
+        local num_tabs = self.special_weapons_available and 3 or 2
+        local tab_width = self.width / num_tabs
+        local clicked_tab = math.floor((mx - self.x) / tab_width) + 1
+        if clicked_tab >= 1 and clicked_tab <= num_tabs then
+            self.active_tab = clicked_tab
         end
         return true
     end
@@ -514,6 +605,33 @@ function Sidebar:mousepressed(mx, my, button)
     -- Check item clicks
     local items_y = tabs_y + Sidebar.TABS_HEIGHT + 4
     if my >= items_y then
+        -- Special weapons tab
+        if self.active_tab == Sidebar.TAB.SPECIAL then
+            local button_w = self.width - Sidebar.BUTTON_MARGIN * 2
+            local button_h = Sidebar.BUTTON_SIZE + 10
+
+            for i, weapon in ipairs(self.special_weapons) do
+                local by = items_y + (i - 1) * (button_h + Sidebar.BUTTON_MARGIN)
+
+                if mx >= self.x + Sidebar.BUTTON_MARGIN and
+                   mx < self.x + Sidebar.BUTTON_MARGIN + button_w and
+                   my >= by and my < by + button_h then
+                    -- Clicked on this weapon
+                    if weapon.ready then
+                        -- Start targeting mode
+                        if self.special_weapons_system then
+                            self.special_weapons_system:start_targeting(self.house, weapon.type)
+                            if self.on_special_weapon_click then
+                                self.on_special_weapon_click(weapon.type, weapon)
+                            end
+                        end
+                    end
+                    return true
+                end
+            end
+            return true
+        end
+
         local items = self.active_tab == Sidebar.TAB.BUILDINGS and
                       self.building_items or self.unit_items
 
@@ -556,6 +674,11 @@ function Sidebar:mousepressed(mx, my, button)
     end
 
     return true
+end
+
+-- Set callback for special weapon clicks
+function Sidebar:set_special_weapon_callback(callback)
+    self.on_special_weapon_click = callback
 end
 
 -- Set callback for unit production
