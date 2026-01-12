@@ -5,6 +5,7 @@
 
 local System = require("src.ecs.system")
 local Constants = require("src.core.constants")
+local Events = require("src.core.events")
 local Direction = require("src.util.direction")
 local Cell = require("src.map.cell")
 
@@ -20,7 +21,15 @@ function MovementSystem.new(grid)
     -- Track which entities occupy which cells (for quick lookup)
     self.entity_cells = {}  -- entity_id -> {cell_x, cell_y}
 
+    -- Trigger system reference (set via set_trigger_system)
+    self.trigger_system = nil
+
     return self
+end
+
+-- Set trigger system reference for cell entry notifications
+function MovementSystem:set_trigger_system(trigger_system)
+    self.trigger_system = trigger_system
 end
 
 function MovementSystem:update(dt, entities)
@@ -58,6 +67,14 @@ function MovementSystem:update_cell_occupancy(entity, old_cell_x, old_cell_y, ne
             end
             new_cell.occupier = entity.id
         end
+
+        -- Notify trigger system of cell entry (for ENTERED_BY triggers)
+        if self.trigger_system then
+            self.trigger_system:on_cell_entered(new_cell_x, new_cell_y, entity)
+        end
+
+        -- Emit cell entered event (for other systems to hook into)
+        Events.emit("CELL_ENTERED", entity, new_cell_x, new_cell_y)
     end
 
     -- Update our tracking table

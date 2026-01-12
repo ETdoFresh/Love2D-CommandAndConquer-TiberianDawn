@@ -226,6 +226,9 @@ function Game:init()
     -- Link trigger, team, and AI systems to scenario loader
     self.scenario_loader:set_systems(self.trigger_system, self.team_system, self.ai_system)
 
+    -- Link trigger system to movement system for cell entry detection
+    self.movement_system:set_trigger_system(self.trigger_system)
+
     -- Create special weapons system
     self.special_weapons = Systems.SpecialWeapons.new(self.world, self.combat_system)
 
@@ -259,6 +262,41 @@ function Game:register_events()
     Events.on("SHOW_TEXT", function(text_id)
         self:show_message(text_id)
     end)
+
+    -- Handle CREATE_TEAM from triggers (uses existing units)
+    Events.on("CREATE_TEAM", function(team_name)
+        if self.team_system then
+            self.team_system:create_team(team_name)
+        end
+    end)
+
+    -- Handle map reveal from triggers
+    Events.on("REVEAL_MAP", function(house)
+        if self.fog_system and house == self.player_house then
+            self.fog_system:reveal_all(house)
+        end
+    end)
+
+    -- Handle reveal zone from triggers (reveal around a waypoint)
+    Events.on("REVEAL_ZONE", function(house, waypoint_index)
+        if self.fog_system and house == self.player_house then
+            local wp = self:get_waypoint(waypoint_index)
+            if wp then
+                self.fog_system:reveal_area(house, wp.x, wp.y, 10)  -- 10 cell radius
+            end
+        end
+    end)
+end
+
+-- Get waypoint from current scenario
+function Game:get_waypoint(index)
+    if self.scenario_loader and self.scenario_loader.scenario then
+        local waypoints = self.scenario_loader.scenario.waypoints
+        if waypoints and waypoints[index] then
+            return waypoints[index]
+        end
+    end
+    return nil
 end
 
 -- Called when player wins a mission
@@ -285,38 +323,87 @@ function Game:spawn_reinforcement(team_name, waypoint)
 
     -- Get the team type definition
     local team_type = self.team_system.team_types[team_name]
-    if not team_type then return end
+    if not team_type then
+        print("Warning: Team type not found: " .. tostring(team_name))
+        return
+    end
 
-    -- Determine spawn position (map edge based on waypoint or default)
+    -- Determine spawn position from waypoint
     local spawn_x, spawn_y = 0, 0
-    if waypoint and self.scenario_loader and self.scenario_loader.scenario then
-        local wp = self.scenario_loader.scenario.waypoints and
-                   self.scenario_loader.scenario.waypoints[waypoint]
-        if wp then
-            spawn_x = wp.x
-            spawn_y = wp.y
+    local wp = self:get_waypoint(waypoint)
+    if wp then
+        spawn_x = wp.x
+        spawn_y = wp.y
+    else
+        -- Default to map edge based on house edge setting
+        local edge = team_type.edge or "North"
+        if edge == "North" then
+            spawn_x = (self.grid.width / 2) * Constants.LEPTON_PER_CELL
+            spawn_y = 0
+        elseif edge == "South" then
+            spawn_x = (self.grid.width / 2) * Constants.LEPTON_PER_CELL
+            spawn_y = self.grid.height * Constants.LEPTON_PER_CELL
+        elseif edge == "West" then
+            spawn_x = 0
+            spawn_y = (self.grid.height / 2) * Constants.LEPTON_PER_CELL
+        elseif edge == "East" then
+            spawn_x = self.grid.width * Constants.LEPTON_PER_CELL
+            spawn_y = (self.grid.height / 2) * Constants.LEPTON_PER_CELL
         end
     end
 
+    -- Convert house string to constant
+    local house = self:string_to_house(team_type.house)
+
     -- Create units for the team
+    local spawned_entities = {}
     if self.production_system then
+        local offset = 0
         for _, member in ipairs(team_type.members or {}) do
             for i = 1, (member.count or 1) do
                 local entity = self.production_system:create_unit(
                     member.type,
-                    Constants.HOUSE[team_type.house] or Constants.HOUSE.BAD,
-                    spawn_x + (i * 128),  -- Offset each unit slightly
-                    spawn_y
+                    house,
+                    spawn_x + offset,
+                    spawn_y + ((i - 1) * 128)  -- Offset each unit slightly
                 )
                 if entity then
                     self.world:add_entity(entity)
+                    table.insert(spawned_entities, entity)
                 end
+                offset = offset + 128
             end
         end
     end
 
     -- Create the team to coordinate these units
-    self.team_system:create_team(team_name)
+    if #spawned_entities > 0 then
+        self.team_system:create_team(team_name)
+    end
+
+    return spawned_entities
+end
+
+-- Convert house string to constant
+function Game:string_to_house(house_str)
+    if type(house_str) == "number" then
+        return house_str
+    end
+
+    local house_map = {
+        GoodGuy = Constants.HOUSE.GOOD,
+        BadGuy = Constants.HOUSE.BAD,
+        Neutral = Constants.HOUSE.NEUTRAL,
+        Special = Constants.HOUSE.SPECIAL,
+        Multi1 = Constants.HOUSE.MULTI1,
+        Multi2 = Constants.HOUSE.MULTI2,
+        Multi3 = Constants.HOUSE.MULTI3,
+        Multi4 = Constants.HOUSE.MULTI4,
+        GOOD = Constants.HOUSE.GOOD,
+        BAD = Constants.HOUSE.BAD
+    }
+
+    return house_map[house_str] or Constants.HOUSE.NEUTRAL
 end
 
 -- Show in-game message
