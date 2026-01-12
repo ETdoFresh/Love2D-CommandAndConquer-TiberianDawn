@@ -470,6 +470,9 @@ function Game:update(dt)
         self.trigger_system:update(adjusted_dt)
     end
 
+    -- Process building repairs
+    self:process_building_repairs(adjusted_dt)
+
     -- Update audio system listener position based on camera
     if self.audio_system and self.render_system then
         self.audio_system:set_listener_position(
@@ -981,6 +984,16 @@ function Game:handle_playing_input(key)
     -- Sell building (Delete key) - sell selected buildings for credits
     if key == "delete" then
         self:sell_selected_buildings()
+    end
+
+    -- Deploy command (D key) - deploy MCV to Construction Yard
+    if key == "d" then
+        self:deploy_selected_units()
+    end
+
+    -- Repair command (R key) - toggle repair mode on selected buildings
+    if key == "r" then
+        self:toggle_repair_selected_buildings()
     end
 
     -- Zoom controls
@@ -1768,6 +1781,93 @@ function Game:sell_selected_buildings()
         end
 
         Events.emit(Events.EVENTS.BUILDING_SOLD, total_refund)
+    end
+end
+
+-- Deploy selected deployable units (MCV -> Construction Yard)
+function Game:deploy_selected_units()
+    local selected = self.selection_system:get_selected_entities()
+    if #selected == 0 then return end
+
+    local deployed_any = false
+
+    for _, entity in ipairs(selected) do
+        -- Only deploy units owned by player that have deployable component
+        if entity:has("deployable") and entity:has("owner") then
+            local owner = entity:get("owner")
+            if owner.house == self.player_house then
+                -- Try to deploy via production system
+                if self.production_system then
+                    local building, err = self.production_system:deploy_unit(entity, self.grid)
+                    if building then
+                        deployed_any = true
+                        print("Deployed MCV to Construction Yard")
+
+                        -- Recalculate power after deployment
+                        if self.power_system then
+                            self.power_system:recalculate_power()
+                        end
+                    else
+                        print("Cannot deploy: " .. tostring(err))
+                    end
+                end
+            end
+        end
+    end
+
+    if deployed_any then
+        -- Clear selection since MCV was destroyed
+        self.selection_system:clear_selection()
+    end
+end
+
+-- Toggle repair mode on selected buildings
+function Game:toggle_repair_selected_buildings()
+    local selected = self.selection_system:get_selected_entities()
+    if #selected == 0 then return end
+
+    for _, entity in ipairs(selected) do
+        -- Only toggle repair on buildings owned by player
+        if entity:has("building") and entity:has("owner") and entity:has("health") then
+            local owner = entity:get("owner")
+            if owner.house == self.player_house then
+                local building = entity:get("building")
+                local health = entity:get("health")
+
+                -- Only allow repair if damaged
+                if health.hp < health.max_hp then
+                    if building.repairing then
+                        -- Stop repairing
+                        if self.production_system then
+                            self.production_system:stop_repair(entity)
+                        end
+                        print("Stopped repairing " .. (building.structure_type or "building"))
+                    else
+                        -- Start repairing
+                        if self.production_system then
+                            self.production_system:start_repair(entity)
+                        end
+                        print("Started repairing " .. (building.structure_type or "building"))
+                    end
+                else
+                    print("Building is already at full health")
+                end
+            end
+        end
+    end
+end
+
+-- Process repair for all buildings that are in repair mode
+function Game:process_building_repairs(dt)
+    if not self.production_system then return end
+
+    -- Get all building entities
+    local buildings = self.world:get_entities_with("building")
+    for _, entity in ipairs(buildings) do
+        local building = entity:get("building")
+        if building and building.repairing then
+            self.production_system:process_repair(entity, dt)
+        end
     end
 end
 

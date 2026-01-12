@@ -15,6 +15,7 @@
     "points": 1250,
     "primary": true,
     "bibbed": true,
+    "factory": "building",
     "sprite": "fact.shp"
   },
   "NUKE": {
