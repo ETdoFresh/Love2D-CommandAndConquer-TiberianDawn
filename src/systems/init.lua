@@ -12,6 +12,7 @@ local Systems = {
     -- Combat
     CombatSystem = require("src.systems.combat_system"),
     AISystem = require("src.systems.ai_system"),
+    TurretSystem = require("src.systems.turret_system"),
 
     -- Economy
     ProductionSystem = require("src.systems.production_system"),

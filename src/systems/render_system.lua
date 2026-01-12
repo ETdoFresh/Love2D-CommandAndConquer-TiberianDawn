@@ -293,12 +293,59 @@ function RenderSystem:draw_placeholder(entity, px, py)
             end
         end
     elseif is_building then
-        -- Buildings: filled rectangle with thicker border
+        -- Buildings: filled rectangle with damage states
+        local health = entity:has("health") and entity:get("health") or nil
+        local hp_ratio = health and (health.hp / health.max_hp) or 1
+
+        -- Draw base building
         love.graphics.rectangle("fill", x, y, w, h)
         love.graphics.setColor(0.2, 0.2, 0.2, 1)
         love.graphics.setLineWidth(2)
         love.graphics.rectangle("line", x, y, w, h)
         love.graphics.setLineWidth(1)
+
+        -- Draw damage overlay based on health
+        if hp_ratio < 0.75 then
+            -- Light damage - some smoke
+            love.graphics.setColor(0.3, 0.3, 0.3, 0.3)
+            local smoke_x = x + w * 0.3
+            local smoke_y = y + h * 0.2
+            love.graphics.circle("fill", smoke_x, smoke_y, 3)
+        end
+
+        if hp_ratio < 0.5 then
+            -- Medium damage - cracks and more smoke
+            love.graphics.setColor(0.15, 0.15, 0.15, 0.5)
+            -- Draw crack lines
+            love.graphics.line(x + w * 0.2, y, x + w * 0.4, y + h * 0.3)
+            love.graphics.line(x + w * 0.6, y + h, x + w * 0.8, y + h * 0.7)
+            -- More smoke
+            local smoke_x = x + w * 0.7
+            local smoke_y = y + h * 0.3
+            love.graphics.setColor(0.4, 0.4, 0.4, 0.4)
+            love.graphics.circle("fill", smoke_x, smoke_y, 4)
+        end
+
+        if hp_ratio < 0.25 then
+            -- Heavy damage - fire and lots of smoke
+            -- Animated fire effect
+            local fire_time = love.timer.getTime() * 4
+            local fire_flicker = math.sin(fire_time) * 0.3 + 0.7
+
+            -- Fire at multiple points
+            love.graphics.setColor(1, 0.5 * fire_flicker, 0, 0.7)
+            love.graphics.circle("fill", x + w * 0.3, y + h * 0.4, 5)
+            love.graphics.circle("fill", x + w * 0.7, y + h * 0.5, 4)
+
+            -- Yellow core
+            love.graphics.setColor(1, 0.9, 0.2, 0.8)
+            love.graphics.circle("fill", x + w * 0.3, y + h * 0.4, 3)
+
+            -- Thick smoke
+            love.graphics.setColor(0.2, 0.2, 0.2, 0.5)
+            love.graphics.circle("fill", x + w * 0.5, y - 3, 6)
+            love.graphics.circle("fill", x + w * 0.4, y - 8, 4)
+        end
     elseif is_infantry then
         -- Infantry: small circle
         local radius = math.min(w, h) / 3

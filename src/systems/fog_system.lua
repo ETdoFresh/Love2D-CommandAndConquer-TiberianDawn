@@ -279,9 +279,34 @@ function FogSystem:draw(render_system)
                     -- Black shroud - completely unexplored areas
                     if self.shroud_enabled then
                         self._debug_unseen_count = self._debug_unseen_count + 1
-                        love.graphics.setColor(0, 0, 0, 1)
-                        love.graphics.rectangle("fill", px, py,
-                            Constants.CELL_PIXEL_W, Constants.CELL_PIXEL_H)
+
+                        -- Check neighboring cells to create edge transitions
+                        local edge_mask = self:get_shroud_edge_mask(house_vis, x, y)
+
+                        if edge_mask == 0 then
+                            -- Interior shroud - solid black
+                            love.graphics.setColor(0, 0, 0, 1)
+                            love.graphics.rectangle("fill", px, py,
+                                Constants.CELL_PIXEL_W, Constants.CELL_PIXEL_H)
+                        else
+                            -- Edge shroud - draw with fade edges
+                            love.graphics.setColor(0, 0, 0, 1)
+                            love.graphics.rectangle("fill", px, py,
+                                Constants.CELL_PIXEL_W, Constants.CELL_PIXEL_H)
+
+                            -- Draw edge fade effect (triangles cut from corners)
+                            love.graphics.setColor(0, 0, 0, 0.7)
+                            local hw, hh = Constants.CELL_PIXEL_W / 2, Constants.CELL_PIXEL_H / 2
+
+                            -- bit.band would be cleaner but we use simple checks
+                            if edge_mask >= 8 then -- North neighbor visible
+                                love.graphics.polygon("fill",
+                                    px, py,
+                                    px + Constants.CELL_PIXEL_W, py,
+                                    px + hw, py + hh / 2
+                                )
+                            end
+                        end
                     end
                 elseif state == FogSystem.VISIBILITY.FOGGED then
                     -- Semi-transparent fog - previously seen but no current vision
@@ -331,6 +356,25 @@ end
 -- Set current player
 function FogSystem:set_player_house(house)
     self.player_house = house
+end
+
+-- Get edge mask for shroud cell (which neighbors are visible)
+-- Returns bitmask: 1=S, 2=E, 4=W, 8=N, 16=SE, 32=SW, 64=NE, 128=NW
+function FogSystem:get_shroud_edge_mask(house_vis, x, y)
+    local mask = 0
+
+    -- Check cardinal directions
+    local n = house_vis[y - 1] and house_vis[y - 1][x] or FogSystem.VISIBILITY.UNSEEN
+    local s = house_vis[y + 1] and house_vis[y + 1][x] or FogSystem.VISIBILITY.UNSEEN
+    local e = house_vis[y] and house_vis[y][x + 1] or FogSystem.VISIBILITY.UNSEEN
+    local w = house_vis[y] and house_vis[y][x - 1] or FogSystem.VISIBILITY.UNSEEN
+
+    if n ~= FogSystem.VISIBILITY.UNSEEN then mask = mask + 8 end
+    if s ~= FogSystem.VISIBILITY.UNSEEN then mask = mask + 1 end
+    if e ~= FogSystem.VISIBILITY.UNSEEN then mask = mask + 2 end
+    if w ~= FogSystem.VISIBILITY.UNSEEN then mask = mask + 4 end
+
+    return mask
 end
 
 -- Reset for new game

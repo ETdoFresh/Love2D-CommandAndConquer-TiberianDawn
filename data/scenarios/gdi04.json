@@ -1,0 +1,193 @@
+{
+  "name": "GDI Mission 4: Rescue Prisoners",
+  "intro": "gdi4",
+  "brief": "GDI4",
+  "win_movie": "gdi4win",
+  "lose_movie": "gdi4lose",
+  "player": "GoodGuy",
+  "build_level": 4,
+  "theater": "TEMPERATE",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+
+  "briefing": {
+    "title": "GDI Mission 4: Rescue Prisoners",
+    "text": "Commander, our intelligence has located a Nod prison facility where several GDI soldiers are being held captive. Your mission is to destroy the Nod prison building to free the prisoners. Once freed, they will join your forces. Nod has established heavy defenses around the facility. Strike fast before they can execute the prisoners.",
+    "objectives": [
+      "Destroy the Nod prison to free the prisoners",
+      "Keep the prisoners alive after rescue",
+      "Eliminate all Nod forces in the area"
+    ]
+  },
+
+  "houses": {
+    "GoodGuy": {
+      "credits": 6000,
+      "edge": "West",
+      "max_unit": 100,
+      "max_building": 50
+    },
+    "BadGuy": {
+      "credits": 3000,
+      "edge": "East",
+      "max_unit": 60,
+      "max_building": 30
+    },
+    "Neutral": {
+      "credits": 0,
+      "edge": "None",
+      "max_unit": 10,
+      "max_building": 5
+    }
+  },
+
+  "structures": [
+    {"house": "BadGuy", "type": "BIO", "health": 256, "cell_x": 48, "cell_y": 32, "tag": "prison"},
+    {"house": "BadGuy", "type": "HAND", "health": 256, "cell_x": 52, "cell_y": 28},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 55, "cell_y": 28},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 45, "cell_y": 28},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 45, "cell_y": 36},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 52, "cell_y": 35},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 50, "cell_y": 25}
+  ],
+
+  "units": [
+    {"house": "GoodGuy", "type": "MCV", "health": 256, "cell_x": 6, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 4, "cell_y": 30, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 4, "cell_y": 34, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HTNK", "health": 256, "cell_x": 2, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "APC", "health": 256, "cell_x": 8, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 46, "cell_y": 30, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 46, "cell_y": 34, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BGGY", "health": 256, "cell_x": 53, "cell_y": 30, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 56, "cell_y": 32, "facing": 192, "mission": "Guard"}
+  ],
+
+  "infantry": [
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 32, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 33, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 3, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 3, "cell_y": 33, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 47, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 47, "cell_y": 30, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 47, "cell_y": 34, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 47, "cell_y": 35, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 33, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 54, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 51, "cell_y": 36, "subcell": 0, "mission": "Guard", "facing": 192}
+  ],
+
+  "triggers": [
+    {
+      "name": "Win1",
+      "house": "BadGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Intro",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 3,
+      "action": 11,
+      "action_param": "Establish a base and locate the Nod prison facility.",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "PrisonFound",
+      "house": "GoodGuy",
+      "event": 9,
+      "event_param": "prison",
+      "action": 11,
+      "action_param": "Prison located! Destroy it to free the prisoners.",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "PrisonDestroyed",
+      "house": "BadGuy",
+      "event": 7,
+      "event_param": "prison",
+      "action": 12,
+      "action_param": "FreePrisoners",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack1",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 300,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Counter1",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack2",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 600,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Counter2",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "NOD_Counter1",
+      "house": "BadGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 5},
+        {"type": "LTNK", "count": 1}
+      ]
+    },
+    {
+      "name": "NOD_Counter2",
+      "house": "BadGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 3},
+        {"type": "E3", "count": 2},
+        {"type": "LTNK", "count": 2}
+      ]
+    },
+    {
+      "name": "FreePrisoners",
+      "house": "GoodGuy",
+      "spawn_at_cell": {"x": 48, "y": 32},
+      "spawn_type": "immediate",
+      "members": [
+        {"type": "E1", "count": 4},
+        {"type": "E5", "count": 1}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 1536, "y": 8192},
+    {"x": 12288, "y": 7168},
+    {"x": 12288, "y": 8192},
+    {"x": 14336, "y": 8192}
+  ],
+
+  "cell_triggers": []
+}

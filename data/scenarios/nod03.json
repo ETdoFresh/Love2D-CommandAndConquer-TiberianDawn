@@ -1,0 +1,218 @@
+{
+  "name": "NOD Mission 3: Friends of the Brotherhood",
+  "intro": "nod3",
+  "brief": "NOD3",
+  "win_movie": "nod3win",
+  "lose_movie": "nod3lose",
+  "player": "BadGuy",
+  "build_level": 3,
+  "theater": "DESERT",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+
+  "briefing": {
+    "title": "NOD Mission 3: Friends of the Brotherhood",
+    "text": "Kane has made contact with a village sympathetic to our cause. GDI forces are approaching to occupy the village. You must defend our allies and eliminate the GDI presence before they can establish a foothold. An MCV has been provided - establish a base and protect the village at all costs. Failure will not be tolerated.",
+    "objectives": [
+      "Deploy your MCV and build a base",
+      "Protect the village from GDI attack",
+      "Destroy all GDI forces"
+    ]
+  },
+
+  "houses": {
+    "BadGuy": {
+      "credits": 5500,
+      "edge": "South",
+      "max_unit": 80,
+      "max_building": 40
+    },
+    "GoodGuy": {
+      "credits": 4000,
+      "edge": "North",
+      "max_unit": 60,
+      "max_building": 25
+    },
+    "Neutral": {
+      "credits": 0,
+      "edge": "None",
+      "max_unit": 0,
+      "max_building": 10
+    }
+  },
+
+  "structures": [
+    {"house": "Neutral", "type": "V01", "health": 256, "cell_x": 30, "cell_y": 30, "tag": "village1"},
+    {"house": "Neutral", "type": "V01", "health": 256, "cell_x": 33, "cell_y": 30, "tag": "village2"},
+    {"house": "Neutral", "type": "V01", "health": 256, "cell_x": 31, "cell_y": 33, "tag": "village3"},
+    {"house": "GoodGuy", "type": "PYLE", "health": 256, "cell_x": 30, "cell_y": 8},
+    {"house": "GoodGuy", "type": "WEAP", "health": 256, "cell_x": 34, "cell_y": 8},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 27, "cell_y": 8},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 25, "cell_y": 12},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 38, "cell_y": 12}
+  ],
+
+  "units": [
+    {"house": "BadGuy", "type": "MCV", "health": 256, "cell_x": 32, "cell_y": 55, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 28, "cell_y": 54, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 36, "cell_y": 54, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BGGY", "health": 256, "cell_x": 30, "cell_y": 52, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BGGY", "health": 256, "cell_x": 34, "cell_y": 52, "facing": 0, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 30, "cell_y": 14, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 34, "cell_y": 14, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 28, "cell_y": 16, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "APC", "health": 256, "cell_x": 36, "cell_y": 16, "facing": 128, "mission": "Guard"}
+  ],
+
+  "infantry": [
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 31, "cell_y": 53, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 32, "cell_y": 53, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 33, "cell_y": 53, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 29, "cell_y": 53, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 35, "cell_y": 53, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 30, "cell_y": 51, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 34, "cell_y": 51, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 29, "cell_y": 9, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 30, "cell_y": 9, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 34, "cell_y": 9, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 35, "cell_y": 9, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 27, "cell_y": 11, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 37, "cell_y": 11, "subcell": 0, "mission": "Guard", "facing": 128}
+  ],
+
+  "triggers": [
+    {
+      "name": "Win1",
+      "house": "GoodGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Intro",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 3,
+      "action": 11,
+      "action_param": "Deploy your MCV. The village must be protected from GDI.",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "VillageLost1",
+      "house": "Neutral",
+      "event": 7,
+      "event_param": "village1",
+      "action": 11,
+      "action_param": "A village building was destroyed! Protect our allies!",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "VillageLost2",
+      "house": "Neutral",
+      "event": 7,
+      "event_param": "village2",
+      "action": 11,
+      "action_param": "The village is being destroyed! Kane will be displeased.",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "VillageLost3",
+      "house": "Neutral",
+      "event": 7,
+      "event_param": "village3",
+      "action": 2,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "GDI_Attack1",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 180,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Assault1",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "GDI_Attack2",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 450,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Assault2",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "GDI_Attack3",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 750,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Assault3",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "GDI_Assault1",
+      "house": "GoodGuy",
+      "edge": "North",
+      "mission": 0,
+      "waypoints": [1, 2],
+      "members": [
+        {"type": "E1", "count": 5},
+        {"type": "JEEP", "count": 1}
+      ]
+    },
+    {
+      "name": "GDI_Assault2",
+      "house": "GoodGuy",
+      "edge": "North",
+      "mission": 0,
+      "waypoints": [1, 2],
+      "members": [
+        {"type": "E1", "count": 4},
+        {"type": "E3", "count": 2},
+        {"type": "MTNK", "count": 2}
+      ]
+    },
+    {
+      "name": "GDI_Assault3",
+      "house": "GoodGuy",
+      "edge": "North",
+      "mission": 0,
+      "waypoints": [1, 2],
+      "members": [
+        {"type": "E1", "count": 6},
+        {"type": "E3", "count": 3},
+        {"type": "MTNK", "count": 3},
+        {"type": "APC", "count": 1}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 8192, "y": 14080},
+    {"x": 7680, "y": 7680},
+    {"x": 8448, "y": 7680},
+    {"x": 8192, "y": 2048}
+  ],
+
+  "cell_triggers": []
+}

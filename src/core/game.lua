@@ -194,6 +194,11 @@ function Game:init()
     self.ai_system:set_priority(25)
     self.world:add_system(self.ai_system)
 
+    -- Turret system for vehicle/building turret rotation
+    self.turret_system = Systems.TurretSystem.new()
+    self.turret_system:set_priority(28)  -- After AI, before combat
+    self.world:add_system(self.turret_system)
+
     -- Create Phase 3 systems (Economy)
     self.production_system = Systems.ProductionSystem.new()
     self.production_system:set_priority(40)
@@ -460,6 +465,10 @@ function Game:init_systems()
     if self.ai_system then
         self.ai_system.world = self.world
         self.ai_system:init()
+    end
+
+    if self.turret_system then
+        self.turret_system.world = self.world
     end
 
     if self.production_system then

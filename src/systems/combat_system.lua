@@ -263,6 +263,11 @@ function CombatSystem:fire_weapon(attacker, target, weapon)
     local transform = attacker:get("transform")
     local target_transform = target:get("transform")
 
+    -- Play weapon fire sound
+    if weapon.report then
+        Events.emit("PLAY_SOUND", weapon.report, transform.x, transform.y)
+    end
+
     -- Get projectile type and speed from data files
     local proj_type = weapon.projectile or "default"
     local speed = self:get_projectile_speed(proj_type)
@@ -1060,9 +1065,27 @@ function CombatSystem:update_smoke_particles()
     end
 end
 
+-- Impact sounds by type
+CombatSystem.IMPACT_SOUNDS = {
+    explosion = "xplos",
+    fire = "flame",
+    smoke = nil,  -- Smoke is silent
+    spark = "xplosml2",
+    chem = "xplos"
+}
+
 -- Spawn impact effect at location
 function CombatSystem:spawn_impact_effect(x, y, effect_type)
     local effect_def = self.IMPACT_EFFECTS[effect_type] or self.IMPACT_EFFECTS.explosion
+
+    -- Play impact sound
+    local impact_sound = self.IMPACT_SOUNDS[effect_type]
+    if impact_sound then
+        -- Convert pixel coordinates to leptons for positional audio
+        local lepton_x = x * Constants.PIXEL_LEPTON_W
+        local lepton_y = y * Constants.PIXEL_LEPTON_H
+        Events.emit("PLAY_SOUND", impact_sound, lepton_x, lepton_y)
+    end
 
     table.insert(self.impact_effects, {
         x = x,
