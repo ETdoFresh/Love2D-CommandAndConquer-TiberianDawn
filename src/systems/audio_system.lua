@@ -5,6 +5,7 @@
 
 local Events = require("src.core.events")
 local System = require("src.ecs.system")
+local Paths = require("src.util.paths")
 
 local AudioSystem = setmetatable({}, {__index = System})
 AudioSystem.__index = AudioSystem
@@ -83,7 +84,7 @@ function AudioSystem:load_sound_definitions()
             end)
             if success and data then
                 for name, info in pairs(data) do
-                    local path = info.path or ("assets/audio/sfx/" .. name .. ".ogg")
+                    local path = info.path or Paths.audio("sfx/" .. name .. ".ogg")
                     local category = info.category or AudioSystem.CATEGORY.SFX
                     self:register_sound(name, path, category)
                 end
@@ -368,7 +369,7 @@ function AudioSystem:load_sound(name)
     local data = self.sound_data[name]
     if not data then
         -- Try default path
-        local path = "assets/sounds/" .. name .. ".wav"
+        local path = Paths.sound(name .. ".wav")
         if love.filesystem.getInfo(path) then
             data = {path = path, category = AudioSystem.CATEGORY.SFX}
         else
@@ -459,9 +460,9 @@ function AudioSystem:play_music(name)
     self:stop_music()
 
     -- Try to load music file
-    local path = "assets/music/" .. name .. ".ogg"
+    local path = Paths.music(name .. ".ogg")
     if not love.filesystem.getInfo(path) then
-        path = "assets/music/" .. name .. ".mp3"
+        path = Paths.music(name .. ".mp3")
     end
     if not love.filesystem.getInfo(path) then
         return false

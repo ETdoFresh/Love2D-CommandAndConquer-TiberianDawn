@@ -5,34 +5,36 @@
 ]]
 
 local Events = require("src.core.events")
+local Paths = require("src.util.paths")
 
 local Cutscene = {}
 Cutscene.__index = Cutscene
 
 -- Video file mapping (original C&C FMV names to remastered files)
+-- Note: Paths are relative to video directory, resolved via Paths module
 Cutscene.VIDEOS = {
     -- GDI Campaign
-    gdi1 = {path = "assets/video/cutscenes/gdi/gdi1.ogv", title = "GDI Mission 1 Briefing"},
-    gdi1win = {path = "assets/video/cutscenes/gdi/gdi1win.ogv", title = "GDI Mission 1 Victory"},
-    gdi1lose = {path = "assets/video/cutscenes/gdi/gdi1lose.ogv", title = "GDI Mission 1 Defeat"},
-    gdi2 = {path = "assets/video/cutscenes/gdi/gdi2.ogv", title = "GDI Mission 2 Briefing"},
-    gdi2win = {path = "assets/video/cutscenes/gdi/gdi2win.ogv", title = "GDI Mission 2 Victory"},
-    gdi3 = {path = "assets/video/cutscenes/gdi/gdi3.ogv", title = "GDI Mission 3 Briefing"},
-    gdifinal = {path = "assets/video/cutscenes/gdi/gdifinal.ogv", title = "GDI Campaign Victory"},
+    gdi1 = {path = "cutscenes/gdi/gdi1.ogv", title = "GDI Mission 1 Briefing"},
+    gdi1win = {path = "cutscenes/gdi/gdi1win.ogv", title = "GDI Mission 1 Victory"},
+    gdi1lose = {path = "cutscenes/gdi/gdi1lose.ogv", title = "GDI Mission 1 Defeat"},
+    gdi2 = {path = "cutscenes/gdi/gdi2.ogv", title = "GDI Mission 2 Briefing"},
+    gdi2win = {path = "cutscenes/gdi/gdi2win.ogv", title = "GDI Mission 2 Victory"},
+    gdi3 = {path = "cutscenes/gdi/gdi3.ogv", title = "GDI Mission 3 Briefing"},
+    gdifinal = {path = "cutscenes/gdi/gdifinal.ogv", title = "GDI Campaign Victory"},
 
     -- Nod Campaign
-    nod1 = {path = "assets/video/cutscenes/nod/nod1.ogv", title = "Nod Mission 1 Briefing"},
-    nod1win = {path = "assets/video/cutscenes/nod/nod1win.ogv", title = "Nod Mission 1 Victory"},
-    nod1lose = {path = "assets/video/cutscenes/nod/nod1lose.ogv", title = "Nod Mission 1 Defeat"},
-    nod2 = {path = "assets/video/cutscenes/nod/nod2.ogv", title = "Nod Mission 2 Briefing"},
-    nod2win = {path = "assets/video/cutscenes/nod/nod2win.ogv", title = "Nod Mission 2 Victory"},
-    nod3 = {path = "assets/video/cutscenes/nod/nod3.ogv", title = "Nod Mission 3 Briefing"},
-    nodfinal = {path = "assets/video/cutscenes/nod/nodfinal.ogv", title = "Nod Campaign Victory"},
+    nod1 = {path = "cutscenes/nod/nod1.ogv", title = "Nod Mission 1 Briefing"},
+    nod1win = {path = "cutscenes/nod/nod1win.ogv", title = "Nod Mission 1 Victory"},
+    nod1lose = {path = "cutscenes/nod/nod1lose.ogv", title = "Nod Mission 1 Defeat"},
+    nod2 = {path = "cutscenes/nod/nod2.ogv", title = "Nod Mission 2 Briefing"},
+    nod2win = {path = "cutscenes/nod/nod2win.ogv", title = "Nod Mission 2 Victory"},
+    nod3 = {path = "cutscenes/nod/nod3.ogv", title = "Nod Mission 3 Briefing"},
+    nodfinal = {path = "cutscenes/nod/nodfinal.ogv", title = "Nod Campaign Victory"},
 
     -- Shared/Intro videos
-    intro = {path = "assets/video/cutscenes/intro.ogv", title = "Command & Conquer Intro"},
-    logo = {path = "assets/video/cutscenes/logo.ogv", title = "Westwood Studios Logo"},
-    credits = {path = "assets/video/cutscenes/credits.ogv", title = "Credits"}
+    intro = {path = "cutscenes/intro.ogv", title = "Command & Conquer Intro"},
+    logo = {path = "cutscenes/logo.ogv", title = "Westwood Studios Logo"},
+    credits = {path = "cutscenes/credits.ogv", title = "Credits"}
 }
 
 -- Cutscene states
@@ -102,8 +104,8 @@ function Cutscene:play(video_id, on_complete)
         return
     end
 
-    -- Check if video file exists
-    local video_path = video_data.path
+    -- Check if video file exists (resolve path via Paths module)
+    local video_path = Paths.video(video_data.path)
     if love.filesystem.getInfo(video_path) then
         -- Load the video
         self.state = Cutscene.STATE.LOADING
@@ -278,7 +280,7 @@ end
 function Cutscene:load_subtitles(video_id)
     self.subtitles = {}
 
-    local sub_path = "assets/video/subtitles/" .. video_id .. ".srt"
+    local sub_path = Paths.video("subtitles/" .. video_id .. ".srt")
     if not love.filesystem.getInfo(sub_path) then
         return
     end

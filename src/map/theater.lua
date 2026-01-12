@@ -5,6 +5,7 @@
 
 local Constants = require("src.core.constants")
 local Serialize = require("src.util.serialize")
+local Paths = require("src.util.paths")
 
 local Theater = {}
 Theater.__index = Theater
@@ -293,8 +294,8 @@ end
 
 -- Get theater-specific asset path
 function Theater:get_asset_path(base_name, extension)
-    return string.format("assets/sprites/classic/terrain/%s.%s.%s",
-        base_name, self.suffix:lower(), extension or "png")
+    return Paths.sprite(string.format("classic/terrain/%s.%s.%s",
+        base_name, self.suffix:lower(), extension or "png"))
 end
 
 -- String representation

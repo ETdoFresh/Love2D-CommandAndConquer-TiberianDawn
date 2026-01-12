@@ -5,6 +5,8 @@
     Love2D Quads for each animation frame.
 ]]
 
+local Paths = require("src.util.paths")
+
 -- Simple JSON parser for metadata files (only handles our simple format)
 local function parse_json(str)
     -- Remove whitespace and parse key-value pairs
@@ -33,8 +35,8 @@ function SpriteLoader.new()
     -- Cache for quads (organized by sprite name)
     self.quads = {}
 
-    -- Base path for sprites
-    self.base_path = "assets/sprites/"
+    -- Base path for sprites (uses Paths module for worktree support)
+    self.base_path = Paths.sprite("")
 
     -- Category subdirectories
     self.categories = {
