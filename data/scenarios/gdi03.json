@@ -1,0 +1,139 @@
+{
+  "name": "GDI Mission 3: Air Superiority",
+  "intro": "gdi3",
+  "brief": "GDI3",
+  "win_movie": "gdi3win",
+  "lose_movie": "gdi3lose",
+  "player": "GoodGuy",
+  "build_level": 3,
+  "theater": "TEMPERATE",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 60,
+  "map_height": 60,
+
+  "briefing": {
+    "title": "GDI Mission 3: Air Superiority",
+    "text": "Commander, Nod has been constructing SAM sites throughout this region, limiting our air support capabilities. Your mission is to establish a base and eliminate all SAM sites in the area. Once the SAM sites are destroyed, air support will be available. An MCV has been deployed to your position. Build a base and produce forces to destroy the enemy defenses.",
+    "objectives": [
+      "Deploy the MCV",
+      "Build a base",
+      "Destroy all enemy SAM sites",
+      "Eliminate remaining Nod forces"
+    ]
+  },
+
+  "houses": {
+    "GoodGuy": {
+      "credits": 5000,
+      "edge": "West",
+      "max_unit": 80,
+      "max_building": 40
+    },
+    "BadGuy": {
+      "credits": 2000,
+      "edge": "East",
+      "max_unit": 50,
+      "max_building": 25
+    }
+  },
+
+  "structures": [
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 45, "cell_y": 15},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 48, "cell_y": 30},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 42, "cell_y": 42},
+    {"house": "BadGuy", "type": "HAND", "health": 256, "cell_x": 50, "cell_y": 25},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 52, "cell_y": 25},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 43, "cell_y": 20},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 46, "cell_y": 38}
+  ],
+
+  "units": [
+    {"house": "GoodGuy", "type": "MCV", "health": 256, "cell_x": 5, "cell_y": 30, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 3, "cell_y": 28, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 3, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 44, "cell_y": 18, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 49, "cell_y": 28, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BGGY", "health": 256, "cell_x": 44, "cell_y": 40, "facing": 192, "mission": "Guard"}
+  ],
+
+  "infantry": [
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 4, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 4, "cell_y": 30, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 4, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 2, "cell_y": 30, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 46, "cell_y": 16, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 47, "cell_y": 16, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 32, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 51, "cell_y": 26, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 43, "cell_y": 43, "subcell": 0, "mission": "Guard", "facing": 192}
+  ],
+
+  "triggers": [
+    {
+      "name": "Win1",
+      "house": "BadGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Intro",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 3,
+      "action": 11,
+      "action_param": "Deploy your MCV and establish a base.",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "BaseBuilt",
+      "house": "GoodGuy",
+      "event": 19,
+      "event_param": 0,
+      "action": 11,
+      "action_param": "Base established. Locate and destroy enemy SAM sites.",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 180,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Attack",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "NOD_Attack",
+      "house": "BadGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 4},
+        {"type": "LTNK", "count": 2}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 1280, "y": 7680},
+    {"x": 11520, "y": 3840},
+    {"x": 12288, "y": 7680},
+    {"x": 10752, "y": 10752}
+  ],
+
+  "cell_triggers": []
+}

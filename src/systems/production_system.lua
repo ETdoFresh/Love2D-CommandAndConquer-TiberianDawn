@@ -26,6 +26,7 @@ function ProductionSystem.new()
     -- Unit and building data
     self.unit_data = {}
     self.building_data = {}
+    self.weapon_data = {}  -- Weapon data for attack range lookup
 
     -- Production queues per house
     self.queues = {}  -- house_id -> {infantry = {}, vehicle = {}, aircraft = {}, building = {}}
@@ -75,6 +76,21 @@ function ProductionSystem:load_data()
             self.building_data[name] = data
         end
     end
+
+    -- Load weapon data for attack range lookup
+    local weapons = Serialize.load_json("data/weapons/weapons.json")
+    if weapons then
+        self.weapon_data = weapons
+    end
+end
+
+-- Get attack range for a unit based on its primary weapon
+function ProductionSystem:get_weapon_range(weapon_name)
+    if weapon_name and self.weapon_data[weapon_name] then
+        -- Weapon range is in cells, convert to leptons (256 leptons per cell)
+        return (self.weapon_data[weapon_name].range or 4) * Constants.LEPTON_PER_CELL
+    end
+    return 4 * Constants.LEPTON_PER_CELL  -- Default 4 cell range
 end
 
 function ProductionSystem:update(dt, entities)
@@ -333,10 +349,12 @@ function ProductionSystem:create_unit(unit_type, house, x, y)
 
     -- Combat
     if data.primary_weapon then
+        -- Get attack range from weapon data (in leptons)
+        local attack_range = self:get_weapon_range(data.primary_weapon)
         entity:add("combat", Component.create("combat", {
             primary_weapon = data.primary_weapon,
             secondary_weapon = data.secondary_weapon,
-            attack_range = data.sight or 4,
+            attack_range = attack_range,
             ammo = data.ammo or -1
         }))
     end
@@ -473,9 +491,11 @@ function ProductionSystem:create_building(building_type, house, cell_x, cell_y)
 
     -- Combat (for defensive structures)
     if data.primary_weapon then
+        -- Get attack range from weapon data (in leptons)
+        local attack_range = self:get_weapon_range(data.primary_weapon)
         entity:add("combat", Component.create("combat", {
             primary_weapon = data.primary_weapon,
-            attack_range = 5
+            attack_range = attack_range
         }))
 
         if data.turret then
@@ -749,12 +769,16 @@ function ProductionSystem:place_building(construction_yard, cell_x, cell_y, grid
         return nil, "Unknown building type"
     end
 
-    -- Check placement validity
+    -- Check placement validity (require adjacency to existing base buildings)
     if grid then
+        -- Most buildings require adjacency (except MCV-deployed Construction Yard)
+        local require_adjacent = building_type ~= "FACT"
         local can_place, reason = grid:can_place_building(
             cell_x, cell_y,
             data.size[1], data.size[2],
-            owner.house
+            owner.house,
+            require_adjacent,
+            building_type
         )
         if not can_place then
             return nil, reason

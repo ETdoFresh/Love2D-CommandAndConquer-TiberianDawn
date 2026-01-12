@@ -1,0 +1,120 @@
+{
+  "name": "GDI Mission 2: Knock out that Refinery",
+  "intro": "gdi2",
+  "brief": "GDI2",
+  "win_movie": "gdi2win",
+  "lose_movie": "gdi2lose",
+  "player": "GoodGuy",
+  "build_level": 2,
+  "theater": "TEMPERATE",
+  "map_x": 5,
+  "map_y": 5,
+  "map_width": 50,
+  "map_height": 50,
+
+  "briefing": {
+    "title": "GDI Mission 2: Knock out that Refinery",
+    "text": "Commander, Nod has established a Tiberium harvesting operation in this sector. Their refinery is providing crucial resources for their war effort. Your mission is to locate and destroy the enemy refinery to cripple their economy. Be advised - they have defensive structures protecting the facility. A reinforcement team will arrive from the north once you engage the enemy.",
+    "objectives": [
+      "Destroy the Nod Refinery",
+      "Eliminate all enemy forces"
+    ]
+  },
+
+  "houses": {
+    "GoodGuy": {
+      "credits": 3000,
+      "edge": "West",
+      "max_unit": 60,
+      "max_building": 25
+    },
+    "BadGuy": {
+      "credits": 1000,
+      "edge": "East",
+      "max_unit": 40,
+      "max_building": 15
+    }
+  },
+
+  "structures": [
+    {"house": "BadGuy", "type": "PROC", "health": 256, "cell_x": 38, "cell_y": 20},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 40, "cell_y": 24},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 35, "cell_y": 18},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 42, "cell_y": 22}
+  ],
+
+  "units": [
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 8, "cell_y": 25, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 8, "cell_y": 27, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 6, "cell_y": 26, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "HARV", "health": 256, "cell_x": 36, "cell_y": 22, "facing": 128, "mission": "Harvest"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 40, "cell_y": 20, "facing": 192, "mission": "Guard"}
+  ],
+
+  "infantry": [
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 7, "cell_y": 24, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 7, "cell_y": 25, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 7, "cell_y": 26, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 7, "cell_y": 27, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 7, "cell_y": 28, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 37, "cell_y": 19, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 38, "cell_y": 19, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 39, "cell_y": 25, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 41, "cell_y": 21, "subcell": 0, "mission": "Guard", "facing": 192}
+  ],
+
+  "triggers": [
+    {
+      "name": "Win1",
+      "house": "BadGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Reinforce",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 60,
+      "action": 7,
+      "action_param": 0,
+      "team": "GDI_Reinforce",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "ShowMsg",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 5,
+      "action": 11,
+      "action_param": "Reinforcements are en route!",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "GDI_Reinforce",
+      "house": "GoodGuy",
+      "edge": "North",
+      "mission": 5,
+      "waypoints": [0, 1],
+      "members": [
+        {"type": "E1", "count": 3},
+        {"type": "JEEP", "count": 1}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 6400, "y": 1280},
+    {"x": 6400, "y": 6400}
+  ],
+
+  "cell_triggers": []
+}

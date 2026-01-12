@@ -1,0 +1,112 @@
+{
+  "name": "NOD Mission 2: Liberation of Egypt",
+  "intro": "nod2",
+  "brief": "NOD2",
+  "win_movie": "nod2win",
+  "lose_movie": "nod2lose",
+  "player": "BadGuy",
+  "build_level": 2,
+  "theater": "DESERT",
+  "map_x": 5,
+  "map_y": 5,
+  "map_width": 50,
+  "map_height": 50,
+
+  "briefing": {
+    "title": "NOD Mission 2: Liberation of Egypt",
+    "text": "Brother, the time has come to liberate our Egyptian brethren from GDI occupation. Intelligence reports a small GDI outpost in the desert. Kane commands you to destroy this outpost and capture any GDI technology you can find. The local population supports our cause - use them wisely. For the Brotherhood!",
+    "objectives": [
+      "Destroy the GDI outpost",
+      "Capture the GDI Communications Center if possible",
+      "Eliminate all GDI forces"
+    ]
+  },
+
+  "houses": {
+    "BadGuy": {
+      "credits": 3500,
+      "edge": "South",
+      "max_unit": 60,
+      "max_building": 25
+    },
+    "GoodGuy": {
+      "credits": 1500,
+      "edge": "North",
+      "max_unit": 40,
+      "max_building": 15
+    }
+  },
+
+  "structures": [
+    {"house": "GoodGuy", "type": "HQ", "health": 256, "cell_x": 25, "cell_y": 10},
+    {"house": "GoodGuy", "type": "PYLE", "health": 256, "cell_x": 28, "cell_y": 10},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 22, "cell_y": 10},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 20, "cell_y": 12},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 30, "cell_y": 12}
+  ],
+
+  "units": [
+    {"house": "BadGuy", "type": "BGGY", "health": 256, "cell_x": 20, "cell_y": 42, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BGGY", "health": 256, "cell_x": 22, "cell_y": 42, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 25, "cell_y": 44, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BIKE", "health": 256, "cell_x": 28, "cell_y": 42, "facing": 0, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 26, "cell_y": 14, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 24, "cell_y": 16, "facing": 128, "mission": "Guard"}
+  ],
+
+  "infantry": [
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 21, "cell_y": 40, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 22, "cell_y": 40, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 23, "cell_y": 40, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 24, "cell_y": 40, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 25, "cell_y": 40, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E6", "health": 256, "cell_x": 26, "cell_y": 40, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 24, "cell_y": 11, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 25, "cell_y": 11, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 27, "cell_y": 11, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 23, "cell_y": 13, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 28, "cell_y": 13, "subcell": 0, "mission": "Guard", "facing": 128}
+  ],
+
+  "triggers": [
+    {
+      "name": "Win1",
+      "house": "GoodGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Alert",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 30,
+      "action": 6,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CaptureBonus",
+      "house": "BadGuy",
+      "event": 32,
+      "event_param": 0,
+      "action": 11,
+      "action_param": "Communications Center captured! New intel acquired.",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [],
+
+  "waypoints": [
+    {"x": 6400, "y": 10240},
+    {"x": 6400, "y": 2560}
+  ],
+
+  "cell_triggers": []
+}
