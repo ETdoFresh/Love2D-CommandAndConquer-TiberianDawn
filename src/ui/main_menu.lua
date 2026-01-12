@@ -15,7 +15,8 @@ MainMenu.STATE = {
     SKIRMISH = "skirmish",
     MULTIPLAYER = "multiplayer",
     OPTIONS = "options",
-    CREDITS = "credits"
+    CREDITS = "credits",
+    EDITOR = "editor"
 }
 
 function MainMenu.new()
@@ -47,6 +48,7 @@ function MainMenu.new()
         {label = "NOD CAMPAIGN", action = "nod_campaign"},
         {label = "SKIRMISH", action = "skirmish"},
         {label = "MULTIPLAYER", action = "multiplayer"},
+        {label = "MAP EDITOR", action = "editor"},
         {label = "OPTIONS", action = "options"},
         {label = "CREDITS", action = "credits"},
         {label = "EXIT", action = "exit"}
@@ -241,6 +243,12 @@ function MainMenu:handle_main_selection(action)
         self.previous_state = self.state
         self.state = MainMenu.STATE.CREDITS
         self.selected_index = 1
+
+    elseif action == "editor" then
+        -- Launch the map editor
+        if self.on_start_game then
+            self.on_start_game("editor", nil)
+        end
 
     elseif action == "exit" then
         love.event.quit()
