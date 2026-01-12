@@ -1,0 +1,9 @@
+{
+  "Executable": null,
+  "SavedPrompts": [
+    {
+      "Title": "PLAN.md",
+      "PromptText": "Analyze Repo and read @PLAN.md and determine the next set of tasks to put on todo list to ensure we are creating a faithful and accurate implementation of c\u0026c in love2d. Implement the next set of tasks."
+    }
+  ]
+}
