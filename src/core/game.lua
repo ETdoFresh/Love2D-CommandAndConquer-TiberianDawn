@@ -1224,63 +1224,125 @@ end
 function Game:draw_briefing()
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
 
-    -- Dark background
+    -- Track briefing fade-in animation
+    self.briefing_fade = self.briefing_fade or 0
+    self.briefing_fade = math.min(1, self.briefing_fade + love.timer.getDelta() * 2)
+    local fade = self.briefing_fade
+
+    -- Dark background with faction-tinted gradient
+    local briefing = self.current_briefing or {}
+    local faction = briefing.faction or "GDI"
+    local faction_color = faction == "NOD" and {0.8, 0.2, 0.2, 1} or {0.9, 0.7, 0.2, 1}
+
     love.graphics.setColor(0.02, 0.02, 0.05, 1)
     love.graphics.rectangle("fill", 0, 0, w, h)
 
+    -- Subtle faction-colored gradient at top
+    love.graphics.setColor(faction_color[1] * 0.15, faction_color[2] * 0.15, faction_color[3] * 0.15, fade * 0.5)
+    love.graphics.rectangle("fill", 0, 0, w, 150)
+
     -- Get briefing data
-    local briefing = self.current_briefing or {}
-    local faction = briefing.faction or "GDI"
     local mission_num = briefing.mission or 1
     local title = briefing.title or string.format("%s Mission %d", faction, mission_num)
     local text = briefing.text or "No briefing available."
 
-    -- Faction color
-    local faction_color = faction == "NOD" and {0.8, 0.2, 0.2, 1} or {0.9, 0.7, 0.2, 1}
+    -- Draw faction emblem area with animated border
+    local emblem_x, emblem_y = 50, 50
+    local emblem_size = 100
 
-    -- Draw faction emblem area (placeholder)
-    love.graphics.setColor(faction_color)
-    love.graphics.rectangle("fill", 50, 50, 100, 100)
-    love.graphics.setColor(0, 0, 0, 1)
-    love.graphics.printf(faction, 50, 85, 100, "center")
+    -- Emblem glow effect
+    love.graphics.setColor(faction_color[1], faction_color[2], faction_color[3], fade * 0.3)
+    love.graphics.rectangle("fill", emblem_x - 5, emblem_y - 5, emblem_size + 10, emblem_size + 10)
 
-    -- Mission title
-    love.graphics.setColor(faction_color)
-    love.graphics.printf(title, 180, 70, w - 230, "left")
+    -- Emblem background
+    love.graphics.setColor(faction_color[1] * 0.3, faction_color[2] * 0.3, faction_color[3] * 0.3, fade)
+    love.graphics.rectangle("fill", emblem_x, emblem_y, emblem_size, emblem_size)
+
+    -- Emblem border (animated pulse)
+    local pulse = 0.7 + 0.3 * math.sin(love.timer.getTime() * 2)
+    love.graphics.setColor(faction_color[1] * pulse, faction_color[2] * pulse, faction_color[3] * pulse, fade)
+    love.graphics.setLineWidth(3)
+    love.graphics.rectangle("line", emblem_x, emblem_y, emblem_size, emblem_size)
+
+    -- Faction name in emblem
+    love.graphics.setColor(1, 1, 1, fade)
+    love.graphics.printf(faction, emblem_x, emblem_y + 35, emblem_size, "center")
+    love.graphics.setColor(faction_color[1], faction_color[2], faction_color[3], fade * 0.7)
+    love.graphics.printf(faction == "NOD" and "Brotherhood" or "Initiative", emblem_x, emblem_y + 55, emblem_size, "center")
+
+    -- Mission title with fade-in from left
+    local title_x = 180 - (1 - fade) * 50
+    love.graphics.setColor(faction_color[1], faction_color[2], faction_color[3], fade)
+    love.graphics.printf(title, title_x, 60, w - 230, "left")
+
+    -- Subtitle line
+    love.graphics.setColor(0.5, 0.5, 0.5, fade)
+    love.graphics.printf("MISSION BRIEFING", title_x, 90, w - 230, "left")
+
+    -- Separator line
+    love.graphics.setColor(faction_color[1] * 0.5, faction_color[2] * 0.5, faction_color[3] * 0.5, fade)
+    love.graphics.rectangle("fill", title_x, 115, w - title_x - 100, 2)
 
     -- Briefing text box
     local text_x = 50
-    local text_y = 180
+    local text_y = 160
     local text_w = w - 100
-    local text_h = h - 300
+    local text_h = h - 280
 
-    -- Text background
-    love.graphics.setColor(0.05, 0.05, 0.1, 0.9)
+    -- Text background with subtle gradient
+    love.graphics.setColor(0.03, 0.03, 0.06, fade * 0.95)
     love.graphics.rectangle("fill", text_x, text_y, text_w, text_h)
 
-    -- Text border
-    love.graphics.setColor(faction_color[1] * 0.5, faction_color[2] * 0.5, faction_color[3] * 0.5, 1)
+    -- Text border with faction color
+    love.graphics.setColor(faction_color[1] * 0.4, faction_color[2] * 0.4, faction_color[3] * 0.4, fade)
     love.graphics.setLineWidth(2)
     love.graphics.rectangle("line", text_x, text_y, text_w, text_h)
 
-    -- Briefing text (with scrolling support if needed)
-    love.graphics.setColor(0.8, 0.8, 0.7, 1)
-    love.graphics.printf(text, text_x + 20, text_y + 20, text_w - 40, "left")
+    -- Corner accents
+    local corner_size = 15
+    love.graphics.setColor(faction_color[1], faction_color[2], faction_color[3], fade * 0.8)
+    love.graphics.line(text_x, text_y + corner_size, text_x, text_y, text_x + corner_size, text_y)
+    love.graphics.line(text_x + text_w - corner_size, text_y, text_x + text_w, text_y, text_x + text_w, text_y + corner_size)
+    love.graphics.line(text_x, text_y + text_h - corner_size, text_x, text_y + text_h, text_x + corner_size, text_y + text_h)
+    love.graphics.line(text_x + text_w - corner_size, text_y + text_h, text_x + text_w, text_y + text_h, text_x + text_w, text_y + text_h - corner_size)
+
+    -- Briefing text with typewriter effect (optional - shows more text over time)
+    local chars_visible = math.floor(#text * math.min(1, self.briefing_fade * 1.5))
+    local display_text = text:sub(1, chars_visible)
+
+    love.graphics.setColor(0.85, 0.85, 0.8, fade)
+    love.graphics.printf(display_text, text_x + 25, text_y + 25, text_w - 50, "left")
 
     -- Objectives section
-    local obj_y = text_y + text_h + 20
-    love.graphics.setColor(faction_color)
-    love.graphics.printf("OBJECTIVES:", text_x, obj_y, text_w, "left")
+    local obj_y = text_y + text_h + 15
+    love.graphics.setColor(faction_color[1], faction_color[2], faction_color[3], fade)
+    love.graphics.printf("PRIMARY OBJECTIVES:", text_x, obj_y, text_w, "left")
 
     local objectives = briefing.objectives or {"Destroy all enemy forces"}
-    love.graphics.setColor(0.7, 0.7, 0.7, 1)
+    love.graphics.setColor(0.75, 0.75, 0.7, fade)
     for i, obj in ipairs(objectives) do
-        love.graphics.printf("- " .. obj, text_x + 20, obj_y + 20 + (i - 1) * 20, text_w - 40, "left")
+        -- Bullet point with faction color
+        love.graphics.setColor(faction_color[1], faction_color[2], faction_color[3], fade)
+        love.graphics.circle("fill", text_x + 15, obj_y + 25 + (i - 1) * 22, 4)
+        -- Objective text
+        love.graphics.setColor(0.75, 0.75, 0.7, fade)
+        love.graphics.printf(obj, text_x + 30, obj_y + 18 + (i - 1) * 22, text_w - 50, "left")
     end
 
-    -- Instructions
-    love.graphics.setColor(0.5, 0.5, 0.5, 1)
-    love.graphics.printf("Press ENTER to begin mission | ESC to return", 0, h - 40, w, "center")
+    -- Bottom bar with instructions
+    love.graphics.setColor(0.02, 0.02, 0.05, fade * 0.9)
+    love.graphics.rectangle("fill", 0, h - 50, w, 50)
+    love.graphics.setColor(faction_color[1] * 0.3, faction_color[2] * 0.3, faction_color[3] * 0.3, fade)
+    love.graphics.rectangle("fill", 0, h - 50, w, 2)
+
+    -- Blinking "Press ENTER" prompt
+    local blink = math.sin(love.timer.getTime() * 3) > 0 and 1 or 0.5
+    love.graphics.setColor(0.6 * blink, 0.6 * blink, 0.5 * blink, fade)
+    love.graphics.printf("Press ENTER to begin mission", 0, h - 35, w / 2, "right")
+    love.graphics.setColor(0.4, 0.4, 0.4, fade)
+    love.graphics.printf(" | ESC to return to campaign", w / 2, h - 35, w / 2, "left")
+
+    love.graphics.setLineWidth(1)
 end
 
 -- Handle briefing screen input
@@ -1361,6 +1423,9 @@ function Game:show_briefing(faction, mission_num)
             objectives = self:get_mission_objectives(faction, mission_num)
         }
     end
+
+    -- Reset briefing animation
+    self.briefing_fade = 0
 
     self.state = Game.STATE.BRIEFING
 end

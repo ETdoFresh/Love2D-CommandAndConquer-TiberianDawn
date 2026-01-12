@@ -53,6 +53,66 @@ function AISystem:init()
     -- Get references to other systems
     self.combat_system = self.world:get_system("combat")
     self.movement_system = self.world:get_system("movement")
+
+    -- Handle transport destruction - eject all passengers
+    Events.on(Events.EVENTS.ENTITY_DESTROYED, function(entity)
+        if entity:has("cargo") then
+            self:eject_passengers(entity)
+        end
+    end)
+
+    Events.on(Events.EVENTS.UNIT_KILLED, function(entity, killer, cause)
+        if entity:has("cargo") then
+            self:eject_passengers(entity)
+        end
+    end)
+end
+
+-- Eject all passengers when transport is destroyed (passengers take damage)
+function AISystem:eject_passengers(transport)
+    if not transport:has("cargo") then return end
+
+    local cargo = transport:get("cargo")
+    local transform = transport:get("transform")
+
+    for _, passenger_id in ipairs(cargo.passengers) do
+        local passenger = self.world:get_entity(passenger_id)
+        if passenger and passenger:is_alive() then
+            local passenger_transform = passenger:get("transform")
+
+            -- Place near destroyed transport
+            local offset_x = (Random.random() - 0.5) * Constants.LEPTON_PER_CELL * 2
+            local offset_y = (Random.random() - 0.5) * Constants.LEPTON_PER_CELL * 2
+            passenger_transform.x = transform.x + offset_x
+            passenger_transform.y = transform.y + offset_y
+            passenger_transform.cell_x = math.floor(passenger_transform.x / Constants.LEPTON_PER_CELL)
+            passenger_transform.cell_y = math.floor(passenger_transform.y / Constants.LEPTON_PER_CELL)
+
+            -- Make visible and selectable again
+            if passenger:has("renderable") then
+                passenger:get("renderable").visible = true
+            end
+            if passenger:has("selectable") then
+                passenger:get("selectable").can_select = true
+            end
+            if passenger:has("mission") then
+                passenger:get("mission").inside_transport = nil
+            end
+
+            -- Apply damage to ejected passengers (transport explosion damages them)
+            if passenger:has("health") then
+                local health = passenger:get("health")
+                local damage = math.floor(health.max_hp * 0.5) -- 50% damage on crash
+                health.hp = math.max(1, health.hp - damage)
+            end
+
+            self:set_mission(passenger, Constants.MISSION.GUARD)
+            Events.emit("UNIT_EJECTED", passenger, transport)
+        end
+    end
+
+    -- Clear passengers list
+    cargo.passengers = {}
 end
 
 function AISystem:update(dt, entities)
@@ -443,9 +503,39 @@ AISystem.mission_handlers[Constants.MISSION.ENTER] = function(self, entity, miss
             local dist = math.sqrt(dx * dx + dy * dy)
 
             if dist < Constants.LEPTON_PER_CELL then
-                -- Close enough, enter
-                -- TODO: Actually enter the transport
-                self:set_mission(entity, Constants.MISSION.SLEEP)
+                -- Close enough, attempt to enter transport
+                if target:has("cargo") then
+                    local cargo = target:get("cargo")
+
+                    -- Check if transport has room
+                    if #cargo.passengers < cargo.capacity then
+                        -- Enter the transport
+                        table.insert(cargo.passengers, entity.id)
+
+                        -- Hide the unit (remove from rendering, disable collision)
+                        if entity:has("renderable") then
+                            entity:get("renderable").visible = false
+                        end
+                        if entity:has("selectable") then
+                            entity:get("selectable").is_selected = false
+                            entity:get("selectable").can_select = false
+                        end
+
+                        -- Mark as inside transport
+                        mission.inside_transport = target.id
+
+                        -- Set to sleep while inside
+                        self:set_mission(entity, Constants.MISSION.SLEEP)
+
+                        Events.emit("UNIT_ENTERED_TRANSPORT", entity, target)
+                    else
+                        -- Transport full, return to guard
+                        self:set_mission(entity, Constants.MISSION.GUARD)
+                    end
+                else
+                    -- Target is not a transport
+                    self:set_mission(entity, Constants.MISSION.GUARD)
+                end
             else
                 self.movement_system:move_to(entity, target_transform.x, target_transform.y)
             end
@@ -558,9 +648,17 @@ AISystem.mission_handlers[Constants.MISSION.UNLOAD] = function(self, entity, mis
                 passenger_transform.cell_x = math.floor(passenger_transform.x / Constants.LEPTON_PER_CELL)
                 passenger_transform.cell_y = math.floor(passenger_transform.y / Constants.LEPTON_PER_CELL)
 
-                -- Make passenger visible again
+                -- Make passenger visible and selectable again
                 if passenger:has("renderable") then
                     passenger:get("renderable").visible = true
+                end
+                if passenger:has("selectable") then
+                    passenger:get("selectable").can_select = true
+                end
+
+                -- Clear transport reference
+                if passenger:has("mission") then
+                    passenger:get("mission").inside_transport = nil
                 end
 
                 -- Set passenger to guard

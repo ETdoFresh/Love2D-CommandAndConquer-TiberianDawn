@@ -389,19 +389,73 @@ function SpecialWeapons:draw_targeting(render_system, mouse_x, mouse_y)
     love.graphics.scale(render_system.scale, render_system.scale)
     love.graphics.translate(-render_system.camera_x, -render_system.camera_y)
 
-    -- Draw targeting circle
-    love.graphics.setColor(1, 0, 0, 0.3)
-    love.graphics.circle("fill", world_x, world_y, radius)
+    -- Animated pulse effect for radius
+    local pulse = 0.8 + 0.2 * math.sin(love.timer.getTime() * 4)
 
-    love.graphics.setColor(1, 0, 0, 1)
+    -- Draw damage falloff gradient (darker at edge = less damage)
+    local segments = 16
+    for i = segments, 1, -1 do
+        local r = radius * (i / segments)
+        local alpha = 0.15 * (i / segments)
+
+        -- Color based on weapon type
+        if self.targeting == SpecialWeapons.TYPE.ION_CANNON then
+            love.graphics.setColor(0.2, 0.5, 1, alpha)
+        elseif self.targeting == SpecialWeapons.TYPE.NUCLEAR_STRIKE then
+            love.graphics.setColor(1, 0.3, 0, alpha)
+        else
+            love.graphics.setColor(1, 0.5, 0, alpha)
+        end
+        love.graphics.circle("fill", world_x, world_y, r)
+    end
+
+    -- Outer radius line (pulsing)
+    local line_color
+    if self.targeting == SpecialWeapons.TYPE.ION_CANNON then
+        line_color = {0.5, 0.8, 1, pulse}
+    elseif self.targeting == SpecialWeapons.TYPE.NUCLEAR_STRIKE then
+        line_color = {1, 0.2, 0, pulse}
+    else
+        line_color = {1, 0.6, 0, pulse}
+    end
+    love.graphics.setColor(unpack(line_color))
+    love.graphics.setLineWidth(2)
     love.graphics.circle("line", world_x, world_y, radius)
+    love.graphics.setLineWidth(1)
+
+    -- Inner kill zone indicator (high damage area)
+    love.graphics.setColor(1, 1, 1, 0.4 * pulse)
+    love.graphics.circle("line", world_x, world_y, radius * 0.3)
 
     -- Draw crosshair
-    love.graphics.line(world_x - 10, world_y, world_x + 10, world_y)
-    love.graphics.line(world_x, world_y - 10, world_x, world_y + 10)
+    love.graphics.setColor(1, 1, 1, 1)
+    local ch_size = 15
+    love.graphics.setLineWidth(2)
+    love.graphics.line(world_x - ch_size, world_y, world_x - 5, world_y)
+    love.graphics.line(world_x + 5, world_y, world_x + ch_size, world_y)
+    love.graphics.line(world_x, world_y - ch_size, world_x, world_y - 5)
+    love.graphics.line(world_x, world_y + 5, world_x, world_y + ch_size)
+    love.graphics.setLineWidth(1)
+
+    -- Center dot
+    love.graphics.circle("fill", world_x, world_y, 3)
 
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.pop()
+
+    -- Draw weapon name and instructions (in screen space)
+    love.graphics.setColor(1, 1, 1, 1)
+    local font = love.graphics.getFont()
+    local text = data.name .. " - Click to fire"
+    local text_width = font:getWidth(text)
+    love.graphics.print(text, mouse_x - text_width / 2, mouse_y + radius * render_system.scale + 20)
+
+    love.graphics.setColor(0.7, 0.7, 0.7, 1)
+    local hint = "ESC to cancel"
+    local hint_width = font:getWidth(hint)
+    love.graphics.print(hint, mouse_x - hint_width / 2, mouse_y + radius * render_system.scale + 35)
+
+    love.graphics.setColor(1, 1, 1, 1)
 end
 
 -- Draw active effects

@@ -18,9 +18,9 @@ Lobby.STATE = {
     STARTING = "starting"
 }
 
--- Maximum players
-Lobby.MAX_PLAYERS = 4
-Lobby.MAX_SPECTATORS = 4
+-- Maximum players (matches original C&C SESSION.H MAX_PLAYERS=6)
+Lobby.MAX_PLAYERS = 6
+Lobby.MAX_SPECTATORS = 6
 
 function Lobby.new()
     local self = setmetatable({}, Lobby)
