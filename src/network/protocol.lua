@@ -200,7 +200,7 @@ function Protocol:encode_command(cmd)
                  self:encode_int(cmd.player_id, 1)
 
     if cmd.type == Protocol.PACKET.CMD_MOVE then
-        data = data .. self:encode_int(cmd.entity_count, 2)
+        data = data .. self:encode_int(cmd.entity_count or #cmd.entities, 2)
         for _, id in ipairs(cmd.entities) do
             data = data .. self:encode_int(id, 4)
         end
@@ -211,21 +211,113 @@ function Protocol:encode_command(cmd)
         data = data .. self:encode_int(cmd.attacker_id, 4) ..
                        self:encode_int(cmd.target_id, 4)
 
+    elseif cmd.type == Protocol.PACKET.CMD_STOP or
+           cmd.type == Protocol.PACKET.CMD_GUARD or
+           cmd.type == Protocol.PACKET.CMD_SCATTER or
+           cmd.type == Protocol.PACKET.CMD_DEPLOY then
+        data = data .. self:encode_int(cmd.entity_count or #cmd.entities, 2)
+        for _, id in ipairs(cmd.entities) do
+            data = data .. self:encode_int(id, 4)
+        end
+
     elseif cmd.type == Protocol.PACKET.CMD_BUILD then
-        data = data .. self:encode_int(cmd.building_type, 2) ..
+        data = data .. self:encode_string(cmd.building_type or "") ..
                        self:encode_int(cmd.cell_x, 2) ..
                        self:encode_int(cmd.cell_y, 2)
 
     elseif cmd.type == Protocol.PACKET.CMD_SELL then
         data = data .. self:encode_int(cmd.building_id, 4)
 
+    elseif cmd.type == Protocol.PACKET.CMD_REPAIR then
+        data = data .. self:encode_int(cmd.building_id, 4)
+
     elseif cmd.type == Protocol.PACKET.CMD_SPECIAL then
         data = data .. self:encode_int(cmd.weapon_type, 1) ..
                        self:encode_int(cmd.target_x, 4) ..
                        self:encode_int(cmd.target_y, 4)
+
+    elseif cmd.type == Protocol.PACKET.CMD_TEAM then
+        data = data .. self:encode_int(cmd.team_number, 1) ..
+                       self:encode_int(cmd.action, 1)  -- 0=assign, 1=select
+
+    elseif cmd.type == Protocol.PACKET.CMD_ALLIANCE then
+        data = data .. self:encode_int(cmd.target_house, 1) ..
+                       self:encode_int(cmd.allied and 1 or 0, 1)
     end
 
     return data
+end
+
+-- Decode a single command from payload
+function Protocol:decode_command(data, offset)
+    if offset > #data then return nil, offset end
+
+    local cmd = {}
+    cmd.type = string.byte(data, offset)
+    cmd.player_id = self:decode_int(data, offset + 1, 1)
+    offset = offset + 2
+
+    if cmd.type == Protocol.PACKET.CMD_MOVE then
+        cmd.entity_count = self:decode_int(data, offset, 2)
+        offset = offset + 2
+        cmd.entities = {}
+        for _ = 1, cmd.entity_count do
+            table.insert(cmd.entities, self:decode_int(data, offset, 4))
+            offset = offset + 4
+        end
+        cmd.dest_x = self:decode_int(data, offset, 4)
+        cmd.dest_y = self:decode_int(data, offset + 4, 4)
+        offset = offset + 8
+
+    elseif cmd.type == Protocol.PACKET.CMD_ATTACK then
+        cmd.attacker_id = self:decode_int(data, offset, 4)
+        cmd.target_id = self:decode_int(data, offset + 4, 4)
+        offset = offset + 8
+
+    elseif cmd.type == Protocol.PACKET.CMD_STOP or
+           cmd.type == Protocol.PACKET.CMD_GUARD or
+           cmd.type == Protocol.PACKET.CMD_SCATTER or
+           cmd.type == Protocol.PACKET.CMD_DEPLOY then
+        cmd.entity_count = self:decode_int(data, offset, 2)
+        offset = offset + 2
+        cmd.entities = {}
+        for _ = 1, cmd.entity_count do
+            table.insert(cmd.entities, self:decode_int(data, offset, 4))
+            offset = offset + 4
+        end
+
+    elseif cmd.type == Protocol.PACKET.CMD_BUILD then
+        cmd.building_type, offset = self:decode_string(data, offset)
+        cmd.cell_x = self:decode_int(data, offset, 2)
+        cmd.cell_y = self:decode_int(data, offset + 2, 2)
+        offset = offset + 4
+
+    elseif cmd.type == Protocol.PACKET.CMD_SELL then
+        cmd.building_id = self:decode_int(data, offset, 4)
+        offset = offset + 4
+
+    elseif cmd.type == Protocol.PACKET.CMD_REPAIR then
+        cmd.building_id = self:decode_int(data, offset, 4)
+        offset = offset + 4
+
+    elseif cmd.type == Protocol.PACKET.CMD_SPECIAL then
+        cmd.weapon_type = self:decode_int(data, offset, 1)
+        cmd.target_x = self:decode_int(data, offset + 1, 4)
+        cmd.target_y = self:decode_int(data, offset + 5, 4)
+        offset = offset + 9
+
+    elseif cmd.type == Protocol.PACKET.CMD_TEAM then
+        cmd.team_number = self:decode_int(data, offset, 1)
+        cmd.action = self:decode_int(data, offset + 1, 1)
+        offset = offset + 2
+
+    elseif cmd.type == Protocol.PACKET.CMD_ALLIANCE then
+        cmd.target_house = self:decode_int(data, offset, 1)
+        cmd.allied = self:decode_int(data, offset + 1, 1) == 1
+        offset = offset + 2
+    end
+
+    return cmd, offset
 end
 
 -- Create SYNC_CHECK packet
@@ -283,7 +375,18 @@ function Protocol:decode(data)
         packet.frame_number = self:decode_int(payload, 1, 4)
         packet.command_count = self:decode_int(payload, 5, 2)
         packet.commands = {}
-        -- Command decoding would go here
+
+        -- Decode each command
+        local offset = 7
+        for _ = 1, packet.command_count do
+            local cmd, new_offset = self:decode_command(payload, offset)
+            if cmd then
+                table.insert(packet.commands, cmd)
+                offset = new_offset
+            else
+                break
+            end
+        end
 
     elseif header.type == Protocol.PACKET.SYNC_CHECK then
         packet.frame_number = self:decode_int(payload, 1, 4)

@@ -259,4 +259,177 @@ function Controller:gamepadRemoved(joystick)
     end
 end
 
+-- Radial Menu System for controller commands
+Controller.RADIAL_MENU = {
+    items = {
+        {name = "Move", action = "move", angle = 0, icon = "M"},
+        {name = "Attack", action = "attack", angle = 45, icon = "A"},
+        {name = "Force Attack", action = "force_attack", angle = 90, icon = "F"},
+        {name = "Guard", action = "guard", angle = 135, icon = "G"},
+        {name = "Stop", action = "stop", angle = 180, icon = "S"},
+        {name = "Scatter", action = "scatter", angle = 225, icon = "X"},
+        {name = "Deploy", action = "deploy", angle = 270, icon = "D"},
+        {name = "Cancel", action = "cancel", angle = 315, icon = "C"}
+    },
+    radius = 80,
+    item_radius = 25,
+    active = false,
+    selected_index = 0,
+    center_x = 0,
+    center_y = 0
+}
+
+-- Open radial menu at current cursor position
+function Controller:open_radial_menu()
+    local menu = Controller.RADIAL_MENU
+    menu.active = true
+    menu.center_x = self.cursor_x
+    menu.center_y = self.cursor_y
+    menu.selected_index = 0
+    Events.emit("RADIAL_MENU_OPENED")
+end
+
+-- Close radial menu and execute selected action
+function Controller:close_radial_menu(execute)
+    local menu = Controller.RADIAL_MENU
+    if not menu.active then return nil end
+
+    local selected_action = nil
+    if execute and menu.selected_index > 0 then
+        selected_action = menu.items[menu.selected_index].action
+        Events.emit("RADIAL_MENU_ACTION", selected_action)
+    end
+
+    menu.active = false
+    Events.emit("RADIAL_MENU_CLOSED")
+    return selected_action
+end
+
+-- Update radial menu selection based on stick direction
+function Controller:update_radial_menu()
+    local menu = Controller.RADIAL_MENU
+    if not menu.active then return end
+
+    -- Get stick direction
+    local stick_x = self.right_stick_x
+    local stick_y = self.right_stick_y
+
+    -- Check if stick is deflected enough to select
+    local magnitude = math.sqrt(stick_x * stick_x + stick_y * stick_y)
+    if magnitude < 0.3 then
+        -- Return to center (no selection)
+        menu.selected_index = 0
+        return
+    end
+
+    -- Calculate angle from stick direction (0 = right, clockwise)
+    local angle = math.deg(math.atan2(stick_y, stick_x))
+    if angle < 0 then angle = angle + 360 end
+
+    -- Find closest menu item
+    local closest_index = 0
+    local closest_diff = 999
+
+    for i, item in ipairs(menu.items) do
+        local diff = math.abs(angle - item.angle)
+        if diff > 180 then diff = 360 - diff end
+
+        if diff < closest_diff and diff < 45 then  -- 45 degree tolerance
+            closest_diff = diff
+            closest_index = i
+        end
+    end
+
+    menu.selected_index = closest_index
+end
+
+-- Draw radial menu
+function Controller:draw_radial_menu()
+    local menu = Controller.RADIAL_MENU
+    if not menu.active then return end
+
+    local cx, cy = menu.center_x, menu.center_y
+
+    -- Draw semi-transparent background
+    love.graphics.setColor(0, 0, 0, 0.7)
+    love.graphics.circle("fill", cx, cy, menu.radius + 40)
+
+    -- Draw center circle
+    love.graphics.setColor(0.2, 0.2, 0.3, 0.9)
+    love.graphics.circle("fill", cx, cy, 30)
+    love.graphics.setColor(0.5, 0.5, 0.6, 1)
+    love.graphics.circle("line", cx, cy, 30)
+
+    -- Draw menu items
+    for i, item in ipairs(menu.items) do
+        local angle_rad = math.rad(item.angle)
+        local ix = cx + math.cos(angle_rad) * menu.radius
+        local iy = cy + math.sin(angle_rad) * menu.radius
+
+        local is_selected = (i == menu.selected_index)
+
+        -- Item background
+        if is_selected then
+            love.graphics.setColor(0.8, 0.6, 0.1, 0.9)
+        else
+            love.graphics.setColor(0.3, 0.3, 0.4, 0.8)
+        end
+        love.graphics.circle("fill", ix, iy, menu.item_radius)
+
+        -- Item border
+        if is_selected then
+            love.graphics.setColor(1, 0.9, 0.3, 1)
+            love.graphics.setLineWidth(3)
+        else
+            love.graphics.setColor(0.5, 0.5, 0.6, 1)
+            love.graphics.setLineWidth(1)
+        end
+        love.graphics.circle("line", ix, iy, menu.item_radius)
+
+        -- Icon letter
+        love.graphics.setColor(1, 1, 1, 1)
+        local font = love.graphics.getFont()
+        local icon_w = font:getWidth(item.icon)
+        love.graphics.print(item.icon, ix - icon_w/2, iy - 8)
+
+        -- Item name (only for selected)
+        if is_selected then
+            love.graphics.setColor(1, 1, 1, 1)
+            local name_w = font:getWidth(item.name)
+            love.graphics.print(item.name, cx - name_w/2, cy - 8)
+        end
+
+        love.graphics.setLineWidth(1)
+    end
+
+    -- Draw direction indicator from center to selected item
+    if menu.selected_index > 0 then
+        local item = menu.items[menu.selected_index]
+        local angle_rad = math.rad(item.angle)
+        local end_x = cx + math.cos(angle_rad) * (menu.radius - menu.item_radius - 5)
+        local end_y = cy + math.sin(angle_rad) * (menu.radius - menu.item_radius - 5)
+
+        love.graphics.setColor(1, 0.8, 0.2, 0.8)
+        love.graphics.setLineWidth(3)
+        love.graphics.line(cx, cy, end_x, end_y)
+        love.graphics.setLineWidth(1)
+    end
+
+    love.graphics.setColor(1, 1, 1, 1)
+end
+
+-- Check if radial menu is open
+function Controller:is_radial_menu_open()
+    return Controller.RADIAL_MENU.active
+end
+
+-- Get selected radial menu action
+function Controller:get_radial_selection()
+    local menu = Controller.RADIAL_MENU
+    if menu.selected_index > 0 then
+        return menu.items[menu.selected_index].action
+    end
+    return nil
+end
+
 return Controller

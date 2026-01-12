@@ -131,12 +131,33 @@ function Game.new()
     self.mission_objectives = {}
     self.show_objectives = false  -- Toggle with O key
 
+    -- Campaign progress tracking (persisted)
+    self.campaign_progress = {
+        gdi = {
+            completed = {},  -- List of completed mission numbers
+            current = 1,     -- Current/highest unlocked mission
+            branch = nil     -- For branching missions (e.g., "A" or "B")
+        },
+        nod = {
+            completed = {},
+            current = 1,
+            branch = nil
+        },
+        covert_ops = {
+            completed = {},
+            current = 1
+        }
+    }
+
     return self
 end
 
 -- Initialize game
 function Game:init()
     self.state = Game.STATE.LOADING
+
+    -- Load saved campaign progress
+    self:load_campaign_progress()
 
     -- Create ECS world
     self.world = ECS.World.new()
@@ -1121,21 +1142,129 @@ function Game:advance_campaign()
     if self.current_mission then
         local faction = self.current_mission:match("^(%a+)")
         local num = tonumber(self.current_mission:match("(%d+)$")) or 1
+
+        -- Mark current mission as completed
+        self:mark_mission_completed(faction, num)
+
         local next_num = num + 1
 
         -- Check if next mission exists (GDI has 15, Nod has 13)
         local max_missions = (faction == "gdi") and 15 or 13
         if next_num <= max_missions then
+            -- Update campaign progress
+            local progress = self.campaign_progress[faction]
+            if progress and next_num > progress.current then
+                progress.current = next_num
+            end
+
             -- Show briefing for next mission
             local faction_upper = faction:upper()
             self:reset_game_state()
             self:show_briefing(faction_upper, next_num)
         else
-            -- Campaign complete - return to menu
-            self.state = Game.STATE.MENU
+            -- Campaign complete!
+            self:on_campaign_complete(faction)
         end
     else
         self.state = Game.STATE.CAMPAIGN_SELECT
+    end
+end
+
+-- Mark a mission as completed
+function Game:mark_mission_completed(faction, mission_num)
+    local progress = self.campaign_progress[faction]
+    if not progress then return end
+
+    -- Add to completed list if not already there
+    local found = false
+    for _, num in ipairs(progress.completed) do
+        if num == mission_num then
+            found = true
+            break
+        end
+    end
+
+    if not found then
+        table.insert(progress.completed, mission_num)
+        -- Sort completed missions
+        table.sort(progress.completed)
+
+        -- Save progress to disk
+        self:save_campaign_progress()
+
+        -- Emit completion event
+        Events.emit("MISSION_COMPLETED", faction, mission_num)
+    end
+end
+
+-- Check if a mission is unlocked
+function Game:is_mission_unlocked(faction, mission_num)
+    local progress = self.campaign_progress[faction]
+    if not progress then return mission_num == 1 end
+
+    -- Mission 1 always unlocked
+    if mission_num == 1 then return true end
+
+    -- Check if previous mission is completed or current is at/past this mission
+    return mission_num <= progress.current
+end
+
+-- Check if a mission is completed
+function Game:is_mission_completed(faction, mission_num)
+    local progress = self.campaign_progress[faction]
+    if not progress then return false end
+
+    for _, num in ipairs(progress.completed) do
+        if num == mission_num then return true end
+    end
+    return false
+end
+
+-- Handle campaign completion
+function Game:on_campaign_complete(faction)
+    -- Show campaign victory screen
+    self.state = Game.STATE.PAUSED
+    self.mission_result = "campaign_victory"
+    self.mission_result_message = string.format("%s Campaign Complete!", faction:upper())
+
+    -- Could play victory cutscene here
+    Events.emit("CAMPAIGN_COMPLETE", faction)
+end
+
+-- Save campaign progress to file
+function Game:save_campaign_progress()
+    local json = require("lib.json")
+    local data = json.encode(self.campaign_progress)
+
+    local success, err = love.filesystem.write("campaign_progress.json", data)
+    if not success then
+        print("Warning: Could not save campaign progress: " .. tostring(err))
+    end
+end
+
+-- Load campaign progress from file
+function Game:load_campaign_progress()
+    if not love.filesystem.getInfo("campaign_progress.json") then
+        return -- No save file, use defaults
+    end
+
+    local content = love.filesystem.read("campaign_progress.json")
+    if not content then return end
+
+    local json = require("lib.json")
+    local success, data = pcall(function()
+        return json.decode(content)
+    end)
+
+    if success and data then
+        -- Merge loaded data with defaults (in case new campaigns added)
+        for faction, progress in pairs(data) do
+            if self.campaign_progress[faction] then
+                self.campaign_progress[faction].completed = progress.completed or {}
+                self.campaign_progress[faction].current = progress.current or 1
+                self.campaign_progress[faction].branch = progress.branch
+            end
+        end
     end
 end
 
@@ -1518,21 +1647,106 @@ end
 function Game:draw_skirmish_setup()
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
 
+    -- Initialize skirmish settings if not set
+    if not self.skirmish_settings then
+        self.skirmish_settings = {
+            map = 1,
+            players = 2,
+            faction = 1,  -- 1=GDI, 2=NOD
+            difficulty = 2,  -- 1=Easy, 2=Normal, 3=Hard
+            credits = 5000,
+            menu_index = 1
+        }
+        self.skirmish_maps = {"Random", "scm01ea", "scm02ea", "scm03ea", "scm04ea"}
+        self.skirmish_factions = {"GDI", "NOD"}
+        self.skirmish_difficulties = {"Easy", "Normal", "Hard"}
+        self.skirmish_credit_options = {2500, 5000, 7500, 10000, 15000}
+    end
+
     love.graphics.setColor(0.05, 0.05, 0.1, 1)
     love.graphics.rectangle("fill", 0, 0, w, h)
 
+    -- Title
     love.graphics.setColor(1, 0.8, 0, 1)
-    love.graphics.printf("SKIRMISH SETUP", 0, 50, w, "center")
+    love.graphics.printf("SKIRMISH SETUP", 0, 40, w, "center")
 
-    love.graphics.setColor(0.7, 0.7, 0.7, 1)
-    love.graphics.printf("Map: Random", w/2 - 200, 120, 180, "right")
-    love.graphics.printf("Players: 2", w/2 - 200, 150, 180, "right")
-    love.graphics.printf("Your Faction: GDI", w/2 - 200, 180, 180, "right")
-    love.graphics.printf("AI Difficulty: Normal", w/2 - 200, 210, 180, "right")
+    -- Menu panel background
+    local panel_x = w/2 - 250
+    local panel_y = 90
+    local panel_w = 500
+    love.graphics.setColor(0.08, 0.08, 0.12, 0.9)
+    love.graphics.rectangle("fill", panel_x, panel_y, panel_w, 280)
+    love.graphics.setColor(0.3, 0.3, 0.4, 1)
+    love.graphics.rectangle("line", panel_x, panel_y, panel_w, 280)
 
+    -- Menu items
+    local items = {
+        {label = "Map", value = self.skirmish_maps[self.skirmish_settings.map]},
+        {label = "Players", value = tostring(self.skirmish_settings.players)},
+        {label = "Your Faction", value = self.skirmish_factions[self.skirmish_settings.faction]},
+        {label = "AI Difficulty", value = self.skirmish_difficulties[self.skirmish_settings.difficulty]},
+        {label = "Starting Credits", value = tostring(self.skirmish_settings.credits)},
+        {label = "Start Game", value = ""}
+    }
+
+    local item_y = panel_y + 20
+    for i, item in ipairs(items) do
+        local is_selected = (i == self.skirmish_settings.menu_index)
+
+        -- Highlight selected row
+        if is_selected then
+            love.graphics.setColor(0.2, 0.3, 0.4, 0.5)
+            love.graphics.rectangle("fill", panel_x + 10, item_y - 5, panel_w - 20, 35)
+
+            -- Selection arrow
+            love.graphics.setColor(1, 0.8, 0, 1)
+            love.graphics.printf(">", panel_x + 15, item_y, 20, "left")
+        end
+
+        -- Label
+        if is_selected then
+            love.graphics.setColor(1, 0.9, 0.5, 1)
+        else
+            love.graphics.setColor(0.7, 0.7, 0.7, 1)
+        end
+        love.graphics.printf(item.label, panel_x + 40, item_y, 200, "left")
+
+        -- Value (with arrows for selection)
+        if item.value ~= "" then
+            if is_selected then
+                love.graphics.setColor(1, 1, 1, 1)
+                love.graphics.printf("< " .. item.value .. " >", panel_x + 240, item_y, 200, "center")
+            else
+                love.graphics.setColor(0.6, 0.6, 0.6, 1)
+                love.graphics.printf(item.value, panel_x + 240, item_y, 200, "center")
+            end
+        else
+            -- "Start Game" button
+            if is_selected then
+                love.graphics.setColor(0.2, 0.6, 0.2, 1)
+                love.graphics.rectangle("fill", panel_x + 150, item_y - 3, 200, 30)
+                love.graphics.setColor(1, 1, 1, 1)
+                love.graphics.printf("[ START ]", panel_x + 150, item_y, 200, "center")
+            else
+                love.graphics.setColor(0.3, 0.5, 0.3, 1)
+                love.graphics.printf("[ START ]", panel_x + 150, item_y, 200, "center")
+            end
+        end
+
+        item_y = item_y + 40
+    end
+
+    -- Faction color preview
+    local faction_color = self.skirmish_settings.faction == 1 and {0.9, 0.7, 0.2} or {0.8, 0.2, 0.2}
+    love.graphics.setColor(faction_color[1], faction_color[2], faction_color[3], 1)
+    love.graphics.rectangle("fill", panel_x + panel_w - 60, panel_y + 10, 40, 40)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.rectangle("line", panel_x + panel_w - 60, panel_y + 10, 40, 40)
+
+    -- Instructions
     love.graphics.setColor(0.5, 0.5, 0.5, 1)
-    love.graphics.printf("Press ENTER to start, ESC to return",
-        0, h - 50, w, "center")
+    love.graphics.printf("UP/DOWN: Select option | LEFT/RIGHT: Change value | ENTER: Start | ESC: Back",
+        0, h - 40, w, "center")
 end
 
 -- Get speed name
@@ -2049,11 +2263,79 @@ end
 
 -- Handle skirmish setup input
 function Game:handle_skirmish_setup_input(key)
+    -- Initialize settings if needed
+    if not self.skirmish_settings then
+        self.skirmish_settings = {
+            map = 1, players = 2, faction = 1, difficulty = 2, credits = 5000, menu_index = 1
+        }
+        self.skirmish_maps = {"Random", "scm01ea", "scm02ea", "scm03ea", "scm04ea"}
+        self.skirmish_factions = {"GDI", "NOD"}
+        self.skirmish_difficulties = {"Easy", "Normal", "Hard"}
+        self.skirmish_credit_options = {2500, 5000, 7500, 10000, 15000}
+    end
+
+    local s = self.skirmish_settings
+    local menu_items = 6  -- Map, Players, Faction, Difficulty, Credits, Start
+
     if key == "escape" then
         self.state = Game.STATE.MENU
-    elseif key == "return" then
-        self.mode = Game.MODE.SKIRMISH
-        self:start_skirmish()
+    elseif key == "up" then
+        s.menu_index = s.menu_index - 1
+        if s.menu_index < 1 then s.menu_index = menu_items end
+    elseif key == "down" then
+        s.menu_index = s.menu_index + 1
+        if s.menu_index > menu_items then s.menu_index = 1 end
+    elseif key == "left" then
+        self:skirmish_change_setting(-1)
+    elseif key == "right" then
+        self:skirmish_change_setting(1)
+    elseif key == "return" or key == "space" then
+        if s.menu_index == menu_items then
+            -- Start button selected
+            self.mode = Game.MODE.SKIRMISH
+            self:start_skirmish()
+        end
+    end
+end
+
+-- Change skirmish setting value
+function Game:skirmish_change_setting(delta)
+    local s = self.skirmish_settings
+
+    if s.menu_index == 1 then
+        -- Map selection
+        s.map = s.map + delta
+        if s.map < 1 then s.map = #self.skirmish_maps end
+        if s.map > #self.skirmish_maps then s.map = 1 end
+
+    elseif s.menu_index == 2 then
+        -- Number of players (2-6)
+        s.players = s.players + delta
+        if s.players < 2 then s.players = 6 end
+        if s.players > 6 then s.players = 2 end
+
+    elseif s.menu_index == 3 then
+        -- Faction
+        s.faction = s.faction + delta
+        if s.faction < 1 then s.faction = 2 end
+        if s.faction > 2 then s.faction = 1 end
+
+    elseif s.menu_index == 4 then
+        -- Difficulty
+        s.difficulty = s.difficulty + delta
+        if s.difficulty < 1 then s.difficulty = 3 end
+        if s.difficulty > 3 then s.difficulty = 1 end
+
+    elseif s.menu_index == 5 then
+        -- Credits
+        local idx = 1
+        for i, c in ipairs(self.skirmish_credit_options) do
+            if c == s.credits then idx = i break end
+        end
+        idx = idx + delta
+        if idx < 1 then idx = #self.skirmish_credit_options end
+        if idx > #self.skirmish_credit_options then idx = 1 end
+        s.credits = self.skirmish_credit_options[idx]
     end
 end
 
@@ -2196,12 +2478,116 @@ end
 function Game:start_skirmish()
     self.state = Game.STATE.SCENARIO_LOADING
 
-    -- Set up skirmish game
-    if self.harvest_system then
-        self.harvest_system:set_credits(self.player_house, 5000)
+    -- Get skirmish settings
+    local s = self.skirmish_settings or {
+        map = 1, players = 2, faction = 1, difficulty = 2, credits = 5000
+    }
+
+    -- Set player faction
+    self.player_house = s.faction == 1 and Constants.HOUSE.GOOD or Constants.HOUSE.BAD
+    if self.selection_system then
+        self.selection_system.player_house = self.player_house
     end
 
-    self:start_game()
+    -- Reset game state
+    self:reset_game_state()
+
+    -- Load selected map or generate random
+    local map_loaded = false
+    if s.map > 1 and self.skirmish_maps then
+        local map_name = self.skirmish_maps[s.map]
+        local scenario_path = "data/scenarios/" .. map_name .. ".json"
+        if self.scenario_loader and love.filesystem.getInfo(scenario_path) then
+            map_loaded = self.scenario_loader:load_scenario(scenario_path)
+        end
+    end
+
+    -- If no map loaded, generate a simple random map
+    if not map_loaded then
+        self:generate_skirmish_map(s)
+    end
+
+    -- Set starting credits for all houses
+    if self.harvest_system then
+        self.harvest_system:set_credits(self.player_house, s.credits)
+        -- Give AI players same credits
+        for i = 2, s.players do
+            local ai_house = (self.player_house == Constants.HOUSE.GOOD) and Constants.HOUSE.BAD or Constants.HOUSE.GOOD
+            self.harvest_system:set_credits(ai_house, s.credits)
+        end
+    end
+
+    -- Configure AI difficulty
+    if self.ai_controller then
+        local iq_values = {50, 100, 150}  -- Easy, Normal, Hard
+        self.ai_controller:set_iq(iq_values[s.difficulty] or 100)
+    end
+
+    self.state = Game.STATE.PLAYING
+
+    -- Center camera on player MCV
+    self:center_camera_on_player()
+end
+
+-- Generate a simple skirmish map with starting positions
+function Game:generate_skirmish_map(settings)
+    -- Clear and regenerate grid with random tiberium
+    if self.grid then
+        self.grid:clear()
+
+        -- Add some random tiberium fields
+        local num_fields = math.random(3, 6)
+        for _ = 1, num_fields do
+            local fx = math.random(5, self.grid.width - 5)
+            local fy = math.random(5, self.grid.height - 5)
+            local field_size = math.random(3, 6)
+
+            for dx = -field_size, field_size do
+                for dy = -field_size, field_size do
+                    local dist = math.sqrt(dx*dx + dy*dy)
+                    if dist <= field_size and math.random() > 0.3 then
+                        local cx, cy = fx + dx, fy + dy
+                        if cx > 0 and cx < self.grid.width and cy > 0 and cy < self.grid.height then
+                            local cell = self.grid:get_cell(cx, cy)
+                            if cell then
+                                cell.tiberium = math.random(50, 100)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Spawn player MCV
+    local player_start_x = 10 * Constants.LEPTON_PER_CELL
+    local player_start_y = 10 * Constants.LEPTON_PER_CELL
+    self:spawn_starting_units(self.player_house, player_start_x, player_start_y)
+
+    -- Spawn AI opponents
+    local ai_house = (self.player_house == Constants.HOUSE.GOOD) and Constants.HOUSE.BAD or Constants.HOUSE.GOOD
+    local ai_positions = {
+        {x = (self.grid.width - 10) * Constants.LEPTON_PER_CELL, y = (self.grid.height - 10) * Constants.LEPTON_PER_CELL},
+        {x = 10 * Constants.LEPTON_PER_CELL, y = (self.grid.height - 10) * Constants.LEPTON_PER_CELL},
+        {x = (self.grid.width - 10) * Constants.LEPTON_PER_CELL, y = 10 * Constants.LEPTON_PER_CELL},
+    }
+
+    for i = 2, math.min(settings.players, #ai_positions + 1) do
+        local pos = ai_positions[i - 1]
+        self:spawn_starting_units(ai_house, pos.x, pos.y)
+    end
+end
+
+-- Spawn starting units for a house
+function Game:spawn_starting_units(house, x, y)
+    if not self.production_system then return end
+
+    -- Spawn MCV
+    local mcv = self.production_system:spawn_unit("MCV", x, y, house)
+    if mcv and self.ai_system then
+        -- Set initial mission
+        self.ai_system:set_mission(mcv, Constants.MISSION.GUARD)
+    end
 end
 
 -- Start editor

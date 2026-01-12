@@ -31,6 +31,16 @@ function MainMenu.new()
     self.fade_alpha = 1
     self.fade_direction = -1  -- -1 = fading in
 
+    -- Globe animation state
+    self.globe_rotation = 0
+    self.globe_pulse = 0
+    self.stars = {}
+    self:generate_stars(100)
+
+    -- Tiberium growth effect
+    self.tiberium_particles = {}
+    self:generate_tiberium_particles(30)
+
     -- Main menu options
     self.main_options = {
         {label = "GDI CAMPAIGN", action = "gdi_campaign"},
@@ -83,6 +93,33 @@ function MainMenu.new()
     return self
 end
 
+-- Generate background stars
+function MainMenu:generate_stars(count)
+    local width, height = love.graphics.getDimensions()
+    for _ = 1, count do
+        table.insert(self.stars, {
+            x = math.random(0, width),
+            y = math.random(0, height),
+            size = math.random() * 2 + 0.5,
+            brightness = math.random() * 0.5 + 0.3,
+            twinkle_speed = math.random() * 2 + 1
+        })
+    end
+end
+
+-- Generate tiberium particles around globe
+function MainMenu:generate_tiberium_particles(count)
+    for _ = 1, count do
+        table.insert(self.tiberium_particles, {
+            angle = math.random() * math.pi * 2,
+            radius = math.random(80, 150),
+            size = math.random(2, 6),
+            speed = (math.random() - 0.5) * 0.3,
+            pulse_offset = math.random() * math.pi * 2
+        })
+    end
+end
+
 -- Update menu
 function MainMenu:update(dt)
     -- Update fade animation
@@ -95,6 +132,15 @@ function MainMenu:update(dt)
             self.fade_alpha = 1
             self.fade_direction = 0
         end
+    end
+
+    -- Update globe rotation (slow spin)
+    self.globe_rotation = self.globe_rotation + dt * 0.1
+    self.globe_pulse = self.globe_pulse + dt * 1.5
+
+    -- Update tiberium particles
+    for _, p in ipairs(self.tiberium_particles) do
+        p.angle = p.angle + p.speed * dt
     end
 end
 
@@ -243,8 +289,11 @@ function MainMenu:draw()
     local width, height = love.graphics.getDimensions()
 
     -- Background
-    love.graphics.setColor(0.05, 0.05, 0.1, 1)
+    love.graphics.setColor(0.02, 0.02, 0.06, 1)
     love.graphics.rectangle("fill", 0, 0, width, height)
+
+    -- Draw animated background
+    self:draw_animated_background(width, height)
 
     -- Title
     self:draw_title(width)
@@ -271,9 +320,122 @@ function MainMenu:draw()
     love.graphics.setColor(1, 1, 1, 1)
 end
 
+-- Draw animated background with globe and stars
+function MainMenu:draw_animated_background(width, height)
+    local time = love.timer.getTime()
+
+    -- Draw twinkling stars
+    for _, star in ipairs(self.stars) do
+        local twinkle = 0.5 + 0.5 * math.sin(time * star.twinkle_speed + star.x)
+        local brightness = star.brightness * twinkle
+        love.graphics.setColor(brightness, brightness, brightness * 1.1, 1)
+        love.graphics.circle("fill", star.x, star.y, star.size)
+    end
+
+    -- Globe position (center-right of screen)
+    local globe_x = width * 0.7
+    local globe_y = height * 0.45
+    local globe_radius = math.min(width, height) * 0.25
+
+    -- Draw globe glow
+    local glow_pulse = 0.3 + 0.1 * math.sin(self.globe_pulse)
+    for i = 5, 1, -1 do
+        local glow_r = globe_radius + i * 15
+        local alpha = glow_pulse * (1 - i / 6)
+        love.graphics.setColor(0.1, 0.4, 0.2, alpha)
+        love.graphics.circle("fill", globe_x, globe_y, glow_r)
+    end
+
+    -- Draw globe base (dark blue for oceans)
+    love.graphics.setColor(0.05, 0.1, 0.2, 1)
+    love.graphics.circle("fill", globe_x, globe_y, globe_radius)
+
+    -- Draw continents (simplified shapes rotating)
+    love.graphics.setColor(0.15, 0.3, 0.15, 1)
+    self:draw_rotating_continent(globe_x, globe_y, globe_radius, self.globe_rotation, 0)
+    self:draw_rotating_continent(globe_x, globe_y, globe_radius, self.globe_rotation, math.pi)
+    self:draw_rotating_continent(globe_x, globe_y, globe_radius, self.globe_rotation, math.pi * 0.5)
+
+    -- Draw tiberium spread on globe
+    love.graphics.setColor(0.2, 0.8, 0.3, 0.6)
+    for _, p in ipairs(self.tiberium_particles) do
+        local px = globe_x + math.cos(p.angle + self.globe_rotation) * p.radius * 0.6
+        local py = globe_y + math.sin(p.angle + self.globe_rotation) * p.radius * 0.4
+        -- Only draw if on visible side of globe
+        if math.cos(p.angle + self.globe_rotation) > -0.3 then
+            local depth = (math.cos(p.angle + self.globe_rotation) + 0.3) / 1.3
+            local pulse = 0.7 + 0.3 * math.sin(time * 2 + p.pulse_offset)
+            love.graphics.setColor(0.2 * depth, 0.8 * depth * pulse, 0.3 * depth, 0.7 * depth)
+            love.graphics.circle("fill", px, py, p.size * depth)
+        end
+    end
+
+    -- Draw globe highlight (atmosphere)
+    love.graphics.setColor(0.3, 0.5, 0.8, 0.15)
+    love.graphics.arc("fill", globe_x - globe_radius * 0.3, globe_y - globe_radius * 0.2,
+                      globe_radius, -math.pi/3, math.pi/3)
+
+    -- Draw globe rim
+    love.graphics.setColor(0.2, 0.4, 0.3, 0.8)
+    love.graphics.setLineWidth(2)
+    love.graphics.circle("line", globe_x, globe_y, globe_radius)
+    love.graphics.setLineWidth(1)
+
+    -- Draw floating tiberium crystals around the globe
+    love.graphics.setColor(0.3, 0.9, 0.4, 0.8)
+    for i = 1, 8 do
+        local angle = (i / 8) * math.pi * 2 + self.globe_rotation * 0.5
+        local orbit_radius = globe_radius + 30 + math.sin(time + i) * 10
+        local cx = globe_x + math.cos(angle) * orbit_radius
+        local cy = globe_y + math.sin(angle) * orbit_radius * 0.3  -- Elliptical orbit
+
+        -- Crystal shape (diamond)
+        local crystal_size = 4 + math.sin(time * 2 + i) * 2
+        love.graphics.polygon("fill",
+            cx, cy - crystal_size,
+            cx + crystal_size * 0.6, cy,
+            cx, cy + crystal_size,
+            cx - crystal_size * 0.6, cy
+        )
+    end
+
+    -- Draw subtle grid lines on globe (latitude/longitude)
+    love.graphics.setColor(0.1, 0.2, 0.15, 0.3)
+    for i = 1, 5 do
+        local lat_y = globe_y + (i - 3) * globe_radius * 0.3
+        local lat_width = math.sqrt(math.max(0, globe_radius^2 - (lat_y - globe_y)^2))
+        if lat_width > 0 then
+            love.graphics.ellipse("line", globe_x, lat_y, lat_width, lat_width * 0.1)
+        end
+    end
+
+    love.graphics.setColor(1, 1, 1, 1)
+end
+
+-- Draw a simplified rotating continent shape
+function MainMenu:draw_rotating_continent(cx, cy, radius, rotation, offset)
+    local angle = rotation + offset
+    local visible = math.cos(angle)
+
+    if visible > -0.5 then
+        local depth = (visible + 0.5) / 1.5
+        local x = cx + math.sin(angle) * radius * 0.6
+        local y = cy
+
+        -- Draw continent as ellipse
+        love.graphics.setColor(0.2 * depth, 0.35 * depth, 0.2 * depth, depth)
+        love.graphics.ellipse("fill", x, y, radius * 0.3 * depth, radius * 0.4)
+    end
+end
+
 -- Draw title
 function MainMenu:draw_title(width)
-    love.graphics.setColor(1, 0.8, 0, 1)
+    local time = love.timer.getTime()
+
+    -- Title glow effect
+    local glow = 0.8 + 0.2 * math.sin(time * 1.5)
+
+    love.graphics.setColor(1 * glow, 0.8 * glow, 0, 1)
     love.graphics.printf("COMMAND & CONQUER", 0, 50, width, "center")
 
     love.graphics.setColor(0.8, 0.8, 0.8, 1)
