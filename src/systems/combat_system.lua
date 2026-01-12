@@ -304,7 +304,19 @@ function CombatSystem:set_target(attacker, target)
     return true
 end
 
--- Find best target in range
+-- Threat priority values (higher = prioritize)
+CombatSystem.THREAT_PRIORITY = {
+    ATTACKING_ME = 100,     -- Target that is attacking this unit
+    ATTACKING_ALLY = 50,    -- Target attacking nearby ally
+    HARVESTER = 40,         -- Enemy harvesters (high value)
+    INFANTRY = 30,          -- Infantry
+    VEHICLE = 25,           -- Vehicles
+    AIRCRAFT = 20,          -- Aircraft
+    BUILDING = 10,          -- Buildings (lowest combat priority)
+    DEFAULT = 15
+}
+
+-- Find best target in range with proper threat prioritization
 function CombatSystem:find_target(entity, threat_mask)
     if not entity:has("combat") or not entity:has("transform") or not entity:has("owner") then
         return nil
@@ -315,7 +327,7 @@ function CombatSystem:find_target(entity, threat_mask)
     local owner = entity:get("owner")
 
     local best_target = nil
-    local best_dist = math.huge
+    local best_score = -math.huge
 
     -- Get all potential targets
     local targets = self.world:get_entities_with("transform", "health", "owner")
@@ -330,15 +342,66 @@ function CombatSystem:find_target(entity, threat_mask)
                 local dist = self:calculate_distance(transform, target_transform)
 
                 -- Check range
-                if dist <= combat.attack_range and dist < best_dist then
-                    best_dist = dist
-                    best_target = target
+                if dist <= combat.attack_range then
+                    local score = self:calculate_threat_score(entity, target, dist)
+
+                    if score > best_score then
+                        best_score = score
+                        best_target = target
+                    end
                 end
             end
         end
     end
 
     return best_target
+end
+
+-- Calculate threat score for target prioritization (like original TECHNO.CPP)
+function CombatSystem:calculate_threat_score(attacker, target, distance)
+    local score = 0
+
+    -- Base priority by target type
+    if target:has("harvester") then
+        score = score + CombatSystem.THREAT_PRIORITY.HARVESTER
+    elseif target:has("infantry") then
+        score = score + CombatSystem.THREAT_PRIORITY.INFANTRY
+    elseif target:has("aircraft") then
+        score = score + CombatSystem.THREAT_PRIORITY.AIRCRAFT
+    elseif target:has("building") then
+        score = score + CombatSystem.THREAT_PRIORITY.BUILDING
+    elseif target:has("mobile") then
+        score = score + CombatSystem.THREAT_PRIORITY.VEHICLE
+    else
+        score = score + CombatSystem.THREAT_PRIORITY.DEFAULT
+    end
+
+    -- Bonus if target is attacking us
+    if target:has("combat") then
+        local target_combat = target:get("combat")
+        if target_combat.target == attacker.id then
+            score = score + CombatSystem.THREAT_PRIORITY.ATTACKING_ME
+        end
+    end
+
+    -- Distance factor - closer targets score higher (normalize by range)
+    local attacker_combat = attacker:get("combat")
+    local range = attacker_combat.attack_range or 5
+    local distance_factor = 1 - (distance / range)  -- 0 to 1, higher when closer
+    score = score + (distance_factor * 20)
+
+    -- Bonus for wounded targets (finish them off)
+    if target:has("health") then
+        local health = target:get("health")
+        local hp_ratio = health.hp / health.max_hp
+        if hp_ratio < 0.25 then
+            score = score + 15  -- Nearly dead, prioritize
+        elseif hp_ratio < 0.5 then
+            score = score + 10  -- Wounded
+        end
+    end
+
+    return score
 end
 
 -- Get projectiles for rendering
