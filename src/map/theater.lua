@@ -4,9 +4,16 @@
 ]]
 
 local Constants = require("src.core.constants")
+local Serialize = require("src.util.serialize")
 
 local Theater = {}
 Theater.__index = Theater
+
+-- Loaded terrain data from JSON (shared across all theaters)
+Theater.land_types = nil
+Theater.overlays = nil
+Theater.terrain_objects = nil
+Theater.tiberium_growth = nil
 
 -- Theater definitions
 Theater.TYPES = {
@@ -72,9 +79,95 @@ function Theater.from_id(id)
     return Theater.new("TEMPERATE")
 end
 
+-- Load shared terrain data from JSON (called once)
+function Theater.load_terrain_data()
+    if Theater.land_types then return end  -- Already loaded
+
+    -- Load templates.json
+    local templates_data = Serialize.load_json("data/terrain/templates.json")
+    if templates_data then
+        Theater.land_types = templates_data.land_types or {}
+        Theater.terrain_objects = templates_data.terrain_objects or {}
+    end
+
+    -- Load overlays.json
+    local overlays_data = Serialize.load_json("data/terrain/overlays.json")
+    if overlays_data then
+        Theater.overlays = overlays_data.overlays or {}
+        Theater.tiberium_growth = overlays_data.tiberium_growth or {}
+    end
+end
+
+-- Get land type data by name
+function Theater.get_land_type(land_name)
+    if not Theater.land_types then Theater.load_terrain_data() end
+    return Theater.land_types[land_name]
+end
+
+-- Get land type data by ID
+function Theater.get_land_type_by_id(id)
+    if not Theater.land_types then Theater.load_terrain_data() end
+    for name, data in pairs(Theater.land_types or {}) do
+        if data.id == id then
+            return data, name
+        end
+    end
+    return nil
+end
+
+-- Get overlay data by name
+function Theater.get_overlay(overlay_name)
+    if not Theater.overlays then Theater.load_terrain_data() end
+    return Theater.overlays[overlay_name]
+end
+
+-- Get overlay data by ID
+function Theater.get_overlay_by_id(id)
+    if not Theater.overlays then Theater.load_terrain_data() end
+    for name, data in pairs(Theater.overlays or {}) do
+        if data.id == id then
+            return data, name
+        end
+    end
+    return nil
+end
+
+-- Get tiberium overlay for a given growth stage (1-12)
+function Theater.get_tiberium_overlay(stage)
+    if not Theater.overlays then Theater.load_terrain_data() end
+    local key = "TIBERIUM" .. tostring(math.min(12, math.max(1, stage)))
+    return Theater.overlays[key]
+end
+
+-- Get tiberium growth parameters
+function Theater.get_tiberium_growth_params()
+    if not Theater.tiberium_growth then Theater.load_terrain_data() end
+    return Theater.tiberium_growth or {
+        growth_rate = 0.02,
+        spread_chance = 0.001,
+        max_spread_distance = 2,
+        infantry_damage_per_tick = 2
+    }
+end
+
+-- Check if an overlay is a wall
+function Theater.is_wall_overlay(overlay_id)
+    local data = Theater.get_overlay_by_id(overlay_id)
+    return data and data.is_wall
+end
+
+-- Check if an overlay is tiberium
+function Theater.is_tiberium_overlay(overlay_id)
+    local data = Theater.get_overlay_by_id(overlay_id)
+    return data and data.is_tiberium
+end
+
 -- Load theater graphics
 function Theater:load()
     if self.loaded then return end
+
+    -- Load shared terrain data first
+    Theater.load_terrain_data()
 
     -- TODO: Load actual graphics from extracted assets
     -- For now, create placeholder tiles
@@ -105,7 +198,11 @@ function Theater:create_placeholder_tiles()
         -- Rough
         rough = {0.45, 0.5, 0.3},
         -- Tiberium
-        tiberium = self.tiberium_color
+        tiberium = self.tiberium_color,
+        -- Wall (gray concrete)
+        wall = {0.6, 0.6, 0.6},
+        -- Beach (sandy)
+        beach = {0.75, 0.7, 0.5}
     }
 
     for name, color in pairs(colors) do
@@ -130,34 +227,68 @@ function Theater:create_placeholder_tiles()
     end
 end
 
--- Get tile image for a template type
-function Theater:get_tile(template_type, icon)
-    -- TODO: Map template types to actual graphics
-    -- For now, return based on template ranges
+-- Get tile image for a land type
+function Theater:get_tile(land_type_id, icon)
+    -- Map land type IDs to tile images using loaded data
+    local land_data = Theater.get_land_type_by_id(land_type_id)
 
-    if template_type == 0 then
+    if land_data then
+        local name = land_data.name:lower()
+        if self.tile_images[name] then
+            return self.tile_images[name]
+        end
+    end
+
+    -- Fallback mappings by ID
+    if land_type_id == 0 then
         return self.tile_images.clear
-    elseif template_type >= 1 and template_type <= 5 then
-        return self.tile_images.water
-    elseif template_type >= 6 and template_type <= 10 then
+    elseif land_type_id == 1 then
         return self.tile_images.road
-    elseif template_type >= 11 and template_type <= 20 then
+    elseif land_type_id == 2 then
+        return self.tile_images.water
+    elseif land_type_id == 3 then
         return self.tile_images.rock
-    elseif template_type >= 21 and template_type <= 30 then
-        return self.tile_images.cliff
+    elseif land_type_id == 4 then
+        return self.tile_images.wall or self.tile_images.rock
+    elseif land_type_id == 5 then
+        return self.tile_images.tiberium
+    elseif land_type_id == 6 then
+        return self.tile_images.beach or self.tile_images.clear
     else
         return self.tile_images.clear
     end
 end
 
 -- Get overlay image
-function Theater:get_overlay(overlay_type)
-    -- Tiberium overlays
-    if overlay_type >= 6 and overlay_type <= 17 then
+function Theater:get_overlay(overlay_id)
+    local overlay_data = Theater.get_overlay_by_id(overlay_id)
+
+    if overlay_data then
+        -- Tiberium overlays
+        if overlay_data.is_tiberium then
+            return self.tile_images.tiberium
+        end
+        -- Wall overlays
+        if overlay_data.is_wall then
+            return self.tile_images.wall or self.tile_images.rock
+        end
+        -- Road overlays
+        if overlay_data.is_road then
+            return self.tile_images.road
+        end
+    end
+
+    -- Fallback: tiberium overlay IDs 6-17
+    if overlay_id >= 6 and overlay_id <= 17 then
         return self.tile_images.tiberium
     end
 
     return nil
+end
+
+-- Get overlay data including health for walls
+function Theater:get_overlay_data(overlay_id)
+    return Theater.get_overlay_by_id(overlay_id)
 end
 
 -- Get theater-specific asset path

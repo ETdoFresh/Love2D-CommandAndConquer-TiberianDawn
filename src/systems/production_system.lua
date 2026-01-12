@@ -129,6 +129,13 @@ function ProductionSystem:process_entity(dt, entity)
 
         -- Emit completion event
         self:emit(Events.EVENTS.PRODUCTION_COMPLETE, entity, item)
+
+        -- Emit specific event for audio system
+        if item.factory_type == "building" then
+            self:emit(Events.EVENTS.BUILDING_BUILT, entity, item.name)
+        else
+            self:emit(Events.EVENTS.UNIT_BUILT, entity, item.name)
+        end
     end
 end
 

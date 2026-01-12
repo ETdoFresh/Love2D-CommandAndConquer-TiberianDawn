@@ -152,6 +152,64 @@ function Cell:has_tiberium()
     return self.overlay >= 6 and self.overlay <= 17
 end
 
+-- Check if cell has a wall
+function Cell:has_wall()
+    -- Wall overlay types are 1-5 (sandbag, chain link, concrete, barbed wire, wood)
+    return self.overlay >= 1 and self.overlay <= 5
+end
+
+-- Get wall health (stored in overlay_data for walls)
+function Cell:get_wall_health()
+    if not self:has_wall() then
+        return 0
+    end
+    return self.overlay_data or 0
+end
+
+-- Set wall health
+function Cell:set_wall_health(health)
+    if self:has_wall() then
+        self.overlay_data = math.max(0, health)
+        if self.overlay_data <= 0 then
+            -- Wall destroyed
+            self:destroy_wall()
+        end
+    end
+end
+
+-- Damage wall and return if destroyed
+function Cell:damage_wall(damage)
+    if not self:has_wall() then
+        return false
+    end
+
+    local health = self:get_wall_health()
+    health = health - damage
+    self.overlay_data = math.max(0, health)
+
+    if health <= 0 then
+        self:destroy_wall()
+        return true  -- Destroyed
+    end
+    return false
+end
+
+-- Destroy wall
+function Cell:destroy_wall()
+    local was_wall = self:has_wall()
+    self.overlay = -1
+    self.overlay_data = 0
+    self:clear_flag(Cell.FLAG.WALL)
+    return was_wall
+end
+
+-- Place wall on cell
+function Cell:place_wall(wall_type, health)
+    self.overlay = wall_type
+    self.overlay_data = health or 100
+    self:set_flag(Cell.FLAG.WALL)
+end
+
 -- Get tiberium value
 function Cell:get_tiberium_value()
     if not self:has_tiberium() then

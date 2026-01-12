@@ -182,6 +182,7 @@ M.EVENTS = {
 
     -- Map
     SHROUD_REVEALED = "map:revealed",
+    WALL_DESTROYED = "map:wall_destroyed",
 
     -- Audio
     SOUND_PLAY = "audio:sound",

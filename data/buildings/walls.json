@@ -1,0 +1,97 @@
+{
+  "_comment": "Wall definitions from original C&C Tiberian Dawn (BUILDING.CPP, CONST.CPP)",
+
+  "walls": {
+    "SBAG": {
+      "name": "Sandbag Wall",
+      "overlay_id": 1,
+      "cost": 50,
+      "build_time": 15,
+      "health": 20,
+      "armor": "wood",
+      "prerequisites": [],
+      "owner": ["GDI", "NOD"],
+      "blocks_movement": true,
+      "blocks_projectiles": false,
+      "crushable": true,
+      "flammable": false
+    },
+    "CYCL": {
+      "name": "Chain Link Fence",
+      "overlay_id": 2,
+      "cost": 75,
+      "build_time": 20,
+      "health": 10,
+      "armor": "wood",
+      "prerequisites": [],
+      "owner": ["GDI", "NOD"],
+      "blocks_movement": true,
+      "blocks_projectiles": false,
+      "crushable": true,
+      "flammable": false
+    },
+    "BRIK": {
+      "name": "Concrete Wall",
+      "overlay_id": 3,
+      "cost": 100,
+      "build_time": 25,
+      "health": 70,
+      "armor": "concrete",
+      "prerequisites": ["FACT"],
+      "owner": ["GDI", "NOD"],
+      "blocks_movement": true,
+      "blocks_projectiles": true,
+      "crushable": false,
+      "flammable": false
+    },
+    "BARB": {
+      "name": "Barbed Wire",
+      "overlay_id": 4,
+      "cost": 25,
+      "build_time": 10,
+      "health": 2,
+      "armor": "none",
+      "prerequisites": [],
+      "owner": ["GDI", "NOD"],
+      "blocks_movement": true,
+      "blocks_projectiles": false,
+      "crushable": true,
+      "flammable": false,
+      "damages_infantry": true,
+      "infantry_damage": 5
+    },
+    "WOOD": {
+      "name": "Wooden Fence",
+      "overlay_id": 5,
+      "cost": 50,
+      "build_time": 15,
+      "health": 10,
+      "armor": "wood",
+      "prerequisites": [],
+      "owner": ["GDI", "NOD"],
+      "blocks_movement": true,
+      "blocks_projectiles": false,
+      "crushable": true,
+      "flammable": true
+    }
+  },
+
+  "wall_placement": {
+    "_comment": "Placement rules for walls",
+    "must_be_adjacent": true,
+    "can_place_on_tiberium": false,
+    "can_place_on_water": false,
+    "can_place_on_rock": false
+  },
+
+  "wall_graphics": {
+    "_comment": "Wall shapes based on neighbors (bitmask-based frame selection)",
+    "frame_count": 16,
+    "neighbor_mask": {
+      "north": 1,
+      "east": 2,
+      "south": 4,
+      "west": 8
+    }
+  }
+}

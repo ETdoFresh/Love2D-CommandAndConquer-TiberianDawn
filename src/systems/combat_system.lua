@@ -398,6 +398,81 @@ function CombatSystem:apply_splash_damage(proj)
             end
         end
     end
+
+    -- Also damage walls in splash radius
+    self:apply_wall_splash_damage(proj.target_x, proj.target_y, splash_radius, splash_damage, proj.warhead)
+end
+
+-- Apply damage to walls in an area (for explosives, splash weapons)
+function CombatSystem:apply_wall_splash_damage(center_x, center_y, radius, damage, warhead)
+    -- Check if warhead can destroy walls
+    local warhead_key = CombatSystem.WARHEAD_MAP[warhead] or "SA"
+    local warhead_data = CombatSystem.warheads[warhead_key]
+    if warhead_data and warhead_data.destroys_walls == false then
+        return  -- Warhead cannot damage walls
+    end
+
+    -- Get grid reference
+    local grid = self.world and self.world.grid
+    if not grid then return end
+
+    -- Calculate cell coordinates
+    local center_cell_x = math.floor(center_x / Constants.LEPTON_PER_CELL)
+    local center_cell_y = math.floor(center_y / Constants.LEPTON_PER_CELL)
+
+    -- Check cells in radius
+    local cell_radius = math.ceil(radius)
+    for dy = -cell_radius, cell_radius do
+        for dx = -cell_radius, cell_radius do
+            local cell = grid:get_cell(center_cell_x + dx, center_cell_y + dy)
+            if cell and cell:has_wall() then
+                local dist = math.sqrt(dx * dx + dy * dy)
+                if dist <= radius then
+                    -- Damage falls off with distance
+                    local damage_mult = 1 - (dist / radius)
+                    local wall_damage = math.floor(damage * damage_mult)
+                    if wall_damage > 0 then
+                        local destroyed = cell:damage_wall(wall_damage)
+                        if destroyed then
+                            -- Emit wall destroyed event
+                            Events.emit(Events.EVENTS.WALL_DESTROYED, cell.x, cell.y)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Direct damage to a wall at a specific cell
+function CombatSystem:damage_wall_at(cell_x, cell_y, damage, warhead)
+    local grid = self.world and self.world.grid
+    if not grid then return false end
+
+    local cell = grid:get_cell(cell_x, cell_y)
+    if not cell or not cell:has_wall() then
+        return false
+    end
+
+    -- Check if warhead can destroy walls
+    local warhead_key = CombatSystem.WARHEAD_MAP[warhead] or "SA"
+    local warhead_data = CombatSystem.warheads[warhead_key]
+    if warhead_data and warhead_data.destroys_walls == false then
+        return false
+    end
+
+    -- Apply damage modifier based on wall armor
+    local Theater = require("src.map.theater")
+    local overlay_data = Theater.get_overlay_by_id(cell.overlay)
+    local armor = overlay_data and overlay_data.armor or "concrete"
+    local modifier = self:get_damage_modifier(warhead, armor)
+    local final_damage = math.floor(damage * modifier)
+
+    local destroyed = cell:damage_wall(final_damage)
+    if destroyed then
+        Events.emit(Events.EVENTS.WALL_DESTROYED, cell_x, cell_y)
+    end
+    return destroyed
 end
 
 function CombatSystem:apply_damage(target, damage, warhead, attacker)

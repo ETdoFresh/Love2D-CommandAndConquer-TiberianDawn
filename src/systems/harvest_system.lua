@@ -1,11 +1,13 @@
 --[[
     Harvest System - Tiberium collection and refinery processing
+    Reference: CELL.CPP, MAP.CPP from original C&C source
 ]]
 
 local System = require("src.ecs.system")
 local Constants = require("src.core.constants")
 local Events = require("src.core.events")
 local Cell = require("src.map.cell")
+local Theater = require("src.map.theater")
 
 local HarvestSystem = setmetatable({}, {__index = System})
 HarvestSystem.__index = HarvestSystem
@@ -481,6 +483,34 @@ end
 -- Enable/disable tiberium growth (can be set by scenario)
 function HarvestSystem:set_tiberium_enabled(enabled)
     self.tiberium_enabled = enabled
+end
+
+-- Get tiberium value for a cell based on overlay data
+function HarvestSystem:get_tiberium_value(cell)
+    if not cell or not cell:has_tiberium() then
+        return 0
+    end
+
+    -- Get overlay data from Theater
+    local overlay_data = Theater.get_overlay_by_id(cell.overlay)
+    if overlay_data and overlay_data.tiberium_value then
+        return overlay_data.tiberium_value
+    end
+
+    -- Fallback: calculate from level
+    local level = cell.overlay - HarvestSystem.TIBERIUM_OVERLAY_BASE
+    return (level + 1) * HarvestSystem.TIBERIUM_VALUE
+end
+
+-- Get growth params from data or use defaults
+function HarvestSystem:get_growth_params()
+    local params = Theater.get_tiberium_growth_params()
+    return {
+        growth_rate = params.growth_rate or 0.02,
+        spread_chance = params.spread_chance or 0.001,
+        max_spread_distance = params.max_spread_distance or 2,
+        infantry_damage = params.infantry_damage_per_tick or HarvestSystem.TIBERIUM_DAMAGE
+    }
 end
 
 return HarvestSystem
