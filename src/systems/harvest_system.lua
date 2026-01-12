@@ -64,6 +64,70 @@ function HarvestSystem:init()
 
     -- Scan map for initial tiberium cells
     self:scan_tiberium()
+
+    -- Listen for building events to update storage capacity
+    Events.on(Events.EVENTS.BUILDING_PLACED, function(entity)
+        self:on_building_placed(entity)
+    end)
+
+    Events.on(Events.EVENTS.BUILDING_DESTROYED, function(entity)
+        self:on_building_destroyed(entity)
+    end)
+
+    Events.on(Events.EVENTS.ENTITY_DESTROYED, function(entity)
+        if entity:has("building") then
+            self:on_building_destroyed(entity)
+        end
+    end)
+end
+
+-- Handle new building placement - update storage if silo/refinery
+function HarvestSystem:on_building_placed(entity)
+    if not entity:has("building") or not entity:has("owner") then return end
+
+    local building = entity:get("building")
+    local owner = entity:get("owner")
+    local building_type = building.building_type or building.structure_type
+
+    if building_type == "PROC" then
+        -- Refinery adds 1000 storage
+        self.storage[owner.house] = (self.storage[owner.house] or 0) + 1000
+        Events.emit("STORAGE_CHANGED", owner.house, self.storage[owner.house])
+    elseif building_type == "SILO" then
+        -- Silo adds 1500 storage
+        self.storage[owner.house] = (self.storage[owner.house] or 0) + 1500
+        Events.emit("STORAGE_CHANGED", owner.house, self.storage[owner.house])
+    end
+end
+
+-- Handle building destruction - reduce storage if silo/refinery
+function HarvestSystem:on_building_destroyed(entity)
+    if not entity:has("building") or not entity:has("owner") then return end
+
+    local building = entity:get("building")
+    local owner = entity:get("owner")
+    local building_type = building.building_type or building.structure_type
+
+    local storage_lost = 0
+    if building_type == "PROC" then
+        storage_lost = 1000
+    elseif building_type == "SILO" then
+        storage_lost = 1500
+    end
+
+    if storage_lost > 0 then
+        self.storage[owner.house] = math.max(0, (self.storage[owner.house] or 0) - storage_lost)
+        Events.emit("STORAGE_CHANGED", owner.house, self.storage[owner.house])
+
+        -- Check if we now have excess credits (over capacity)
+        local credits = self.credits[owner.house] or 0
+        local capacity = self.storage[owner.house]
+
+        if credits > capacity and capacity > 0 then
+            -- Credits over capacity - emit silos needed warning
+            Events.emit("SILOS_NEEDED", owner.house)
+        end
+    end
 end
 
 -- Scan map for tiberium cells and categorize for growth/spread

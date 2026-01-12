@@ -2691,6 +2691,16 @@ function Game:handle_right_click(screen_x, screen_y)
             -- Right-click on enemy = attack
             self:issue_attack(selected, target_entity)
             return
+        else
+            -- Right-click on own building with production - set as primary factory
+            if target_entity:has("production") and target_entity:has("building") then
+                local production = target_entity:get("production")
+                if production.factory_type then
+                    self.production_system:set_primary_factory(target_entity)
+                    Events.emit("UI_MESSAGE", "Primary factory set")
+                    return
+                end
+            end
         end
     end
 

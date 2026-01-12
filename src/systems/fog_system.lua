@@ -276,7 +276,7 @@ function FogSystem:draw(render_system)
                 local py = y * Constants.CELL_PIXEL_H
 
                 if state == FogSystem.VISIBILITY.UNSEEN then
-                    -- Black shroud
+                    -- Black shroud - completely unexplored areas
                     if self.shroud_enabled then
                         self._debug_unseen_count = self._debug_unseen_count + 1
                         love.graphics.setColor(0, 0, 0, 1)
@@ -284,11 +284,17 @@ function FogSystem:draw(render_system)
                             Constants.CELL_PIXEL_W, Constants.CELL_PIXEL_H)
                     end
                 elseif state == FogSystem.VISIBILITY.FOGGED then
-                    -- Semi-transparent fog
+                    -- Semi-transparent fog - previously seen but no current vision
+                    -- Slightly blue tint to distinguish from shroud (like original C&C)
                     if self.fog_enabled then
                         self._debug_fogged_count = self._debug_fogged_count + 1
-                        love.graphics.setColor(0, 0, 0, 0.5)
+                        -- Draw darker overlay first
+                        love.graphics.setColor(0, 0, 0.05, 0.55)
                         love.graphics.rectangle("fill", px, py,
+                            Constants.CELL_PIXEL_W, Constants.CELL_PIXEL_H)
+                        -- Add subtle edge darkening for depth
+                        love.graphics.setColor(0, 0, 0, 0.15)
+                        love.graphics.rectangle("line", px, py,
                             Constants.CELL_PIXEL_W, Constants.CELL_PIXEL_H)
                     end
                 end

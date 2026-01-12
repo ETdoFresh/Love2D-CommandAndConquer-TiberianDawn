@@ -290,13 +290,4 @@ function CloakSystem:get_cloak_alpha(entity, viewer_house)
     return 1
 end
 
--- Force uncloak (for taking damage, etc.)
-function CloakSystem:force_uncloak(entity)
-    local cloak = entity:get("cloak")
-    if cloak and cloak.state ~= CloakSystem.STATE.UNCLOAKED then
-        cloak.state = CloakSystem.STATE.UNCLOAKING
-        cloak.timer = 0
-    end
-end
-
 return CloakSystem
