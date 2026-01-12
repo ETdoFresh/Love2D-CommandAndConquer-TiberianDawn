@@ -225,4 +225,56 @@ Constants.SPECIAL_WEAPON = {
     AIR_STRIKE = 3
 }
 
+-- Overlay types (from OVERLAY.H)
+-- These match original C&C values
+Constants.OVERLAY = {
+    NONE = -1,
+    SANDBAG = 0,       -- Sandbag wall
+    CYCLONE = 1,       -- Chain link fence
+    BRICK = 2,         -- Concrete wall
+    BARBWIRE = 3,      -- Barbed wire
+    WOOD = 4,          -- Wood wall
+    -- Tiberium (6-17)
+    TI1 = 6,           -- Tiberium stage 1
+    TI2 = 7,           -- Tiberium stage 2
+    TI3 = 8,           -- Tiberium stage 3
+    TI4 = 9,           -- Tiberium stage 4
+    TI5 = 10,          -- Tiberium stage 5
+    TI6 = 11,          -- Tiberium stage 6
+    TI7 = 12,          -- Tiberium stage 7
+    TI8 = 13,          -- Tiberium stage 8
+    TI9 = 14,          -- Tiberium stage 9
+    TI10 = 15,         -- Tiberium stage 10
+    TI11 = 16,         -- Tiberium stage 11
+    TI12 = 17,         -- Tiberium stage 12
+    -- Other overlays
+    SQUISH = 18,       -- Squished infantry
+    V12 = 19,          -- Haystacks
+    V13 = 20,          -- Haystacks 2
+    V14 = 21,          -- Wheat field
+    V15 = 22,          -- Fallow field
+    V16 = 23,          -- Corn
+    V17 = 24,          -- Celery
+    V18 = 25,          -- Potato
+    FPLS = 26,         -- Flag placement (multiplayer)
+    WCRATE = 27,       -- Wood crate (power-up)
+    SCRATE = 28        -- Steel crate (power-up)
+}
+
+-- Tiberium value per overlay stage
+Constants.TIBERIUM_VALUE = {
+    [6] = 25,   -- TI1
+    [7] = 26,
+    [8] = 27,
+    [9] = 28,
+    [10] = 29,
+    [11] = 30,
+    [12] = 31,
+    [13] = 32,
+    [14] = 33,
+    [15] = 34,
+    [16] = 35,
+    [17] = 36   -- TI12 (maximum growth)
+}
+
 return Constants

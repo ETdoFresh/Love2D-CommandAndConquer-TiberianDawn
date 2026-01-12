@@ -142,7 +142,9 @@ function ScenarioLoader:convert_ini_to_scenario(ini)
         triggers = {},
         teams = {},
         waypoints = {},
-        cell_triggers = {}
+        cell_triggers = {},
+        overlays = {},
+        terrain = {}
     }
 
     -- Basic info
@@ -335,6 +337,30 @@ function ScenarioLoader:convert_ini_to_scenario(ini)
         end
     end
 
+    -- Overlays (Tiberium, walls, etc.)
+    if ini.OVERLAY then
+        for cell_str, overlay_type in pairs(ini.OVERLAY) do
+            local cell = tonumber(cell_str) or 0
+            table.insert(scenario.overlays, {
+                cell_x = cell % 64,
+                cell_y = math.floor(cell / 64),
+                type = overlay_type
+            })
+        end
+    end
+
+    -- Terrain objects (trees, rocks, etc.)
+    if ini.TERRAIN then
+        for cell_str, terrain_type in pairs(ini.TERRAIN) do
+            local cell = tonumber(cell_str) or 0
+            table.insert(scenario.terrain, {
+                cell_x = cell % 64,
+                cell_y = math.floor(cell / 64),
+                type = terrain_type
+            })
+        end
+    end
+
     return scenario
 end
 
@@ -381,6 +407,12 @@ function ScenarioLoader:load_scenario_data(data)
 
     -- Clear pending missions
     self.pending_missions = {}
+
+    -- Place overlays (Tiberium, walls) on grid
+    self:place_overlays(data.overlays or {})
+
+    -- Place terrain objects (trees, rocks)
+    self:place_terrain(data.terrain or {})
 
     -- Create entities (these will also bind to triggers)
     self:create_structures(data.structures or {})
@@ -557,6 +589,87 @@ function ScenarioLoader:create_infantry(infantry)
 
                 self.world:add_entity(entity)
             end
+        end
+    end
+end
+
+-- Place overlays (Tiberium, walls) on grid cells
+function ScenarioLoader:place_overlays(overlays)
+    if not self.grid then return end
+
+    -- Overlay name to type mapping
+    local overlay_map = {
+        -- Walls
+        SBAG = Constants.OVERLAY.SANDBAG,
+        CYCL = Constants.OVERLAY.CYCLONE,
+        BRIK = Constants.OVERLAY.BRICK,
+        BARB = Constants.OVERLAY.BARBWIRE,
+        WOOD = Constants.OVERLAY.WOOD,
+        -- Tiberium
+        TI1 = Constants.OVERLAY.TI1,
+        TI2 = Constants.OVERLAY.TI2,
+        TI3 = Constants.OVERLAY.TI3,
+        TI4 = Constants.OVERLAY.TI4,
+        TI5 = Constants.OVERLAY.TI5,
+        TI6 = Constants.OVERLAY.TI6,
+        TI7 = Constants.OVERLAY.TI7,
+        TI8 = Constants.OVERLAY.TI8,
+        TI9 = Constants.OVERLAY.TI9,
+        TI10 = Constants.OVERLAY.TI10,
+        TI11 = Constants.OVERLAY.TI11,
+        TI12 = Constants.OVERLAY.TI12,
+        -- Civilian overlays
+        SQUISH = Constants.OVERLAY.SQUISH,
+        V12 = Constants.OVERLAY.V12,
+        V13 = Constants.OVERLAY.V13,
+        V14 = Constants.OVERLAY.V14,
+        V15 = Constants.OVERLAY.V15,
+        V16 = Constants.OVERLAY.V16,
+        V17 = Constants.OVERLAY.V17,
+        V18 = Constants.OVERLAY.V18,
+        -- Crates
+        WCRATE = Constants.OVERLAY.WCRATE,
+        SCRATE = Constants.OVERLAY.SCRATE,
+        -- Flag
+        FPLS = Constants.OVERLAY.FPLS
+    }
+
+    for _, overlay in ipairs(overlays) do
+        local cell = self.grid:get_cell(overlay.cell_x, overlay.cell_y)
+        if cell then
+            -- Convert overlay type string to constant
+            local overlay_type = overlay_map[overlay.type]
+            if overlay_type then
+                cell.overlay = overlay_type
+
+                -- Set initial overlay data based on type
+                if overlay_type >= Constants.OVERLAY.TI1 and overlay_type <= Constants.OVERLAY.TI12 then
+                    -- Tiberium - store value based on stage
+                    cell.overlay_data = Constants.TIBERIUM_VALUE[overlay_type] or 25
+                elseif overlay_type >= Constants.OVERLAY.SANDBAG and overlay_type <= Constants.OVERLAY.WOOD then
+                    -- Wall - full health initially
+                    cell.overlay_data = 256
+                else
+                    cell.overlay_data = 0
+                end
+            end
+        end
+    end
+end
+
+-- Place terrain objects (trees, rocks) on grid
+function ScenarioLoader:place_terrain(terrain)
+    if not self.grid then return end
+
+    for _, t in ipairs(terrain) do
+        local cell = self.grid:get_cell(t.cell_x, t.cell_y)
+        if cell then
+            -- Store terrain type on cell
+            cell.terrain_object = t.type
+
+            -- Most terrain objects block movement
+            local Cell = require("src.map.cell")
+            cell:set_flag(Cell.FLAG.MONOLITH)
         end
     end
 end
