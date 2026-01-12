@@ -1,0 +1,169 @@
+{
+  "name": "GDI Mission 10: Slovenia",
+  "intro": "gdi10",
+  "brief": "GDI10",
+  "win_movie": "gdi10win",
+  "lose_movie": "gdifail",
+  "player": "GoodGuy",
+  "build_level": 10,
+  "theater": "TEMPERATE",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+
+  "briefing": {
+    "title": "GDI Mission 10: Secure Slovenia",
+    "text": "Commander, our advance into the Balkans continues. Slovenia is a critical gateway - Nod has fortified the mountain passes with heavy defenses. Intelligence indicates they've deployed multiple Obelisks and SAM sites. We've also detected a cloaked Stealth Tank battalion in the area. Use your MLRS units to soften defenses from range, then push through with armor.",
+    "objectives": [
+      "Destroy all Nod forces",
+      "Secure the mountain pass",
+      "Establish a forward base"
+    ]
+  },
+
+  "houses": {
+    "GoodGuy": {
+      "credits": 10000,
+      "edge": "North",
+      "max_unit": 120,
+      "max_building": 60
+    },
+    "BadGuy": {
+      "credits": 6000,
+      "edge": "South",
+      "max_unit": 100,
+      "max_building": 50
+    }
+  },
+
+  "structures": [
+    {"house": "BadGuy", "type": "FACT", "health": 256, "cell_x": 32, "cell_y": 50},
+    {"house": "BadGuy", "type": "HAND", "health": 256, "cell_x": 28, "cell_y": 48},
+    {"house": "BadGuy", "type": "WEAP", "health": 256, "cell_x": 36, "cell_y": 48},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 30, "cell_y": 52},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 34, "cell_y": 52},
+    {"house": "BadGuy", "type": "PROC", "health": 256, "cell_x": 38, "cell_y": 52},
+    {"house": "BadGuy", "type": "HQ", "health": 256, "cell_x": 32, "cell_y": 46},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 26, "cell_y": 44},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 38, "cell_y": 44},
+    {"house": "BadGuy", "type": "OBEL", "health": 256, "cell_x": 30, "cell_y": 44},
+    {"house": "BadGuy", "type": "OBEL", "health": 256, "cell_x": 34, "cell_y": 44},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 28, "cell_y": 54},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 36, "cell_y": 54}
+  ],
+
+  "units": [
+    {"house": "GoodGuy", "type": "MCV", "health": 256, "cell_x": 32, "cell_y": 6, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HTNK", "health": 256, "cell_x": 30, "cell_y": 4, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HTNK", "health": 256, "cell_x": 34, "cell_y": 4, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 28, "cell_y": 6, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 36, "cell_y": 6, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MLRS", "health": 256, "cell_x": 30, "cell_y": 8, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MLRS", "health": 256, "cell_x": 34, "cell_y": 8, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "APC", "health": 256, "cell_x": 32, "cell_y": 10, "facing": 128, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 30, "cell_y": 46, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 34, "cell_y": 46, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 32, "cell_y": 48, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 28, "cell_y": 42, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 36, "cell_y": 42, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 32, "cell_y": 40, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 40, "cell_y": 50, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 24, "cell_y": 50, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "HARV", "health": 256, "cell_x": 40, "cell_y": 52, "facing": 0, "mission": "Harvest"}
+  ],
+
+  "infantry": [
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 31, "cell_y": 5, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 33, "cell_y": 5, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 29, "cell_y": 7, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 35, "cell_y": 7, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 29, "cell_y": 49, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 35, "cell_y": 49, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 31, "cell_y": 51, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 33, "cell_y": 51, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 27, "cell_y": 45, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 37, "cell_y": 45, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 31, "cell_y": 47, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 33, "cell_y": 47, "subcell": 0, "mission": "Guard", "facing": 0}
+  ],
+
+  "triggers": [
+    {
+      "name": "Win",
+      "house": "BadGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Intro",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 3,
+      "action": 11,
+      "action_param": "Warning: Stealth Tanks detected in the area. Use your Comm Center for detection.",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack1",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 360,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Counter1",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack2",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 720,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Counter2",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "NOD_Counter1",
+      "house": "BadGuy",
+      "edge": "South",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 5},
+        {"type": "LTNK", "count": 2},
+        {"type": "BIKE", "count": 2}
+      ]
+    },
+    {
+      "name": "NOD_Counter2",
+      "house": "BadGuy",
+      "edge": "South",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E4", "count": 4},
+        {"type": "STNK", "count": 2},
+        {"type": "FTNK", "count": 1}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 8192, "y": 1536},
+    {"x": 8192, "y": 12800}
+  ],
+
+  "cell_triggers": []
+}

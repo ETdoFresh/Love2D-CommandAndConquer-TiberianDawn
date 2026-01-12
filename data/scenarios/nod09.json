@@ -1,0 +1,135 @@
+{
+  "name": "NOD Mission 9: Gabon",
+  "intro": "nod9",
+  "brief": "NOD9",
+  "win_movie": "nod9win",
+  "lose_movie": "nodfail",
+  "player": "BadGuy",
+  "build_level": 9,
+  "theater": "DESERT",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+
+  "briefing": {
+    "title": "NOD Mission 9: Gabon Consolidation",
+    "text": "Brother, Kane's vision expands across Africa. The Brotherhood must secure Gabon's rich Tiberium deposits. GDI has established a forward operating base here to protect their mining interests. Their arrogance blinds them - they do not expect an attack from the jungle. Infiltrate their perimeter with stealth tanks, then strike with full force. Leave no survivors. Peace through power.",
+    "objectives": [
+      "Destroy the GDI base",
+      "Secure Tiberium fields",
+      "Eliminate all GDI forces"
+    ]
+  },
+
+  "houses": {
+    "BadGuy": {
+      "credits": 9000,
+      "edge": "West",
+      "max_unit": 100,
+      "max_building": 50
+    },
+    "GoodGuy": {
+      "credits": 6000,
+      "edge": "East",
+      "max_unit": 80,
+      "max_building": 40
+    }
+  },
+
+  "structures": [
+    {"house": "GoodGuy", "type": "FACT", "health": 256, "cell_x": 52, "cell_y": 30},
+    {"house": "GoodGuy", "type": "PYLE", "health": 256, "cell_x": 48, "cell_y": 28},
+    {"house": "GoodGuy", "type": "WEAP", "health": 256, "cell_x": 56, "cell_y": 28},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 50, "cell_y": 26},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 54, "cell_y": 26},
+    {"house": "GoodGuy", "type": "PROC", "health": 256, "cell_x": 58, "cell_y": 30},
+    {"house": "GoodGuy", "type": "HQ", "health": 256, "cell_x": 52, "cell_y": 34},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 46, "cell_y": 28},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 46, "cell_y": 34},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 58, "cell_y": 26}
+  ],
+
+  "units": [
+    {"house": "BadGuy", "type": "MCV", "health": 256, "cell_x": 6, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 4, "cell_y": 30, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 4, "cell_y": 34, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 8, "cell_y": 28, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 8, "cell_y": 36, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BIKE", "health": 256, "cell_x": 6, "cell_y": 28, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BIKE", "health": 256, "cell_x": 6, "cell_y": 36, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 50, "cell_y": 30, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 54, "cell_y": 30, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 48, "cell_y": 32, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 56, "cell_y": 32, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HARV", "health": 256, "cell_x": 60, "cell_y": 30, "facing": 192, "mission": "Harvest"}
+  ],
+
+  "infantry": [
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 33, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 3, "cell_y": 32, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 7, "cell_y": 30, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 7, "cell_y": 34, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 51, "cell_y": 33, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 53, "cell_y": 33, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 55, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192}
+  ],
+
+  "triggers": [
+    {
+      "name": "Win",
+      "house": "GoodGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Intro",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 3,
+      "action": 11,
+      "action_param": "Use the stealth tanks to scout enemy defenses before engaging.",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Reinforce1",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 360,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Patrol1",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "GDI_Patrol1",
+      "house": "GoodGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 4},
+        {"type": "MTNK", "count": 2}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 1536, "y": 8192},
+    {"x": 14336, "y": 8192}
+  ],
+
+  "cell_triggers": []
+}

@@ -1,0 +1,294 @@
+{
+  "name": "NOD Mission 13: South Africa",
+  "intro": "nod13",
+  "brief": "NOD13",
+  "win_movie": "nodfina",
+  "lose_movie": "nodfail",
+  "player": "BadGuy",
+  "build_level": 13,
+  "theater": "DESERT",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+
+  "briefing": {
+    "title": "NOD Mission 13: The Final Victory",
+    "text": "This is it, brother. The final battle. GDI's African headquarters in South Africa is the last obstacle to Kane's vision. The Temple of Nod is complete - nuclear weapons are at your disposal. GDI has deployed everything they have remaining: Mammoth tanks, Orcas, Commandos. But they cannot stop the inevitable. Kane has foreseen this moment. Destroy GDI utterly. Show no mercy. Peace through power. Kane lives!",
+    "objectives": [
+      "Destroy GDI headquarters",
+      "Eliminate all GDI forces",
+      "Victory for the Brotherhood of Nod"
+    ]
+  },
+
+  "houses": {
+    "BadGuy": {
+      "credits": 25000,
+      "edge": "West",
+      "max_unit": 150,
+      "max_building": 75
+    },
+    "GoodGuy": {
+      "credits": 20000,
+      "edge": "East",
+      "max_unit": 150,
+      "max_building": 75
+    }
+  },
+
+  "structures": [
+    {"house": "GoodGuy", "type": "FACT", "health": 256, "cell_x": 52, "cell_y": 24},
+    {"house": "GoodGuy", "type": "FACT", "health": 256, "cell_x": 52, "cell_y": 40},
+    {"house": "GoodGuy", "type": "PYLE", "health": 256, "cell_x": 48, "cell_y": 22},
+    {"house": "GoodGuy", "type": "PYLE", "health": 256, "cell_x": 48, "cell_y": 42},
+    {"house": "GoodGuy", "type": "WEAP", "health": 256, "cell_x": 56, "cell_y": 22},
+    {"house": "GoodGuy", "type": "WEAP", "health": 256, "cell_x": 56, "cell_y": 42},
+    {"house": "GoodGuy", "type": "HPAD", "health": 256, "cell_x": 58, "cell_y": 28},
+    {"house": "GoodGuy", "type": "HPAD", "health": 256, "cell_x": 58, "cell_y": 36},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 50, "cell_y": 20},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 54, "cell_y": 20},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 50, "cell_y": 44},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 54, "cell_y": 44},
+    {"house": "GoodGuy", "type": "NUK2", "health": 256, "cell_x": 58, "cell_y": 24},
+    {"house": "GoodGuy", "type": "NUK2", "health": 256, "cell_x": 58, "cell_y": 40},
+    {"house": "GoodGuy", "type": "PROC", "health": 256, "cell_x": 60, "cell_y": 28},
+    {"house": "GoodGuy", "type": "PROC", "health": 256, "cell_x": 60, "cell_y": 36},
+    {"house": "GoodGuy", "type": "HQ", "health": 256, "cell_x": 54, "cell_y": 32, "tag": "gdi_hq"},
+    {"house": "GoodGuy", "type": "EYE", "health": 256, "cell_x": 50, "cell_y": 32},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 46, "cell_y": 24},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 46, "cell_y": 32},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 46, "cell_y": 40},
+    {"house": "GoodGuy", "type": "ATWR", "health": 256, "cell_x": 48, "cell_y": 28},
+    {"house": "GoodGuy", "type": "ATWR", "health": 256, "cell_x": 48, "cell_y": 36},
+    {"house": "GoodGuy", "type": "ATWR", "health": 256, "cell_x": 52, "cell_y": 28},
+    {"house": "GoodGuy", "type": "ATWR", "health": 256, "cell_x": 52, "cell_y": 36}
+  ],
+
+  "units": [
+    {"house": "BadGuy", "type": "MCV", "health": 256, "cell_x": 6, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 4, "cell_y": 26, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 4, "cell_y": 30, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 4, "cell_y": 34, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 4, "cell_y": 38, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 8, "cell_y": 28, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 8, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 8, "cell_y": 36, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 6, "cell_y": 24, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 6, "cell_y": 28, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 6, "cell_y": 36, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 6, "cell_y": 40, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 10, "cell_y": 26, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 10, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 10, "cell_y": 38, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BIKE", "health": 256, "cell_x": 2, "cell_y": 30, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BIKE", "health": 256, "cell_x": 2, "cell_y": 34, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HTNK", "health": 256, "cell_x": 50, "cell_y": 26, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HTNK", "health": 256, "cell_x": 50, "cell_y": 30, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HTNK", "health": 256, "cell_x": 50, "cell_y": 34, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HTNK", "health": 256, "cell_x": 50, "cell_y": 38, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 54, "cell_y": 26, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 54, "cell_y": 30, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 54, "cell_y": 34, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 54, "cell_y": 38, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MLRS", "health": 256, "cell_x": 56, "cell_y": 28, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MLRS", "health": 256, "cell_x": 56, "cell_y": 32, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MLRS", "health": 256, "cell_x": 56, "cell_y": 36, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MSAM", "health": 256, "cell_x": 58, "cell_y": 32, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "ORCA", "health": 256, "cell_x": 60, "cell_y": 28, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "ORCA", "health": 256, "cell_x": 60, "cell_y": 32, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "ORCA", "health": 256, "cell_x": 60, "cell_y": 36, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HARV", "health": 256, "cell_x": 62, "cell_y": 30, "facing": 192, "mission": "Harvest"},
+    {"house": "GoodGuy", "type": "HARV", "health": 256, "cell_x": 62, "cell_y": 34, "facing": 192, "mission": "Harvest"}
+  ],
+
+  "infantry": [
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 33, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 35, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 3, "cell_y": 28, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 3, "cell_y": 36, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 7, "cell_y": 30, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 7, "cell_y": 34, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E5", "health": 256, "cell_x": 9, "cell_y": 30, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E5", "health": 256, "cell_x": 9, "cell_y": 34, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 25, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 33, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 37, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 41, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 53, "cell_y": 27, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 53, "cell_y": 37, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "GoodGuy", "type": "RMBO", "health": 256, "cell_x": 51, "cell_y": 32, "subcell": 0, "mission": "Guard", "facing": 192}
+  ],
+
+  "triggers": [
+    {
+      "name": "HQDestroyed",
+      "house": "GoodGuy",
+      "event": 7,
+      "event_param": "gdi_hq",
+      "action": 11,
+      "action_param": "GDI headquarters destroyed! Their command structure has collapsed!",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Win",
+      "house": "GoodGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Intro",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 3,
+      "action": 11,
+      "action_param": "The final battle begins. Nuclear weapons are available. Kane wills it - destroy GDI!",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "NukeReady",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 5,
+      "action": 25,
+      "action_param": 2,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack1",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 180,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Counter1",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack2",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 360,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Counter2",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack3",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 540,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Counter3",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack4",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 720,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Counter4",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack5",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 900,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Counter5",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "GDI_Counter1",
+      "house": "GoodGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 8},
+        {"type": "MTNK", "count": 3}
+      ]
+    },
+    {
+      "name": "GDI_Counter2",
+      "house": "GoodGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 5},
+        {"type": "E3", "count": 4},
+        {"type": "HTNK", "count": 2}
+      ]
+    },
+    {
+      "name": "GDI_Counter3",
+      "house": "GoodGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "HTNK", "count": 3},
+        {"type": "MLRS", "count": 2}
+      ]
+    },
+    {
+      "name": "GDI_Counter4",
+      "house": "GoodGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 6},
+        {"type": "HTNK", "count": 2},
+        {"type": "MTNK", "count": 2},
+        {"type": "ORCA", "count": 2}
+      ]
+    },
+    {
+      "name": "GDI_Counter5",
+      "house": "GoodGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 8},
+        {"type": "E3", "count": 4},
+        {"type": "HTNK", "count": 3},
+        {"type": "MLRS", "count": 3},
+        {"type": "ORCA", "count": 2}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 1536, "y": 8192},
+    {"x": 15360, "y": 8192}
+  ],
+
+  "cell_triggers": []
+}

@@ -1,0 +1,206 @@
+{
+  "name": "GDI Mission 12: Bosnia",
+  "intro": "gdi12",
+  "brief": "GDI12",
+  "win_movie": "gdi12win",
+  "lose_movie": "gdifail",
+  "player": "GoodGuy",
+  "build_level": 12,
+  "theater": "WINTER",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+
+  "briefing": {
+    "title": "GDI Mission 12: Bosnian Highlands",
+    "text": "Commander, the Bosnian highlands are Kane's last major defensive position before Sarajevo. Nod has dug in with heavy fortifications including multiple Obelisks of Light in overlapping fields of fire. Intelligence reports they also have a Temple of Nod under construction - if completed, they could deploy nuclear weapons. Destroy the Temple before it becomes operational, then eliminate remaining Nod forces.",
+    "objectives": [
+      "Destroy the Temple of Nod before it deploys",
+      "Eliminate all Nod forces",
+      "Secure the highland passes"
+    ]
+  },
+
+  "houses": {
+    "GoodGuy": {
+      "credits": 15000,
+      "edge": "North",
+      "max_unit": 140,
+      "max_building": 70
+    },
+    "BadGuy": {
+      "credits": 10000,
+      "edge": "South",
+      "max_unit": 120,
+      "max_building": 60
+    }
+  },
+
+  "structures": [
+    {"house": "BadGuy", "type": "TMPL", "health": 256, "cell_x": 32, "cell_y": 52, "tag": "temple"},
+    {"house": "BadGuy", "type": "FACT", "health": 256, "cell_x": 28, "cell_y": 48},
+    {"house": "BadGuy", "type": "HAND", "health": 256, "cell_x": 24, "cell_y": 46},
+    {"house": "BadGuy", "type": "WEAP", "health": 256, "cell_x": 36, "cell_y": 48},
+    {"house": "BadGuy", "type": "AFLD", "health": 256, "cell_x": 40, "cell_y": 50},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 26, "cell_y": 50},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 30, "cell_y": 48},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 38, "cell_y": 52},
+    {"house": "BadGuy", "type": "NUK2", "health": 256, "cell_x": 34, "cell_y": 48},
+    {"house": "BadGuy", "type": "PROC", "health": 256, "cell_x": 42, "cell_y": 48},
+    {"house": "BadGuy", "type": "HQ", "health": 256, "cell_x": 32, "cell_y": 46},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 22, "cell_y": 44},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 42, "cell_y": 44},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 26, "cell_y": 54},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 38, "cell_y": 54},
+    {"house": "BadGuy", "type": "OBEL", "health": 256, "cell_x": 28, "cell_y": 44},
+    {"house": "BadGuy", "type": "OBEL", "health": 256, "cell_x": 36, "cell_y": 44},
+    {"house": "BadGuy", "type": "OBEL", "health": 256, "cell_x": 32, "cell_y": 42},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 24, "cell_y": 52},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 40, "cell_y": 52},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 32, "cell_y": 56}
+  ],
+
+  "units": [
+    {"house": "GoodGuy", "type": "MCV", "health": 256, "cell_x": 32, "cell_y": 6, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HTNK", "health": 256, "cell_x": 28, "cell_y": 4, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HTNK", "health": 256, "cell_x": 36, "cell_y": 4, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HTNK", "health": 256, "cell_x": 32, "cell_y": 4, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 26, "cell_y": 6, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 38, "cell_y": 6, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MLRS", "health": 256, "cell_x": 30, "cell_y": 8, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MLRS", "health": 256, "cell_x": 34, "cell_y": 8, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MSAM", "health": 256, "cell_x": 28, "cell_y": 10, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MSAM", "health": 256, "cell_x": 36, "cell_y": 10, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "APC", "health": 256, "cell_x": 32, "cell_y": 10, "facing": 128, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 30, "cell_y": 44, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 34, "cell_y": 44, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 32, "cell_y": 46, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 30, "cell_y": 50, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 26, "cell_y": 42, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 38, "cell_y": 42, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 24, "cell_y": 48, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 40, "cell_y": 48, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "HARV", "health": 256, "cell_x": 44, "cell_y": 48, "facing": 0, "mission": "Harvest"}
+  ],
+
+  "infantry": [
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 31, "cell_y": 5, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 33, "cell_y": 5, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 29, "cell_y": 7, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 35, "cell_y": 7, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E6", "health": 256, "cell_x": 31, "cell_y": 9, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E6", "health": 256, "cell_x": 33, "cell_y": 9, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 29, "cell_y": 45, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 35, "cell_y": 45, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 31, "cell_y": 49, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 33, "cell_y": 49, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 27, "cell_y": 47, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 37, "cell_y": 47, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 31, "cell_y": 51, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 33, "cell_y": 51, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E5", "health": 256, "cell_x": 31, "cell_y": 53, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E5", "health": 256, "cell_x": 33, "cell_y": 53, "subcell": 0, "mission": "Guard", "facing": 0}
+  ],
+
+  "triggers": [
+    {
+      "name": "TempleDestroyed",
+      "house": "BadGuy",
+      "event": 7,
+      "event_param": "temple",
+      "action": 11,
+      "action_param": "The Temple of Nod has been destroyed! Now eliminate remaining forces.",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Win",
+      "house": "BadGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Intro",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 3,
+      "action": 11,
+      "action_param": "WARNING: Temple of Nod detected. Destroy it before nuclear weapons become active!",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "NukeWarning",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 600,
+      "action": 11,
+      "action_param": "Nuclear launch imminent if Temple is not destroyed!",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack1",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 360,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Counter1",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack2",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 720,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Counter2",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "NOD_Counter1",
+      "house": "BadGuy",
+      "edge": "South",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 6},
+        {"type": "E4", "count": 3},
+        {"type": "LTNK", "count": 2},
+        {"type": "FTNK", "count": 1}
+      ]
+    },
+    {
+      "name": "NOD_Counter2",
+      "house": "BadGuy",
+      "edge": "South",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 4},
+        {"type": "E5", "count": 2},
+        {"type": "STNK", "count": 3},
+        {"type": "ARTY", "count": 2}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 8192, "y": 1536},
+    {"x": 8192, "y": 13312}
+  ],
+
+  "cell_triggers": []
+}

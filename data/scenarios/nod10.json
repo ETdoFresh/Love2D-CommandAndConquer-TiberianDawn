@@ -1,0 +1,171 @@
+{
+  "name": "NOD Mission 10: Congo",
+  "intro": "nod10",
+  "brief": "NOD10",
+  "win_movie": "nod10win",
+  "lose_movie": "nodfail",
+  "player": "BadGuy",
+  "build_level": 10,
+  "theater": "DESERT",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+
+  "briefing": {
+    "title": "NOD Mission 10: Congo Basin Control",
+    "text": "The Congo basin is crucial for our Tiberium harvesting operations. GDI has fortified multiple positions to deny us access. Kane demands we break through their defensive line. Deploy our flame tanks against their infantry concentrations. The Obelisk of Light is now available - use it to devastate their armor. The time for subtlety has passed. Burn them all.",
+    "objectives": [
+      "Destroy all GDI bases",
+      "Capture or destroy the GDI headquarters",
+      "Secure the region for NOD operations"
+    ]
+  },
+
+  "houses": {
+    "BadGuy": {
+      "credits": 12000,
+      "edge": "North",
+      "max_unit": 120,
+      "max_building": 60
+    },
+    "GoodGuy": {
+      "credits": 8000,
+      "edge": "South",
+      "max_unit": 100,
+      "max_building": 50
+    }
+  },
+
+  "structures": [
+    {"house": "GoodGuy", "type": "FACT", "health": 256, "cell_x": 30, "cell_y": 52},
+    {"house": "GoodGuy", "type": "FACT", "health": 256, "cell_x": 42, "cell_y": 52},
+    {"house": "GoodGuy", "type": "PYLE", "health": 256, "cell_x": 26, "cell_y": 50},
+    {"house": "GoodGuy", "type": "PYLE", "health": 256, "cell_x": 46, "cell_y": 50},
+    {"house": "GoodGuy", "type": "WEAP", "health": 256, "cell_x": 34, "cell_y": 50},
+    {"house": "GoodGuy", "type": "WEAP", "health": 256, "cell_x": 38, "cell_y": 50},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 28, "cell_y": 54},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 32, "cell_y": 54},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 40, "cell_y": 54},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 44, "cell_y": 54},
+    {"house": "GoodGuy", "type": "PROC", "health": 256, "cell_x": 36, "cell_y": 56},
+    {"house": "GoodGuy", "type": "HQ", "health": 256, "cell_x": 36, "cell_y": 52, "tag": "gdi_hq"},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 28, "cell_y": 48},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 36, "cell_y": 48},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 44, "cell_y": 48},
+    {"house": "GoodGuy", "type": "ATWR", "health": 256, "cell_x": 32, "cell_y": 46},
+    {"house": "GoodGuy", "type": "ATWR", "health": 256, "cell_x": 40, "cell_y": 46}
+  ],
+
+  "units": [
+    {"house": "BadGuy", "type": "MCV", "health": 256, "cell_x": 32, "cell_y": 6, "facing": 128, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 28, "cell_y": 4, "facing": 128, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 36, "cell_y": 4, "facing": 128, "mission": "Guard"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 30, "cell_y": 8, "facing": 128, "mission": "Guard"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 34, "cell_y": 8, "facing": 128, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 26, "cell_y": 6, "facing": 128, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 38, "cell_y": 6, "facing": 128, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 32, "cell_y": 10, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 32, "cell_y": 48, "facing": 0, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 40, "cell_y": 48, "facing": 0, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HTNK", "health": 256, "cell_x": 36, "cell_y": 50, "facing": 0, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 28, "cell_y": 50, "facing": 0, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 44, "cell_y": 50, "facing": 0, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HARV", "health": 256, "cell_x": 38, "cell_y": 56, "facing": 0, "mission": "Harvest"}
+  ],
+
+  "infantry": [
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 31, "cell_y": 5, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 33, "cell_y": 5, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 29, "cell_y": 7, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 35, "cell_y": 7, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 31, "cell_y": 9, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 33, "cell_y": 9, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 29, "cell_y": 49, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 35, "cell_y": 49, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 37, "cell_y": 49, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 43, "cell_y": 49, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 33, "cell_y": 47, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 39, "cell_y": 47, "subcell": 0, "mission": "Guard", "facing": 0}
+  ],
+
+  "triggers": [
+    {
+      "name": "Win",
+      "house": "GoodGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Intro",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 3,
+      "action": 11,
+      "action_param": "The Obelisk of Light is now available. Build it to devastate GDI armor.",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack1",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 420,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Counter1",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack2",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 720,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Counter2",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "GDI_Counter1",
+      "house": "GoodGuy",
+      "edge": "South",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 5},
+        {"type": "MTNK", "count": 2},
+        {"type": "JEEP", "count": 2}
+      ]
+    },
+    {
+      "name": "GDI_Counter2",
+      "house": "GoodGuy",
+      "edge": "South",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 4},
+        {"type": "E3", "count": 2},
+        {"type": "HTNK", "count": 1},
+        {"type": "MTNK", "count": 2}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 8192, "y": 1536},
+    {"x": 8192, "y": 14336}
+  ],
+
+  "cell_triggers": []
+}
