@@ -784,6 +784,101 @@ function AISystem:order_stop(entity)
     end
 end
 
+-- Give scatter order to infantry
+-- Scatter makes infantry run to a random nearby location to avoid AOE damage
+-- This is the classic C&C "X" key command
+function AISystem:order_scatter(entity)
+    if not entity:has("infantry") or not entity:has("mobile") or not entity:has("transform") then
+        return false
+    end
+
+    local transform = entity:get("transform")
+    local mobile = entity:get("mobile")
+
+    -- Calculate random scatter direction and distance
+    local angle = math.random() * math.pi * 2
+    local distance = Constants.LEPTON_PER_CELL * (2 + math.random() * 3)  -- 2-5 cells away
+
+    local dest_x = transform.x + math.cos(angle) * distance
+    local dest_y = transform.y + math.sin(angle) * distance
+
+    -- Move to scatter position
+    self:set_mission(entity, Constants.MISSION.MOVE)
+    if self.movement_system then
+        self.movement_system:move_to(entity, dest_x, dest_y)
+    end
+
+    return true
+end
+
+-- Scatter multiple infantry units (avoiding overlap)
+function AISystem:order_scatter_group(entities)
+    if not entities or #entities == 0 then
+        return
+    end
+
+    -- Calculate center of group
+    local center_x, center_y = 0, 0
+    local count = 0
+
+    for _, entity in ipairs(entities) do
+        if entity:has("infantry") and entity:has("transform") then
+            local transform = entity:get("transform")
+            center_x = center_x + transform.x
+            center_y = center_y + transform.y
+            count = count + 1
+        end
+    end
+
+    if count == 0 then
+        return
+    end
+
+    center_x = center_x / count
+    center_y = center_y / count
+
+    -- Scatter each unit away from center
+    local angle_step = (math.pi * 2) / count
+    local base_angle = math.random() * math.pi * 2
+
+    local idx = 0
+    for _, entity in ipairs(entities) do
+        if entity:has("infantry") and entity:has("transform") and entity:has("mobile") then
+            local transform = entity:get("transform")
+
+            -- Direction away from center, with some angular spread
+            local dx = transform.x - center_x
+            local dy = transform.y - center_y
+            local dist_from_center = math.sqrt(dx * dx + dy * dy)
+
+            local angle
+            if dist_from_center > Constants.LEPTON_PER_CELL then
+                -- Move away from center
+                angle = math.atan2(dy, dx) + (math.random() - 0.5) * 0.5
+            else
+                -- Units near center get evenly distributed angles
+                angle = base_angle + idx * angle_step
+            end
+
+            local distance = Constants.LEPTON_PER_CELL * (3 + math.random() * 2)  -- 3-5 cells
+
+            local dest_x = transform.x + math.cos(angle) * distance
+            local dest_y = transform.y + math.sin(angle) * distance
+
+            -- Set move mission
+            self:set_mission(entity, Constants.MISSION.MOVE)
+            if self.movement_system then
+                self.movement_system:move_to(entity, dest_x, dest_y)
+            end
+
+            idx = idx + 1
+        end
+    end
+
+    -- Play scatter sound
+    Events.emit("PLAY_SOUND", "await1", center_x, center_y)
+end
+
 -- Get mission name for debugging
 function AISystem:get_mission_name(entity)
     if not entity:has("mission") then

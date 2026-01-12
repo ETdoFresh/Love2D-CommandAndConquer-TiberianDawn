@@ -108,6 +108,30 @@ function Briefing.new()
     self.text_font = nil
     self.objective_font = nil
 
+    -- Map reveal animation state
+    self.map_reveal = {
+        enabled = false,
+        grid = nil,              -- Reference to map grid for reveal
+        reveal_points = {},      -- Points to reveal in sequence
+        current_point = 0,
+        reveal_timer = 0,
+        reveal_interval = 0.5,   -- Time between reveal points
+        reveal_radius = 8,       -- Cells to reveal per point
+        cells_revealed = {},     -- Track which cells are revealed
+        animation_complete = false
+    }
+
+    -- Mini-map display state (for showing map during briefing)
+    self.minimap = {
+        enabled = false,
+        x = 0,
+        y = 0,
+        width = 200,
+        height = 150,
+        scale = 1,
+        shroud_alpha = 1.0       -- Full shroud initially
+    }
+
     return self
 end
 
@@ -179,6 +203,199 @@ function Briefing:complete()
     self:hide()
 end
 
+-- Setup map reveal animation for a mission
+-- reveal_points: list of {x, y} cell coordinates to reveal in sequence
+-- grid: reference to the map grid
+function Briefing:setup_map_reveal(grid, reveal_points, minimap_rect)
+    self.map_reveal.enabled = true
+    self.map_reveal.grid = grid
+    self.map_reveal.reveal_points = reveal_points or {}
+    self.map_reveal.current_point = 0
+    self.map_reveal.reveal_timer = 0
+    self.map_reveal.cells_revealed = {}
+    self.map_reveal.animation_complete = false
+
+    -- Setup minimap display area
+    if minimap_rect then
+        self.minimap.enabled = true
+        self.minimap.x = minimap_rect.x or 0
+        self.minimap.y = minimap_rect.y or 0
+        self.minimap.width = minimap_rect.width or 200
+        self.minimap.height = minimap_rect.height or 150
+    end
+
+    -- Calculate scale to fit grid in minimap
+    if grid then
+        local grid_w = grid.width or 64
+        local grid_h = grid.height or 64
+        self.minimap.scale = math.min(
+            self.minimap.width / grid_w,
+            self.minimap.height / grid_h
+        )
+    end
+end
+
+-- Add reveal points from scenario waypoints
+function Briefing:add_reveal_waypoints(waypoints)
+    if not waypoints then return end
+
+    for _, wp in pairs(waypoints) do
+        if wp.x and wp.y then
+            table.insert(self.map_reveal.reveal_points, {
+                x = wp.x,
+                y = wp.y,
+                name = wp.name or ""
+            })
+        end
+    end
+end
+
+-- Reveal cells around a point (circular reveal)
+function Briefing:reveal_around_point(center_x, center_y, radius)
+    local revealed = {}
+    for dy = -radius, radius do
+        for dx = -radius, radius do
+            local dist = math.sqrt(dx * dx + dy * dy)
+            if dist <= radius then
+                local cx, cy = center_x + dx, center_y + dy
+                local key = cx .. "," .. cy
+                if not self.map_reveal.cells_revealed[key] then
+                    self.map_reveal.cells_revealed[key] = true
+                    table.insert(revealed, {x = cx, y = cy})
+                end
+            end
+        end
+    end
+    return revealed
+end
+
+-- Update map reveal animation
+function Briefing:update_map_reveal(dt)
+    if not self.map_reveal.enabled or self.map_reveal.animation_complete then
+        return
+    end
+
+    self.map_reveal.reveal_timer = self.map_reveal.reveal_timer + dt
+
+    if self.map_reveal.reveal_timer >= self.map_reveal.reveal_interval then
+        self.map_reveal.reveal_timer = 0
+        self.map_reveal.current_point = self.map_reveal.current_point + 1
+
+        if self.map_reveal.current_point <= #self.map_reveal.reveal_points then
+            local point = self.map_reveal.reveal_points[self.map_reveal.current_point]
+            self:reveal_around_point(point.x, point.y, self.map_reveal.reveal_radius)
+
+            -- Play reveal sound
+            Events.emit("PLAY_SOUND", "radar_on", 0, 0)
+        else
+            self.map_reveal.animation_complete = true
+        end
+    end
+
+    -- Gradually reduce shroud alpha as more is revealed
+    local total_points = #self.map_reveal.reveal_points
+    if total_points > 0 then
+        local progress = self.map_reveal.current_point / total_points
+        self.minimap.shroud_alpha = math.max(0, 1 - progress)
+    end
+end
+
+-- Draw minimap with reveal animation
+function Briefing:draw_minimap()
+    if not self.minimap.enabled or not self.map_reveal.grid then
+        return
+    end
+
+    local mx = self.minimap.x
+    local my = self.minimap.y
+    local mw = self.minimap.width
+    local mh = self.minimap.height
+    local scale = self.minimap.scale
+
+    -- Draw minimap background
+    love.graphics.setColor(0.1, 0.15, 0.1, 0.9)
+    love.graphics.rectangle("fill", mx - 2, my - 2, mw + 4, mh + 4)
+
+    -- Border
+    love.graphics.setColor(0.2, 0.6, 0.2, 1)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", mx - 2, my - 2, mw + 4, mh + 4)
+
+    -- Draw terrain (simplified)
+    local grid = self.map_reveal.grid
+    for cy = 0, (grid.height or 64) - 1 do
+        for cx = 0, (grid.width or 64) - 1 do
+            local px = mx + cx * scale
+            local py = my + cy * scale
+
+            -- Check if cell is revealed
+            local key = cx .. "," .. cy
+            local is_revealed = self.map_reveal.cells_revealed[key]
+
+            if is_revealed then
+                -- Get cell data
+                local cell = grid:get_cell(cx, cy)
+                if cell then
+                    -- Color based on terrain type
+                    if cell.terrain == "water" then
+                        love.graphics.setColor(0.1, 0.2, 0.4, 1)
+                    elseif cell.terrain == "rock" then
+                        love.graphics.setColor(0.3, 0.25, 0.2, 1)
+                    elseif cell:has_tiberium() then
+                        love.graphics.setColor(0.2, 0.8, 0.2, 1)
+                    else
+                        love.graphics.setColor(0.35, 0.3, 0.25, 1)
+                    end
+                else
+                    love.graphics.setColor(0.3, 0.3, 0.2, 1)
+                end
+                love.graphics.rectangle("fill", px, py, scale, scale)
+            else
+                -- Shrouded
+                love.graphics.setColor(0, 0, 0, self.minimap.shroud_alpha)
+                love.graphics.rectangle("fill", px, py, scale, scale)
+            end
+        end
+    end
+
+    -- Draw reveal points that have been reached
+    for i = 1, self.map_reveal.current_point do
+        local point = self.map_reveal.reveal_points[i]
+        if point then
+            local px = mx + point.x * scale
+            local py = my + point.y * scale
+
+            -- Pulsing marker
+            local pulse = math.sin(love.timer.getTime() * 4) * 0.3 + 0.7
+            love.graphics.setColor(1, 0.8, 0.2, pulse)
+            love.graphics.circle("fill", px, py, 4)
+
+            -- Point name if present
+            if point.name and point.name ~= "" then
+                love.graphics.setColor(1, 1, 1, 0.8)
+                love.graphics.print(point.name, px + 6, py - 6)
+            end
+        end
+    end
+
+    -- Draw current reveal animation (expanding circle)
+    if self.map_reveal.current_point > 0 and not self.map_reveal.animation_complete then
+        local point = self.map_reveal.reveal_points[self.map_reveal.current_point]
+        if point then
+            local px = mx + point.x * scale
+            local py = my + point.y * scale
+            local t = self.map_reveal.reveal_timer / self.map_reveal.reveal_interval
+            local radius = t * self.map_reveal.reveal_radius * scale
+
+            love.graphics.setColor(0.3, 1, 0.3, 0.3 * (1 - t))
+            love.graphics.circle("line", px, py, radius)
+        end
+    end
+
+    love.graphics.setLineWidth(1)
+    love.graphics.setColor(1, 1, 1, 1)
+end
+
 function Briefing:update(dt)
     if not self.active or not self.briefing_data then
         return
@@ -208,6 +425,9 @@ function Briefing:update(dt)
             end
         end
     end
+
+    -- Update map reveal animation
+    self:update_map_reveal(dt)
 end
 
 function Briefing:draw()
@@ -339,6 +559,14 @@ function Briefing:draw()
 
     local inst_width = small_font:getWidth(instructions)
     love.graphics.print(instructions, panel_x + panel_w / 2 - inst_width / 2, panel_y + panel_h - 40)
+
+    -- Draw minimap with reveal animation (positioned in top-right of panel)
+    if self.minimap.enabled then
+        -- Position minimap in top-right corner of the panel
+        self.minimap.x = panel_x + panel_w - self.minimap.width - 30
+        self.minimap.y = panel_y + 60
+        self:draw_minimap()
+    end
 
     love.graphics.setColor(1, 1, 1, 1)
 end
