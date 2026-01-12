@@ -1358,6 +1358,12 @@ function Game:draw_briefing()
     self.briefing_fade = math.min(1, self.briefing_fade + love.timer.getDelta() * 2)
     local fade = self.briefing_fade
 
+    -- Track map reveal animation (separate timer)
+    self.map_reveal_progress = self.map_reveal_progress or 0
+    if self.briefing_fade > 0.5 then
+        self.map_reveal_progress = math.min(1, self.map_reveal_progress + love.timer.getDelta() * 0.8)
+    end
+
     -- Dark background with faction-tinted gradient
     local briefing = self.current_briefing or {}
     local faction = briefing.faction or "GDI"
@@ -1435,12 +1441,19 @@ function Game:draw_briefing()
     love.graphics.line(text_x, text_y + text_h - corner_size, text_x, text_y + text_h, text_x + corner_size, text_y + text_h)
     love.graphics.line(text_x + text_w - corner_size, text_y + text_h, text_x + text_w, text_y + text_h, text_x + text_w, text_y + text_h - corner_size)
 
+    -- Split area: Left side for text, right side for tactical map
+    local map_area_w = 200
+    local text_area_w = text_w - map_area_w - 20
+
     -- Briefing text with typewriter effect (optional - shows more text over time)
     local chars_visible = math.floor(#text * math.min(1, self.briefing_fade * 1.5))
     local display_text = text:sub(1, chars_visible)
 
     love.graphics.setColor(0.85, 0.85, 0.8, fade)
-    love.graphics.printf(display_text, text_x + 25, text_y + 25, text_w - 50, "left")
+    love.graphics.printf(display_text, text_x + 25, text_y + 25, text_area_w - 30, "left")
+
+    -- Draw tactical map preview with reveal animation
+    self:draw_briefing_tactical_map(text_x + text_area_w + 10, text_y + 10, map_area_w - 10, text_h - 20, fade)
 
     -- Objectives section
     local obj_y = text_y + text_h + 15
@@ -1525,10 +1538,151 @@ function Game:start_mission_from_briefing()
     end
 end
 
+-- Draw tactical map preview during briefing with animated reveal
+function Game:draw_briefing_tactical_map(x, y, w, h, fade)
+    local briefing = self.current_briefing or {}
+    local faction = briefing.faction or "GDI"
+    local faction_color = faction == "NOD" and {0.8, 0.2, 0.2} or {0.9, 0.7, 0.2}
+    local reveal = self.map_reveal_progress or 0
+
+    -- Map border
+    love.graphics.setColor(faction_color[1] * 0.4, faction_color[2] * 0.4, faction_color[3] * 0.4, fade)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", x, y, w, h)
+
+    -- Map title
+    love.graphics.setColor(faction_color[1], faction_color[2], faction_color[3], fade)
+    love.graphics.printf("TACTICAL MAP", x, y + 5, w, "center")
+
+    -- Map area (below title)
+    local map_y = y + 25
+    local map_h = h - 30
+
+    -- Map background (dark)
+    love.graphics.setColor(0.02, 0.04, 0.02, fade)
+    love.graphics.rectangle("fill", x + 2, map_y, w - 4, map_h)
+
+    -- Generate grid cells for tactical display
+    local grid_cols = 16
+    local grid_rows = 12
+    local cell_w = (w - 4) / grid_cols
+    local cell_h = map_h / grid_rows
+
+    -- Draw terrain pattern with reveal animation (sweep from top-left)
+    for row = 0, grid_rows - 1 do
+        for col = 0, grid_cols - 1 do
+            local cx = x + 2 + col * cell_w
+            local cy = map_y + row * cell_h
+
+            -- Calculate reveal based on distance from top-left corner
+            local dist = (col / grid_cols + row / grid_rows) / 2
+            local cell_revealed = reveal > dist
+
+            if cell_revealed then
+                -- Generate pseudo-random terrain color based on position
+                local seed = (col * 17 + row * 31 + (briefing.mission or 1) * 7) % 100
+                local is_tiberium = seed < 15  -- 15% tiberium
+                local is_structure = seed >= 15 and seed < 25 and row > 2  -- 10% structures
+                local is_enemy = seed >= 25 and seed < 30 and row > 4  -- 5% enemy markers
+
+                if is_tiberium then
+                    -- Tiberium (green glow)
+                    local pulse = 0.6 + 0.4 * math.sin(love.timer.getTime() * 2 + col + row)
+                    love.graphics.setColor(0.2 * pulse, 0.6 * pulse, 0.2 * pulse, fade * 0.8)
+                    love.graphics.rectangle("fill", cx + 1, cy + 1, cell_w - 2, cell_h - 2)
+                elseif is_structure then
+                    -- Structure (faction colored)
+                    love.graphics.setColor(faction_color[1] * 0.6, faction_color[2] * 0.6, faction_color[3] * 0.6, fade * 0.9)
+                    love.graphics.rectangle("fill", cx + 1, cy + 1, cell_w - 2, cell_h - 2)
+                elseif is_enemy then
+                    -- Enemy marker (red)
+                    love.graphics.setColor(0.8, 0.2, 0.2, fade * 0.8)
+                    love.graphics.rectangle("fill", cx + 1, cy + 1, cell_w - 2, cell_h - 2)
+                else
+                    -- Normal terrain
+                    local terrain_shade = 0.08 + (seed % 5) * 0.02
+                    love.graphics.setColor(terrain_shade, terrain_shade + 0.02, terrain_shade, fade * 0.5)
+                    love.graphics.rectangle("fill", cx + 1, cy + 1, cell_w - 2, cell_h - 2)
+                end
+            else
+                -- Shrouded (not yet revealed)
+                love.graphics.setColor(0.01, 0.01, 0.01, fade * 0.9)
+                love.graphics.rectangle("fill", cx, cy, cell_w, cell_h)
+            end
+        end
+    end
+
+    -- Draw reveal sweep line
+    if reveal > 0 and reveal < 1 then
+        local sweep_x = x + 2 + reveal * (w - 4)
+        local sweep_y = map_y + reveal * map_h
+        love.graphics.setColor(faction_color[1], faction_color[2], faction_color[3], fade * 0.6)
+        love.graphics.setLineWidth(2)
+        -- Diagonal sweep line
+        love.graphics.line(x + 2, sweep_y, sweep_x, map_y)
+        love.graphics.setLineWidth(1)
+    end
+
+    -- Draw player start marker (after reveal)
+    if reveal > 0.3 then
+        local marker_x = x + w * 0.2
+        local marker_y = map_y + map_h * 0.7
+        local marker_pulse = 0.7 + 0.3 * math.sin(love.timer.getTime() * 3)
+
+        -- Pulsing circle marker
+        love.graphics.setColor(faction_color[1] * marker_pulse, faction_color[2] * marker_pulse, faction_color[3] * marker_pulse, fade)
+        love.graphics.circle("fill", marker_x, marker_y, 6)
+        love.graphics.setColor(1, 1, 1, fade * 0.8)
+        love.graphics.circle("line", marker_x, marker_y, 8)
+
+        -- "YOU" label
+        love.graphics.setColor(1, 1, 1, fade * 0.7)
+        love.graphics.print("YOU", marker_x - 10, marker_y + 10)
+    end
+
+    -- Draw objective marker (after further reveal)
+    if reveal > 0.7 then
+        local obj_x = x + w * 0.75
+        local obj_y = map_y + map_h * 0.25
+        local obj_pulse = 0.5 + 0.5 * math.sin(love.timer.getTime() * 4)
+
+        -- Blinking enemy marker
+        love.graphics.setColor(0.9 * obj_pulse, 0.2 * obj_pulse, 0.2 * obj_pulse, fade)
+        love.graphics.circle("fill", obj_x, obj_y, 5)
+        love.graphics.setColor(1, 0.3, 0.3, fade * obj_pulse)
+        love.graphics.circle("line", obj_x, obj_y, 10)
+
+        -- "OBJ" label
+        love.graphics.setColor(1, 0.5, 0.5, fade * 0.7)
+        love.graphics.print("OBJ", obj_x - 10, obj_y + 12)
+    end
+
+    -- Grid lines (subtle)
+    love.graphics.setColor(0.15, 0.2, 0.15, fade * 0.3)
+    for col = 1, grid_cols - 1 do
+        local lx = x + 2 + col * cell_w
+        love.graphics.line(lx, map_y, lx, map_y + map_h)
+    end
+    for row = 1, grid_rows - 1 do
+        local ly = map_y + row * cell_h
+        love.graphics.line(x + 2, ly, x + w - 2, ly)
+    end
+
+    -- Map legend
+    local legend_y = map_y + map_h - 35
+    love.graphics.setColor(0.5, 0.5, 0.5, fade * 0.7)
+    love.graphics.printf("Scan: " .. math.floor(reveal * 100) .. "%", x, legend_y, w, "center")
+
+    love.graphics.setLineWidth(1)
+end
+
 -- Show briefing for a mission
 function Game:show_briefing(faction, mission_num)
     self.current_mission = string.lower(faction) .. string.format("%02d", mission_num)
     self.mode = Game.MODE.CAMPAIGN
+
+    -- Reset map reveal animation
+    self.map_reveal_progress = 0
 
     -- Try to load briefing from scenario file
     local scenario_path = "data/scenarios/" .. self.current_mission .. ".json"
