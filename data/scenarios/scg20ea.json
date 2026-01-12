@@ -1,0 +1,155 @@
+{
+  "name": "Covert Ops GDI 1: Blackout",
+  "intro": "covert1",
+  "brief": "SCG20EA",
+  "win_movie": "covertwin",
+  "lose_movie": "gdifail",
+  "player": "GoodGuy",
+  "build_level": 15,
+  "theater": "TEMPERATE",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+  "covert_ops": true,
+
+  "briefing": {
+    "title": "Blackout",
+    "text": "Commander, Nod has established a communications blackout zone using jamming equipment. Our forces in the region are cut off and vulnerable. Locate and destroy all Nod jamming towers to restore communications. You have limited forces - stealth and precision are essential. The jamming equipment is heavily guarded. Once communications are restored, reinforcements can be called in.",
+    "objectives": [
+      "Destroy all Nod communications jammers",
+      "Preserve your strike force",
+      "Call in reinforcements once communications are restored"
+    ]
+  },
+
+  "houses": {
+    "GoodGuy": {
+      "credits": 5000,
+      "edge": "West",
+      "max_unit": 80,
+      "max_building": 30
+    },
+    "BadGuy": {
+      "credits": 4000,
+      "edge": "East",
+      "max_unit": 60,
+      "max_building": 30
+    }
+  },
+
+  "structures": [
+    {"house": "BadGuy", "type": "HQ", "health": 256, "cell_x": 20, "cell_y": 20, "tag": "jammer1"},
+    {"house": "BadGuy", "type": "HQ", "health": 256, "cell_x": 45, "cell_y": 15, "tag": "jammer2"},
+    {"house": "BadGuy", "type": "HQ", "health": 256, "cell_x": 50, "cell_y": 45, "tag": "jammer3"},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 18, "cell_y": 18},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 22, "cell_y": 22},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 43, "cell_y": 13},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 47, "cell_y": 17},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 48, "cell_y": 43},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 52, "cell_y": 47},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 20, "cell_y": 24},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 45, "cell_y": 19},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 54, "cell_y": 45}
+  ],
+
+  "units": [
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 4, "cell_y": 30, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 4, "cell_y": 34, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "APC", "health": 256, "cell_x": 6, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 2, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 22, "cell_y": 20, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 47, "cell_y": 15, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 52, "cell_y": 45, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BIKE", "health": 256, "cell_x": 18, "cell_y": 22, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BIKE", "health": 256, "cell_x": 43, "cell_y": 17, "facing": 192, "mission": "Guard"}
+  ],
+
+  "infantry": [
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 33, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 3, "cell_y": 32, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E6", "health": 256, "cell_x": 7, "cell_y": 32, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 19, "cell_y": 19, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 21, "cell_y": 21, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 44, "cell_y": 14, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 46, "cell_y": 16, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 44, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 51, "cell_y": 46, "subcell": 0, "mission": "Guard", "facing": 192}
+  ],
+
+  "triggers": [
+    {
+      "name": "Jammer1Down",
+      "house": "BadGuy",
+      "event": 7,
+      "event_param": "jammer1",
+      "action": 11,
+      "action_param": "First jammer destroyed! Two more to go.",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Jammer2Down",
+      "house": "BadGuy",
+      "event": 7,
+      "event_param": "jammer2",
+      "action": 11,
+      "action_param": "Second jammer destroyed! One more target.",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Jammer3Down",
+      "house": "BadGuy",
+      "event": 7,
+      "event_param": "jammer3",
+      "action": 11,
+      "action_param": "All jammers destroyed! Communications restored. Reinforcements inbound!",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Win",
+      "house": "BadGuy",
+      "event": 9,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Reinforce",
+      "house": "BadGuy",
+      "event": 9,
+      "event_param": 0,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Reinforce",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "GDI_Reinforce",
+      "house": "GoodGuy",
+      "edge": "West",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "HTNK", "count": 2},
+        {"type": "MTNK", "count": 2},
+        {"type": "E1", "count": 6}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 1024, "y": 8192}
+  ],
+
+  "cell_triggers": []
+}

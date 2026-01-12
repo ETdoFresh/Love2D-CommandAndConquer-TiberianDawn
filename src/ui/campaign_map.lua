@@ -45,6 +45,29 @@ CampaignMap.NOD_MISSIONS = {
     {id = 13, name = "South Africa", x = 0.55, y = 0.92, file = "nod13", region = "south_africa", requires = {12}, final = true}
 }
 
+-- Covert Operations expansion missions (standalone, no prerequisites)
+-- Original expansion had 7 GDI missions and 8 NOD missions
+CampaignMap.COVERT_OPS_GDI = {
+    {id = 1, name = "Blackout", file = "scg20ea", region = "covert", standalone = true},
+    {id = 2, name = "Hell's Fury", file = "scg21ea", region = "covert", standalone = true},
+    {id = 3, name = "Infiltrated!", file = "scg22ea", region = "covert", standalone = true},
+    {id = 4, name = "Elemental Imperative", file = "scg23ea", region = "covert", standalone = true},
+    {id = 5, name = "Ground Zero", file = "scg24ea", region = "covert", standalone = true},
+    {id = 6, name = "Twist of Fate", file = "scg25ea", region = "covert", standalone = true},
+    {id = 7, name = "Blindsided", file = "scg26ea", region = "covert", standalone = true}
+}
+
+CampaignMap.COVERT_OPS_NOD = {
+    {id = 1, name = "Bad Neighborhood", file = "scb20ea", region = "covert", standalone = true},
+    {id = 2, name = "Deceit", file = "scb21ea", region = "covert", standalone = true},
+    {id = 3, name = "Eviction Notice", file = "scb22ea", region = "covert", standalone = true},
+    {id = 4, name = "The Tiberium Strain", file = "scb23ea", region = "covert", standalone = true},
+    {id = 5, name = "Cloak and Dagger", file = "scb24ea", region = "covert", standalone = true},
+    {id = 6, name = "Hostile Takeover", file = "scb25ea", region = "covert", standalone = true},
+    {id = 7, name = "Under Siege: C&C", file = "scb26ea", region = "covert", standalone = true},
+    {id = 8, name = "No Mercy", file = "scb27ea", region = "covert", standalone = true}
+}
+
 -- Region colors for map rendering
 CampaignMap.REGION_COLORS = {
     baltic = {0.4, 0.5, 0.3},

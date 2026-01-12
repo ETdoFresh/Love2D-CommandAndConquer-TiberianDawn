@@ -1,0 +1,143 @@
+{
+  "name": "Covert Ops NOD 2: Deceit",
+  "intro": "covert2n",
+  "brief": "SCB21EA",
+  "win_movie": "covertwin",
+  "lose_movie": "nodfail",
+  "player": "BadGuy",
+  "build_level": 15,
+  "theater": "DESERT",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+  "covert_ops": true,
+
+  "briefing": {
+    "title": "Deceit",
+    "text": "Kane has a special mission for you, brother. GDI believes they have a spy within our ranks. We will use this to our advantage. Lure them into a trap at the coordinates provided. Once the GDI strike force enters the kill zone, eliminate them utterly. Then destroy their base while they are weakened. Deception is the greatest weapon.",
+    "objectives": [
+      "Lure GDI forces into the ambush zone",
+      "Destroy the GDI strike force",
+      "Eliminate the remaining GDI base"
+    ]
+  },
+
+  "houses": {
+    "BadGuy": {
+      "credits": 10000,
+      "edge": "South",
+      "max_unit": 100,
+      "max_building": 50
+    },
+    "GoodGuy": {
+      "credits": 6000,
+      "edge": "North",
+      "max_unit": 80,
+      "max_building": 40
+    }
+  },
+
+  "structures": [
+    {"house": "BadGuy", "type": "FACT", "health": 256, "cell_x": 32, "cell_y": 54},
+    {"house": "BadGuy", "type": "HAND", "health": 256, "cell_x": 28, "cell_y": 52},
+    {"house": "BadGuy", "type": "WEAP", "health": 256, "cell_x": 36, "cell_y": 52},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 30, "cell_y": 56},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 34, "cell_y": 56},
+    {"house": "BadGuy", "type": "PROC", "health": 256, "cell_x": 38, "cell_y": 56},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 26, "cell_y": 50},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 38, "cell_y": 50},
+    {"house": "BadGuy", "type": "OBEL", "health": 256, "cell_x": 32, "cell_y": 50},
+    {"house": "GoodGuy", "type": "FACT", "health": 256, "cell_x": 32, "cell_y": 10},
+    {"house": "GoodGuy", "type": "PYLE", "health": 256, "cell_x": 28, "cell_y": 8},
+    {"house": "GoodGuy", "type": "WEAP", "health": 256, "cell_x": 36, "cell_y": 8},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 30, "cell_y": 6},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 34, "cell_y": 6},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 26, "cell_y": 10},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 38, "cell_y": 10}
+  ],
+
+  "units": [
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 30, "cell_y": 52, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 34, "cell_y": 52, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 32, "cell_y": 50, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 28, "cell_y": 34, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 36, "cell_y": 34, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 26, "cell_y": 36, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 38, "cell_y": 36, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "HARV", "health": 256, "cell_x": 40, "cell_y": 56, "facing": 0, "mission": "Harvest"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 30, "cell_y": 12, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 34, "cell_y": 12, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 28, "cell_y": 10, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HARV", "health": 256, "cell_x": 40, "cell_y": 10, "facing": 128, "mission": "Harvest"}
+  ],
+
+  "infantry": [
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 29, "cell_y": 51, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 35, "cell_y": 51, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 31, "cell_y": 53, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 33, "cell_y": 53, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 27, "cell_y": 35, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 37, "cell_y": 35, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 29, "cell_y": 9, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 35, "cell_y": 9, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 31, "cell_y": 11, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 33, "cell_y": 11, "subcell": 0, "mission": "Guard", "facing": 128}
+  ],
+
+  "triggers": [
+    {
+      "name": "Ambush",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 180,
+      "action": 11,
+      "action_param": "GDI forces are moving toward the trap. Prepare to spring the ambush!",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "GDIStrike",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 240,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Strike",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Win",
+      "house": "GoodGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "GDI_Strike",
+      "house": "GoodGuy",
+      "edge": "North",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "HTNK", "count": 2},
+        {"type": "MTNK", "count": 3},
+        {"type": "E1", "count": 8}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 8192, "y": 13824},
+    {"x": 8192, "y": 8192}
+  ],
+
+  "cell_triggers": []
+}

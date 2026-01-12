@@ -1,0 +1,156 @@
+{
+  "name": "Covert Ops GDI 5: Ground Zero",
+  "intro": "covert5",
+  "brief": "SCG24EA",
+  "win_movie": "covertwin",
+  "lose_movie": "gdifail",
+  "player": "GoodGuy",
+  "build_level": 15,
+  "theater": "DESERT",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+  "covert_ops": true,
+
+  "briefing": {
+    "title": "Ground Zero",
+    "text": "Commander, Nod has established a nuclear missile silo in the desert. Intelligence indicates they are preparing for a launch within the hour. You must destroy the Temple of Nod housing the nuclear facility before they can launch. Time is critical - every second counts. Use the Ion Cannon wisely. Failure is not an option.",
+    "objectives": [
+      "Destroy the Temple of Nod before nuclear launch",
+      "Eliminate all Nod forces",
+      "Time is critical - move fast"
+    ]
+  },
+
+  "houses": {
+    "GoodGuy": {
+      "credits": 15000,
+      "edge": "West",
+      "max_unit": 120,
+      "max_building": 60
+    },
+    "BadGuy": {
+      "credits": 10000,
+      "edge": "East",
+      "max_unit": 100,
+      "max_building": 50
+    }
+  },
+
+  "structures": [
+    {"house": "BadGuy", "type": "TMPL", "health": 256, "cell_x": 52, "cell_y": 30, "tag": "temple"},
+    {"house": "BadGuy", "type": "FACT", "health": 256, "cell_x": 48, "cell_y": 26},
+    {"house": "BadGuy", "type": "HAND", "health": 256, "cell_x": 56, "cell_y": 26},
+    {"house": "BadGuy", "type": "WEAP", "health": 256, "cell_x": 56, "cell_y": 34},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 50, "cell_y": 24},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 54, "cell_y": 24},
+    {"house": "BadGuy", "type": "NUK2", "health": 256, "cell_x": 58, "cell_y": 30},
+    {"house": "BadGuy", "type": "PROC", "health": 256, "cell_x": 58, "cell_y": 26},
+    {"house": "BadGuy", "type": "HQ", "health": 256, "cell_x": 48, "cell_y": 30},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 46, "cell_y": 28},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 46, "cell_y": 32},
+    {"house": "BadGuy", "type": "OBEL", "health": 256, "cell_x": 50, "cell_y": 28},
+    {"house": "BadGuy", "type": "OBEL", "health": 256, "cell_x": 50, "cell_y": 32},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 52, "cell_y": 24},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 52, "cell_y": 36},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 58, "cell_y": 34}
+  ],
+
+  "units": [
+    {"house": "GoodGuy", "type": "MCV", "health": 256, "cell_x": 6, "cell_y": 30, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HTNK", "health": 256, "cell_x": 4, "cell_y": 28, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HTNK", "health": 256, "cell_x": 4, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 2, "cell_y": 30, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 8, "cell_y": 28, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 8, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MLRS", "health": 256, "cell_x": 6, "cell_y": 26, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MLRS", "health": 256, "cell_x": 6, "cell_y": 34, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MSAM", "health": 256, "cell_x": 4, "cell_y": 26, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MSAM", "health": 256, "cell_x": 4, "cell_y": 34, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 48, "cell_y": 28, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 48, "cell_y": 32, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 54, "cell_y": 28, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 54, "cell_y": 32, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 50, "cell_y": 26, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 50, "cell_y": 34, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 56, "cell_y": 30, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "HARV", "health": 256, "cell_x": 60, "cell_y": 26, "facing": 192, "mission": "Harvest"}
+  ],
+
+  "infantry": [
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 3, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 3, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E6", "health": 256, "cell_x": 7, "cell_y": 30, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 47, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 47, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 51, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 51, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 53, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 53, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 192}
+  ],
+
+  "triggers": [
+    {
+      "name": "IonCannon",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 5,
+      "action": 25,
+      "action_param": 1,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "TempleDestroyed",
+      "house": "BadGuy",
+      "event": 7,
+      "event_param": "temple",
+      "action": 11,
+      "action_param": "Temple destroyed! Nuclear launch prevented! Eliminate remaining forces!",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Win",
+      "house": "BadGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "NukeLaunch",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 900,
+      "action": 2,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "NukeWarning",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 600,
+      "action": 11,
+      "action_param": "WARNING: Nuclear launch in 5 minutes! Destroy the Temple NOW!",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [],
+
+  "waypoints": [
+    {"x": 1536, "y": 7680},
+    {"x": 13312, "y": 7680}
+  ],
+
+  "cell_triggers": []
+}

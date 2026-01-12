@@ -1,0 +1,170 @@
+{
+  "name": "Covert Ops GDI 7: Blindsided",
+  "intro": "covert7",
+  "brief": "SCG26EA",
+  "win_movie": "covertwin",
+  "lose_movie": "gdifail",
+  "player": "GoodGuy",
+  "build_level": 15,
+  "theater": "DESERT",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+  "covert_ops": true,
+
+  "briefing": {
+    "title": "Blindsided",
+    "text": "Commander, we've been ambushed. A routine patrol was hit by a massive Nod force. Survivors are holding out at a defensive position but are heavily outnumbered. You must break through Nod lines and relieve our forces before they're overrun. The besieged forces have limited ammunition - time is critical. Break the siege and destroy the Nod attackers.",
+    "objectives": [
+      "Relieve the besieged GDI forces",
+      "Destroy all Nod attackers",
+      "Protect surviving GDI units"
+    ]
+  },
+
+  "houses": {
+    "GoodGuy": {
+      "credits": 12000,
+      "edge": "West",
+      "max_unit": 120,
+      "max_building": 60
+    },
+    "BadGuy": {
+      "credits": 8000,
+      "edge": "East",
+      "max_unit": 100,
+      "max_building": 40
+    }
+  },
+
+  "structures": [
+    {"house": "GoodGuy", "type": "GTWR", "health": 150, "cell_x": 30, "cell_y": 28},
+    {"house": "GoodGuy", "type": "GTWR", "health": 150, "cell_x": 30, "cell_y": 32},
+    {"house": "GoodGuy", "type": "GTWR", "health": 150, "cell_x": 34, "cell_y": 28},
+    {"house": "GoodGuy", "type": "GTWR", "health": 150, "cell_x": 34, "cell_y": 32},
+    {"house": "BadGuy", "type": "FACT", "health": 256, "cell_x": 54, "cell_y": 30},
+    {"house": "BadGuy", "type": "HAND", "health": 256, "cell_x": 50, "cell_y": 28},
+    {"house": "BadGuy", "type": "WEAP", "health": 256, "cell_x": 58, "cell_y": 28},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 52, "cell_y": 32},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 56, "cell_y": 32},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 48, "cell_y": 30},
+    {"house": "BadGuy", "type": "OBEL", "health": 256, "cell_x": 50, "cell_y": 32}
+  ],
+
+  "units": [
+    {"house": "GoodGuy", "type": "MCV", "health": 256, "cell_x": 6, "cell_y": 30, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HTNK", "health": 256, "cell_x": 4, "cell_y": 28, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HTNK", "health": 256, "cell_x": 4, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 8, "cell_y": 28, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 8, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MLRS", "health": 256, "cell_x": 6, "cell_y": 26, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MLRS", "health": 256, "cell_x": 6, "cell_y": 34, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 100, "cell_x": 32, "cell_y": 30, "facing": 64, "mission": "Guard", "tag": "survivor1"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 80, "cell_x": 31, "cell_y": 29, "facing": 64, "mission": "Guard", "tag": "survivor2"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 40, "cell_y": 28, "facing": 192, "mission": "Hunt"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 40, "cell_y": 32, "facing": 192, "mission": "Hunt"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 42, "cell_y": 30, "facing": 192, "mission": "Hunt"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 52, "cell_y": 28, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 52, "cell_y": 30, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 44, "cell_y": 28, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 44, "cell_y": 32, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "HARV", "health": 256, "cell_x": 60, "cell_y": 30, "facing": 192, "mission": "Harvest"}
+  ],
+
+  "infantry": [
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 3, "cell_y": 30, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E6", "health": 256, "cell_x": 7, "cell_y": 30, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 100, "cell_x": 31, "cell_y": 30, "subcell": 0, "mission": "Guard", "facing": 64, "tag": "survivor3"},
+    {"house": "GoodGuy", "type": "E1", "health": 100, "cell_x": 33, "cell_y": 30, "subcell": 0, "mission": "Guard", "facing": 64, "tag": "survivor4"},
+    {"house": "GoodGuy", "type": "E3", "health": 100, "cell_x": 32, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64, "tag": "survivor5"},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 39, "cell_y": 29, "subcell": 0, "mission": "Hunt", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 39, "cell_y": 31, "subcell": 0, "mission": "Hunt", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 41, "cell_y": 29, "subcell": 0, "mission": "Hunt", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 41, "cell_y": 31, "subcell": 0, "mission": "Hunt", "facing": 192},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 51, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 51, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 192}
+  ],
+
+  "triggers": [
+    {
+      "name": "SiegeAlert",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 3,
+      "action": 11,
+      "action_param": "Our forces are under siege! Break through and save them!",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Win",
+      "house": "BadGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Reinforce1",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 240,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Reinforce1",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Reinforce2",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 480,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Reinforce2",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "NOD_Reinforce1",
+      "house": "BadGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 5},
+        {"type": "LTNK", "count": 2},
+        {"type": "BIKE", "count": 2}
+      ]
+    },
+    {
+      "name": "NOD_Reinforce2",
+      "house": "BadGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 4},
+        {"type": "E4", "count": 3},
+        {"type": "FTNK", "count": 2},
+        {"type": "STNK", "count": 1}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 1536, "y": 7680},
+    {"x": 8192, "y": 7680}
+  ],
+
+  "cell_triggers": []
+}

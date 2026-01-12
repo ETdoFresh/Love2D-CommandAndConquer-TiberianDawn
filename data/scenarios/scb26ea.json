@@ -1,0 +1,240 @@
+{
+  "name": "Covert Ops NOD 7: Under Siege: C&C",
+  "intro": "covert7n",
+  "brief": "SCB26EA",
+  "win_movie": "covertwin",
+  "lose_movie": "nodfail",
+  "player": "BadGuy",
+  "build_level": 15,
+  "theater": "WINTER",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+  "covert_ops": true,
+
+  "briefing": {
+    "title": "Under Siege: C&C",
+    "text": "Our forward base is under siege by GDI forces. Reinforcements are en route but will take time to arrive. You must hold the base against overwhelming odds until help arrives. The Temple of Nod must be protected at all costs - it contains critical technology. Use every defensive structure available. Hold the line, brother.",
+    "objectives": [
+      "Defend the Temple of Nod",
+      "Survive until reinforcements arrive",
+      "Destroy all attacking GDI forces"
+    ]
+  },
+
+  "houses": {
+    "BadGuy": {
+      "credits": 8000,
+      "edge": "Center",
+      "max_unit": 100,
+      "max_building": 50
+    },
+    "GoodGuy": {
+      "credits": 8000,
+      "edge": "West",
+      "max_unit": 100,
+      "max_building": 30
+    }
+  },
+
+  "structures": [
+    {"house": "BadGuy", "type": "TMPL", "health": 256, "cell_x": 32, "cell_y": 30, "tag": "temple"},
+    {"house": "BadGuy", "type": "FACT", "health": 256, "cell_x": 28, "cell_y": 28},
+    {"house": "BadGuy", "type": "HAND", "health": 256, "cell_x": 36, "cell_y": 28},
+    {"house": "BadGuy", "type": "WEAP", "health": 256, "cell_x": 38, "cell_y": 32},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 26, "cell_y": 30},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 30, "cell_y": 32},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 34, "cell_y": 32},
+    {"house": "BadGuy", "type": "PROC", "health": 256, "cell_x": 40, "cell_y": 30},
+    {"house": "BadGuy", "type": "HQ", "health": 256, "cell_x": 32, "cell_y": 26},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 24, "cell_y": 28},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 24, "cell_y": 32},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 40, "cell_y": 28},
+    {"house": "BadGuy", "type": "OBEL", "health": 256, "cell_x": 26, "cell_y": 28},
+    {"house": "BadGuy", "type": "OBEL", "health": 256, "cell_x": 26, "cell_y": 32},
+    {"house": "BadGuy", "type": "OBEL", "health": 256, "cell_x": 38, "cell_y": 28},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 28, "cell_y": 24},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 36, "cell_y": 24},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 32, "cell_y": 34}
+  ],
+
+  "units": [
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 30, "cell_y": 28, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 34, "cell_y": 28, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 32, "cell_y": 28, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 28, "cell_y": 30, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 36, "cell_y": 30, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "HARV", "health": 256, "cell_x": 42, "cell_y": 30, "facing": 192, "mission": "Harvest"}
+  ],
+
+  "infantry": [
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 29, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 35, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 31, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 33, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 25, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 25, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 39, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 39, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 192}
+  ],
+
+  "triggers": [
+    {
+      "name": "Wave1",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 60,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Wave1",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Wave2",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 240,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Wave2",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Wave3",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 420,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Wave3",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Wave4",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 600,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Wave4",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Reinforcements",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 720,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Reinforce",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "ReinforcementMsg",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 720,
+      "action": 11,
+      "action_param": "Reinforcements have arrived! Counter-attack and destroy GDI!",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Win",
+      "house": "GoodGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "TempleDestroyed",
+      "house": "BadGuy",
+      "event": 7,
+      "event_param": "temple",
+      "action": 2,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "GDI_Wave1",
+      "house": "GoodGuy",
+      "edge": "West",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 8},
+        {"type": "MTNK", "count": 2}
+      ]
+    },
+    {
+      "name": "GDI_Wave2",
+      "house": "GoodGuy",
+      "edge": "West",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 5},
+        {"type": "E3", "count": 3},
+        {"type": "MTNK", "count": 2},
+        {"type": "HTNK", "count": 1}
+      ]
+    },
+    {
+      "name": "GDI_Wave3",
+      "house": "GoodGuy",
+      "edge": "West",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 6},
+        {"type": "HTNK", "count": 2},
+        {"type": "MLRS", "count": 2}
+      ]
+    },
+    {
+      "name": "GDI_Wave4",
+      "house": "GoodGuy",
+      "edge": "West",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 8},
+        {"type": "HTNK", "count": 3},
+        {"type": "MTNK", "count": 2},
+        {"type": "ORCA", "count": 2}
+      ]
+    },
+    {
+      "name": "NOD_Reinforce",
+      "house": "BadGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "LTNK", "count": 4},
+        {"type": "FTNK", "count": 2},
+        {"type": "STNK", "count": 2},
+        {"type": "E1", "count": 8}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 8192, "y": 7680}
+  ],
+
+  "cell_triggers": []
+}

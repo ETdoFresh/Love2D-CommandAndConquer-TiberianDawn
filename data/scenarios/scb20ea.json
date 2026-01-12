@@ -1,0 +1,131 @@
+{
+  "name": "Covert Ops NOD 1: Bad Neighborhood",
+  "intro": "covert1n",
+  "brief": "SCB20EA",
+  "win_movie": "covertwin",
+  "lose_movie": "nodfail",
+  "player": "BadGuy",
+  "build_level": 15,
+  "theater": "TEMPERATE",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+  "covert_ops": true,
+
+  "briefing": {
+    "title": "Bad Neighborhood",
+    "text": "Brother, GDI has established a forward base dangerously close to our territory. Kane has ordered its destruction. The base is lightly defended but reinforcements are nearby. Strike fast and hard before they can respond. Leave no survivors. Use your stealth tanks to scout ahead and strike when the moment is right. Peace through power.",
+    "objectives": [
+      "Destroy the GDI forward base",
+      "Eliminate all GDI forces",
+      "Complete the mission before reinforcements arrive"
+    ]
+  },
+
+  "houses": {
+    "BadGuy": {
+      "credits": 7000,
+      "edge": "East",
+      "max_unit": 80,
+      "max_building": 40
+    },
+    "GoodGuy": {
+      "credits": 5000,
+      "edge": "West",
+      "max_unit": 60,
+      "max_building": 30
+    }
+  },
+
+  "structures": [
+    {"house": "GoodGuy", "type": "FACT", "health": 256, "cell_x": 14, "cell_y": 30},
+    {"house": "GoodGuy", "type": "PYLE", "health": 256, "cell_x": 10, "cell_y": 28},
+    {"house": "GoodGuy", "type": "WEAP", "health": 256, "cell_x": 18, "cell_y": 28},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 12, "cell_y": 32},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 16, "cell_y": 32},
+    {"house": "GoodGuy", "type": "PROC", "health": 256, "cell_x": 20, "cell_y": 30},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 8, "cell_y": 28},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 8, "cell_y": 32}
+  ],
+
+  "units": [
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 58, "cell_y": 28, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 58, "cell_y": 32, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 56, "cell_y": 30, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 60, "cell_y": 30, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BIKE", "health": 256, "cell_x": 56, "cell_y": 26, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BIKE", "health": 256, "cell_x": 56, "cell_y": 34, "facing": 192, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 14, "cell_y": 28, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 12, "cell_y": 30, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 16, "cell_y": 30, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HARV", "health": 256, "cell_x": 22, "cell_y": 30, "facing": 64, "mission": "Harvest"}
+  ],
+
+  "infantry": [
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 57, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 57, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 59, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 59, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 55, "cell_y": 30, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 11, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 11, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 17, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 17, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64}
+  ],
+
+  "triggers": [
+    {
+      "name": "Win",
+      "house": "GoodGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Reinforce",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 480,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Reinforce",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Warning",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 360,
+      "action": 11,
+      "action_param": "GDI reinforcements inbound! Complete the mission quickly!",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "GDI_Reinforce",
+      "house": "GoodGuy",
+      "edge": "West",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "HTNK", "count": 2},
+        {"type": "MTNK", "count": 2},
+        {"type": "E1", "count": 6}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 14336, "y": 7680}
+  ],
+
+  "cell_triggers": []
+}

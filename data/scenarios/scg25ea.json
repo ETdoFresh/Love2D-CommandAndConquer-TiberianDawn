@@ -1,0 +1,191 @@
+{
+  "name": "Covert Ops GDI 6: Twist of Fate",
+  "intro": "covert6",
+  "brief": "SCG25EA",
+  "win_movie": "covertwin",
+  "lose_movie": "gdifail",
+  "player": "GoodGuy",
+  "build_level": 15,
+  "theater": "TEMPERATE",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+  "covert_ops": true,
+
+  "briefing": {
+    "title": "Twist of Fate",
+    "text": "Commander, a Nod commander has defected and is seeking asylum. He has valuable intelligence about Nod operations. However, his former comrades are hunting him. You must extract the defector from his current location before Nod forces eliminate him. The defector is hiding in a civilian village. Protect him and escort him to the extraction point.",
+    "objectives": [
+      "Locate and protect the Nod defector",
+      "Escort the defector to the extraction point",
+      "Eliminate pursuing Nod forces"
+    ]
+  },
+
+  "houses": {
+    "GoodGuy": {
+      "credits": 8000,
+      "edge": "West",
+      "max_unit": 100,
+      "max_building": 50
+    },
+    "BadGuy": {
+      "credits": 6000,
+      "edge": "East",
+      "max_unit": 80,
+      "max_building": 30
+    },
+    "Neutral": {
+      "credits": 0,
+      "edge": "Center",
+      "max_unit": 5,
+      "max_building": 10
+    }
+  },
+
+  "structures": [
+    {"house": "Neutral", "type": "V19", "health": 256, "cell_x": 32, "cell_y": 30},
+    {"house": "Neutral", "type": "V19", "health": 256, "cell_x": 30, "cell_y": 32},
+    {"house": "Neutral", "type": "V19", "health": 256, "cell_x": 34, "cell_y": 32},
+    {"house": "BadGuy", "type": "FACT", "health": 256, "cell_x": 54, "cell_y": 30},
+    {"house": "BadGuy", "type": "HAND", "health": 256, "cell_x": 50, "cell_y": 28},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 52, "cell_y": 32},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 48, "cell_y": 30},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 56, "cell_y": 28}
+  ],
+
+  "units": [
+    {"house": "GoodGuy", "type": "APC", "health": 256, "cell_x": 6, "cell_y": 30, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 4, "cell_y": 28, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 4, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 8, "cell_y": 30, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 52, "cell_y": 28, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 52, "cell_y": 32, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BIKE", "health": 256, "cell_x": 48, "cell_y": 28, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BIKE", "health": 256, "cell_x": 48, "cell_y": 32, "facing": 192, "mission": "Guard"}
+  ],
+
+  "infantry": [
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 3, "cell_y": 30, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E6", "health": 256, "cell_x": 7, "cell_y": 30, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "Neutral", "type": "E1", "health": 256, "cell_x": 32, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64, "tag": "defector"},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 29, "subcell": 0, "mission": "Hunt", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 31, "subcell": 0, "mission": "Hunt", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 51, "cell_y": 29, "subcell": 0, "mission": "Hunt", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 51, "cell_y": 31, "subcell": 0, "mission": "Hunt", "facing": 192}
+  ],
+
+  "triggers": [
+    {
+      "name": "DefectorFound",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 5,
+      "action": 11,
+      "action_param": "The defector is hiding in the village center. Protect him and escort to extraction!",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "HuntWave1",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 120,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Hunt1",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "HuntWave2",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 300,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Hunt2",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "HuntWave3",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 480,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Hunt3",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Win",
+      "house": "BadGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "DefectorDead",
+      "house": "Neutral",
+      "event": 7,
+      "event_param": "defector",
+      "action": 2,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "NOD_Hunt1",
+      "house": "BadGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 6},
+        {"type": "BIKE", "count": 2}
+      ]
+    },
+    {
+      "name": "NOD_Hunt2",
+      "house": "BadGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 4},
+        {"type": "E4", "count": 2},
+        {"type": "LTNK", "count": 2}
+      ]
+    },
+    {
+      "name": "NOD_Hunt3",
+      "house": "BadGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 5},
+        {"type": "STNK", "count": 2},
+        {"type": "FTNK", "count": 1}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 1536, "y": 7680},
+    {"x": 8192, "y": 7680}
+  ],
+
+  "cell_triggers": []
+}
