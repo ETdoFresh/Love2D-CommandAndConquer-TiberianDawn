@@ -229,6 +229,9 @@ function Game:init()
     -- Link trigger system to movement system for cell entry detection
     self.movement_system:set_trigger_system(self.trigger_system)
 
+    -- Link movement system to team system for coordinated waypoint movement
+    self.team_system:set_movement_system(self.movement_system)
+
     -- Create special weapons system
     self.special_weapons = Systems.SpecialWeapons.new(self.world, self.combat_system)
 
@@ -2654,9 +2657,20 @@ function Game:load_game(filename)
     if self.world then
         self.world:clear()
 
+        -- Find highest entity ID to set counter properly
+        local max_id = 0
         for _, entity_data in ipairs(save_data.entities or {}) do
-            local entity = ECS.Entity.new()
-            entity:deserialize(entity_data)
+            if entity_data.id and entity_data.id > max_id then
+                max_id = entity_data.id
+            end
+        end
+
+        -- Set next ID counter before deserializing
+        ECS.Entity.set_next_id(max_id + 1)
+
+        -- Deserialize entities using static method
+        for _, entity_data in ipairs(save_data.entities or {}) do
+            local entity = ECS.Entity.deserialize(entity_data)
             self.world:add_entity(entity)
         end
     end

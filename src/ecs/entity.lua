@@ -130,4 +130,87 @@ function Entity:__tostring()
     return string.format("Entity(%d)[%s]", self.id, components)
 end
 
+-- Serialize entity to a table for save/load
+-- Performs deep copy of all component data
+function Entity:serialize()
+    local data = {
+        id = self.id,
+        alive = self.alive,
+        components = {},
+        tags = {}
+    }
+
+    -- Deep copy components
+    for name, component in pairs(self.components) do
+        data.components[name] = Entity.deep_copy(component)
+    end
+
+    -- Copy tags
+    for tag in pairs(self.tags) do
+        table.insert(data.tags, tag)
+    end
+
+    return data
+end
+
+-- Deserialize entity from saved data
+-- Returns a new entity with the saved state
+function Entity.deserialize(data)
+    local entity = setmetatable({}, Entity)
+    entity.id = data.id
+    entity.alive = data.alive
+    entity.components = {}
+    entity.tags = {}
+
+    -- Restore components
+    for name, component_data in pairs(data.components) do
+        entity.components[name] = Entity.deep_copy(component_data)
+    end
+
+    -- Restore tags
+    for _, tag in ipairs(data.tags) do
+        entity.tags[tag] = true
+    end
+
+    -- Update next_id to avoid collisions
+    if data.id >= next_id then
+        next_id = data.id + 1
+    end
+
+    return entity
+end
+
+-- Deep copy helper for component data
+-- Handles nested tables but not functions or userdata
+function Entity.deep_copy(obj)
+    if type(obj) ~= "table" then
+        return obj
+    end
+
+    -- Skip Love2D objects and functions (can't be serialized)
+    if obj.typeOf or type(obj) == "userdata" then
+        return nil
+    end
+
+    local copy = {}
+    for k, v in pairs(obj) do
+        if type(v) == "table" then
+            copy[k] = Entity.deep_copy(v)
+        elseif type(v) ~= "function" and type(v) ~= "userdata" then
+            copy[k] = v
+        end
+    end
+    return copy
+end
+
+-- Set the next ID counter (used when loading saves)
+function Entity.set_next_id(id)
+    next_id = id
+end
+
+-- Get current next ID (for save state)
+function Entity.get_next_id()
+    return next_id
+end
+
 return Entity

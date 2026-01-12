@@ -31,6 +31,7 @@ function TeamSystem.new(world, ai_system)
 
     self.world = world
     self.ai_system = ai_system
+    self.movement_system = nil  -- Set via set_movement_system()
 
     -- Team definitions (from scenario)
     self.team_types = {}
@@ -41,10 +42,23 @@ function TeamSystem.new(world, ai_system)
     -- Next team ID
     self.next_team_id = 1
 
+    -- Scenario waypoints reference
+    self.scenario_waypoints = {}
+
     -- Register events
     self:register_events()
 
     return self
+end
+
+-- Set movement system reference
+function TeamSystem:set_movement_system(movement_system)
+    self.movement_system = movement_system
+end
+
+-- Set scenario waypoints (called by loader)
+function TeamSystem:set_waypoints(waypoints)
+    self.scenario_waypoints = waypoints or {}
 end
 
 -- Register event listeners
@@ -285,13 +299,18 @@ end
 function TeamSystem:update_waypoint_movement(team)
     if #team.waypoints == 0 then return end
 
-    local waypoint = team.waypoints[team.current_waypoint]
+    -- Resolve waypoint (can be index into scenario waypoints or direct coords)
+    local waypoint = self:resolve_waypoint(team.waypoints[team.current_waypoint])
     if not waypoint then return end
 
     -- Check if all members reached waypoint
     local all_reached = true
+    local any_moving = false
+
     for _, entity in ipairs(team.members) do
         local transform = entity:get("transform")
+        local mobile = entity:get("mobile")
+
         if transform then
             local dx = transform.x - waypoint.x
             local dy = transform.y - waypoint.y
@@ -299,8 +318,21 @@ function TeamSystem:update_waypoint_movement(team)
 
             if dist > 256 then  -- 1 cell tolerance
                 all_reached = false
-                break
+
+                -- Issue move command if not already moving
+                if mobile and not mobile.is_moving then
+                    self:move_entity_to(entity, waypoint.x, waypoint.y)
+                else
+                    any_moving = true
+                end
             end
+        end
+    end
+
+    -- If not all reached and none moving, re-issue move commands
+    if not all_reached and not any_moving then
+        for _, entity in ipairs(team.members) do
+            self:move_entity_to(entity, waypoint.x, waypoint.y)
         end
     end
 
@@ -312,22 +344,57 @@ function TeamSystem:update_waypoint_movement(team)
             if team.mission == TeamSystem.MISSION.LOOP then
                 team.current_waypoint = 1
             else
-                -- Team mission complete
+                -- Team mission complete - switch to guard
+                for _, entity in ipairs(team.members) do
+                    if self.ai_system then
+                        self.ai_system:set_mission(entity, Constants.MISSION.GUARD)
+                    end
+                end
                 return
             end
         end
 
         -- Issue move commands to new waypoint
-        local next_wp = team.waypoints[team.current_waypoint]
+        local next_wp = self:resolve_waypoint(team.waypoints[team.current_waypoint])
         if next_wp then
             for _, entity in ipairs(team.members) do
-                if self.ai_system then
-                    self.ai_system:set_mission(entity, Constants.MISSION.MOVE)
-                    entity.target_x = next_wp.x
-                    entity.target_y = next_wp.y
-                end
+                self:move_entity_to(entity, next_wp.x, next_wp.y)
             end
         end
+    end
+end
+
+-- Resolve waypoint reference to coordinates
+-- Waypoint can be: {x=n, y=n}, or index into scenario waypoints
+function TeamSystem:resolve_waypoint(waypoint)
+    if not waypoint then return nil end
+
+    -- Direct coordinates
+    if waypoint.x and waypoint.y then
+        return waypoint
+    end
+
+    -- Index into scenario waypoints
+    if type(waypoint) == "number" then
+        return self.scenario_waypoints[waypoint]
+    end
+
+    -- Named waypoint index
+    if waypoint.index then
+        return self.scenario_waypoints[waypoint.index]
+    end
+
+    return nil
+end
+
+-- Move entity to coordinates using movement system
+function TeamSystem:move_entity_to(entity, x, y)
+    if self.movement_system and entity:has("mobile") then
+        self.movement_system:move_to(entity, x, y)
+    end
+
+    if self.ai_system then
+        self.ai_system:set_mission(entity, Constants.MISSION.MOVE)
     end
 end
 

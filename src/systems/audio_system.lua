@@ -66,6 +66,44 @@ end
 function AudioSystem:init_audio()
     -- Set up default audio settings
     love.audio.setVolume(self.volumes.master)
+
+    -- Try to load sound definitions from data files
+    self:load_sound_definitions()
+end
+
+-- Load sound definitions from JSON data files
+function AudioSystem:load_sound_definitions()
+    -- Load sounds.json
+    local sounds_path = "data/audio/sounds.json"
+    if love.filesystem.getInfo(sounds_path) then
+        local content = love.filesystem.read(sounds_path)
+        if content then
+            local success, data = pcall(function()
+                return require("lib.json").decode(content)
+            end)
+            if success and data then
+                for name, info in pairs(data) do
+                    local path = info.path or ("assets/audio/sfx/" .. name .. ".ogg")
+                    local category = info.category or AudioSystem.CATEGORY.SFX
+                    self:register_sound(name, path, category)
+                end
+            end
+        end
+    end
+
+    -- Load themes.json for music
+    local themes_path = "data/audio/themes.json"
+    if love.filesystem.getInfo(themes_path) then
+        local content = love.filesystem.read(themes_path)
+        if content then
+            local success, data = pcall(function()
+                return require("lib.json").decode(content)
+            end)
+            if success and data then
+                self.music_tracks = data
+            end
+        end
+    end
 end
 
 -- Register event listeners
