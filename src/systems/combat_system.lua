@@ -281,6 +281,8 @@ function CombatSystem:fire_weapon(attacker, target, weapon)
         weapon = weapon,
         x = transform.x,
         y = transform.y,
+        start_x = transform.x,  -- Store start position for arc calculation
+        start_y = transform.y,
         target_x = target_transform.x,
         target_y = target_transform.y,
         speed = speed,
@@ -289,8 +291,11 @@ function CombatSystem:fire_weapon(attacker, target, weapon)
         homing = weapon.homing or behavior.homing or false,
         inaccurate = weapon.inaccurate or behavior.inaccurate or false,
         arcing = behavior.arcing or false,
+        dropping = behavior.dropping or false,
         high = behavior.high or false,
-        alive = true
+        alive = true,
+        height = 0,  -- Current height above ground (for arcing projectiles)
+        z_velocity = 0  -- Vertical velocity for gravity simulation
     }
 
     -- Add inaccuracy for artillery-type weapons (use deterministic RNG for multiplayer sync)
@@ -298,6 +303,24 @@ function CombatSystem:fire_weapon(attacker, target, weapon)
         local scatter = Constants.LEPTON_PER_CELL * 2  -- 2 cell scatter
         projectile.target_x = projectile.target_x + (Random.random() - 0.5) * scatter
         projectile.target_y = projectile.target_y + (Random.random() - 0.5) * scatter
+    end
+
+    -- Calculate initial arc parameters for arcing projectiles (grenades, artillery)
+    if projectile.arcing then
+        local total_dist = math.sqrt(
+            (projectile.target_x - projectile.start_x)^2 +
+            (projectile.target_y - projectile.start_y)^2
+        )
+        -- Time to reach target = distance / horizontal speed
+        local flight_time = total_dist / speed
+        -- Calculate initial z velocity to create a nice parabola
+        -- Using physics: z = v0*t - 0.5*g*t^2, we want z=0 at t=flight_time
+        -- So v0 = 0.5*g*flight_time
+        local gravity = 2.0  -- Gravity constant (leptons per tick^2)
+        projectile.z_velocity = 0.5 * gravity * flight_time
+        projectile.gravity = gravity
+        projectile.flight_time = flight_time
+        projectile.elapsed = 0
     end
 
     self.next_projectile_id = self.next_projectile_id + 1
@@ -345,8 +368,39 @@ function CombatSystem:update_projectiles(dt)
                 local dy = proj.target_y - proj.y
                 local dist = math.sqrt(dx * dx + dy * dy)
 
-                if dist <= proj.speed then
-                    -- Reached target
+                -- Handle arcing projectiles (grenades, artillery)
+                if proj.arcing then
+                    proj.elapsed = (proj.elapsed or 0) + 1
+
+                    -- Update height using physics: h = v0*t - 0.5*g*t^2
+                    local t = proj.elapsed
+                    local g = proj.gravity or 2.0
+                    local v0 = proj.z_velocity or 0
+                    proj.height = v0 * t - 0.5 * g * t * t
+
+                    -- Check if projectile has landed (height <= 0 after reaching peak)
+                    if proj.height <= 0 and proj.elapsed > 1 then
+                        -- Hit ground - apply damage at current position
+                        proj.alive = false
+                        proj.target_x = proj.x
+                        proj.target_y = proj.y
+
+                        local impact_x = proj.x / Constants.PIXEL_LEPTON_W
+                        local impact_y = proj.y / Constants.PIXEL_LEPTON_H
+                        local impact_type = self:get_impact_type(proj.warhead)
+                        self:spawn_impact_effect(impact_x, impact_y, impact_type)
+
+                        -- Artillery always does splash damage
+                        self:apply_splash_damage(proj)
+
+                        table.insert(to_remove, i)
+                    else
+                        -- Continue moving horizontally
+                        proj.x = proj.x + (dx / dist) * proj.speed
+                        proj.y = proj.y + (dy / dist) * proj.speed
+                    end
+                elseif dist <= proj.speed then
+                    -- Reached target (non-arcing projectiles)
                     proj.x = proj.target_x
                     proj.y = proj.target_y
                     proj.alive = false
@@ -427,6 +481,63 @@ function CombatSystem:apply_splash_damage(proj)
     -- Destroy tiberium in splash radius if warhead supports it (HE, FIRE, PB)
     if warhead_data and warhead_data.destroys_tiberium then
         self:destroy_tiberium_in_radius(proj.target_x, proj.target_y, splash_radius)
+    end
+
+    -- Add terrain effects (craters, scorches) at impact point
+    self:apply_terrain_damage(proj.target_x, proj.target_y, proj.warhead, splash_radius)
+end
+
+-- Apply terrain damage (craters from explosions, scorches from fire)
+function CombatSystem:apply_terrain_damage(center_x, center_y, warhead, radius)
+    local grid = self.world and self.world.grid
+    if not grid then return end
+
+    -- Convert lepton position to cell coordinates
+    local center_cell_x = math.floor(center_x / Constants.LEPTON_PER_CELL)
+    local center_cell_y = math.floor(center_y / Constants.LEPTON_PER_CELL)
+
+    -- Determine effect type based on warhead
+    local warhead_key = CombatSystem.WARHEAD_MAP[warhead] or "SA"
+    local is_fire = warhead_key == "FIRE" or warhead_key == "SPORE"
+    local is_explosive = warhead_key == "HE" or warhead_key == "AP" or warhead_key == "PB"
+
+    -- Only HE, AP, and fire weapons create terrain effects
+    if not is_fire and not is_explosive then
+        return
+    end
+
+    -- Add effect at impact cell
+    local impact_cell = grid:get_cell(center_cell_x, center_cell_y)
+    if impact_cell then
+        if is_fire then
+            -- Fire creates scorch marks
+            local scorch_size = math.min(3, math.ceil(radius))
+            impact_cell:add_scorch(scorch_size)
+        elseif is_explosive then
+            -- Explosives create craters
+            local crater_size = math.min(3, math.ceil(radius))
+            impact_cell:add_crater(crater_size)
+        end
+    end
+
+    -- For larger explosions, affect adjacent cells too
+    if radius >= 2 then
+        local offsets = {{-1,0}, {1,0}, {0,-1}, {0,1}}
+        for _, offset in ipairs(offsets) do
+            local cell = grid:get_cell(center_cell_x + offset[1], center_cell_y + offset[2])
+            if cell then
+                -- Smaller effect on adjacent cells
+                if is_fire then
+                    if Random.random() < 0.5 then
+                        cell:add_scorch(1)
+                    end
+                elseif is_explosive then
+                    if Random.random() < 0.3 then
+                        cell:add_crater(1)
+                    end
+                end
+            end
+        end
     end
 end
 
@@ -1223,8 +1334,13 @@ function CombatSystem:draw_projectiles(render_system)
 
             -- Handle arcing projectiles (grenades, artillery)
             local draw_y = py
-            if visual.arc and proj.start_x and proj.start_y then
-                -- Calculate arc height based on distance traveled
+            if proj.arcing and proj.height then
+                -- Use physics-calculated height for accurate arc
+                -- Convert height from leptons to pixels (roughly)
+                local height_pixels = proj.height / (Constants.LEPTON_PER_CELL / Constants.CELL_PIXEL_H)
+                draw_y = py - math.max(0, height_pixels)
+            elseif visual.arc and proj.start_x and proj.start_y then
+                -- Fallback: Calculate arc height based on distance traveled
                 local total_dist = math.sqrt((proj.target_x - proj.start_x)^2 + (proj.target_y - proj.start_y)^2)
                 local current_dist = math.sqrt((proj.x - proj.start_x)^2 + (proj.y - proj.start_y)^2)
                 local progress = total_dist > 0 and (current_dist / total_dist) or 0

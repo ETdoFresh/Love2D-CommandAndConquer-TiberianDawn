@@ -239,6 +239,146 @@ function Cell:harvest_tiberium(amount)
     return harvested
 end
 
+-- Damage tiberium (explosions destroy tiberium)
+function Cell:damage_tiberium(damage)
+    if not self:has_tiberium() then
+        return 0
+    end
+
+    local value_before = self:get_tiberium_value()
+    local value_after = math.max(0, value_before - damage)
+
+    if value_after <= 0 then
+        self.overlay = -1
+        self.overlay_data = 0
+    else
+        -- Reduce overlay level based on remaining value
+        self.overlay = 5 + math.ceil(value_after / 10)
+    end
+
+    return value_before - value_after
+end
+
+-- Check if cell has a smudge (crater, scorch mark)
+function Cell:has_smudge()
+    return self.smudge >= 0
+end
+
+-- Smudge types (from original C&C SMUDGE.H)
+-- 0-5: Craters (SC1-SC6)
+-- 6-11: Bibs/scorches (BIB1-BIB3, etc)
+Cell.SMUDGE = {
+    CRATER1 = 0,
+    CRATER2 = 1,
+    CRATER3 = 2,
+    CRATER4 = 3,
+    CRATER5 = 4,
+    CRATER6 = 5,
+    SCORCH1 = 6,
+    SCORCH2 = 7,
+    SCORCH3 = 8,
+    SCORCH4 = 9,
+    SCORCH5 = 10,
+    SCORCH6 = 11
+}
+
+-- Add a crater at this cell (from explosions)
+function Cell:add_crater(size)
+    -- Don't add craters on buildings, tiberium, or walls
+    if self:has_flag_set(Cell.FLAG.BUILDING) or self:has_tiberium() or self:has_wall() then
+        return false
+    end
+
+    -- Size determines crater type (0-5)
+    size = size or 1
+    local crater_type = math.min(5, math.max(0, size - 1))
+
+    -- If already has a smudge, make it bigger (up to max)
+    if self:has_smudge() and self.smudge <= 5 then
+        -- Existing crater - upgrade it
+        self.smudge = math.min(5, self.smudge + 1)
+        self.smudge_data = (self.smudge_data or 0) + 1
+    else
+        -- New crater
+        self.smudge = crater_type
+        self.smudge_data = 1
+    end
+
+    return true
+end
+
+-- Add a scorch mark at this cell (from fire/laser)
+function Cell:add_scorch(size)
+    -- Don't add scorches on buildings or walls
+    if self:has_flag_set(Cell.FLAG.BUILDING) or self:has_wall() then
+        return false
+    end
+
+    -- Size determines scorch type (6-11)
+    size = size or 1
+    local scorch_type = 6 + math.min(5, math.max(0, size - 1))
+
+    -- Fire can burn tiberium
+    if self:has_tiberium() then
+        self:damage_tiberium(20)
+    end
+
+    -- If already has a scorch, make it bigger
+    if self:has_smudge() and self.smudge >= 6 then
+        self.smudge = math.min(11, self.smudge + 1)
+    else
+        self.smudge = scorch_type
+    end
+    self.smudge_data = (self.smudge_data or 0) + 1
+
+    return true
+end
+
+-- Clear smudge from cell
+function Cell:clear_smudge()
+    self.smudge = -1
+    self.smudge_data = 0
+end
+
+-- Grow tiberium (for spread mechanics)
+function Cell:grow_tiberium(amount)
+    amount = amount or 1
+
+    if self:has_tiberium() then
+        -- Already has tiberium - increase level up to max (17)
+        local current_value = self:get_tiberium_value()
+        local new_value = math.min(120, current_value + amount * 10)  -- Max 120 value (overlay 17)
+        self.overlay = 5 + math.ceil(new_value / 10)
+        return true
+    else
+        -- No tiberium yet - check if this cell can have tiberium
+        -- Don't grow on buildings, walls, or water
+        if self:has_flag_set(Cell.FLAG.BUILDING) or self:has_wall() then
+            return false
+        end
+
+        -- Start with minimum tiberium (overlay 6)
+        self.overlay = 6
+        self.overlay_data = 0
+        return true
+    end
+end
+
+-- Check if cell can receive tiberium spread
+function Cell:can_receive_tiberium()
+    -- Can't spread to buildings, walls, water, or cells already at max tiberium
+    if self:has_flag_set(Cell.FLAG.BUILDING) or self:has_wall() then
+        return false
+    end
+
+    -- Check if already at max tiberium
+    if self:has_tiberium() and self.overlay >= 17 then
+        return false
+    end
+
+    return true
+end
+
 -- Add overlapper
 function Cell:add_overlapper(entity_id)
     for _, id in ipairs(self.overlappers) do

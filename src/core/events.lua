@@ -164,6 +164,8 @@ M.EVENTS = {
     BUILDING_PLACED = "building:placed",
     BUILDING_SOLD = "building:sold",
     BUILDING_CAPTURED = "building:captured",
+    BUILDING_SPIED = "building:spied",      -- Building infiltrated by spy
+    BUILDING_THIEVED = "building:thieved",  -- Building/tech stolen by thief
 
     -- Combat
     UNIT_ATTACKED = "combat:attacked",

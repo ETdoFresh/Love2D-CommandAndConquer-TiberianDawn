@@ -180,6 +180,107 @@ function TriggerSystem:register_events()
         self.house_stats[house].power_output = produced
         self.house_stats[house].power_drain = consumed
     end)
+
+    -- Spy/Infiltration events (for campaign trigger support)
+    Events.on(Events.EVENTS.BUILDING_SPIED, function(building, spy)
+        self:on_building_spied(building, spy)
+    end)
+
+    Events.on(Events.EVENTS.BUILDING_THIEVED, function(building, thief)
+        self:on_building_thieved(building, thief)
+    end)
+
+    -- Building captured (engineer)
+    Events.on(Events.EVENTS.BUILDING_CAPTURED, function(building, capturer)
+        self:on_building_captured(building, capturer)
+    end)
+end
+
+-- Handle building spied by spy unit
+function TriggerSystem:on_building_spied(building, spy)
+    if not building or not building:is_alive() then return end
+
+    local building_owner = building:has("owner") and building:get("owner")
+    local spy_owner = spy and spy:has("owner") and spy:get("owner")
+
+    if not building_owner then return end
+
+    -- Check triggers attached to this building
+    local trigger_name = self.object_triggers[building.id]
+    if trigger_name then
+        local trigger = self.triggers[trigger_name]
+        if trigger and trigger.event == TriggerSystem.EVENT.SPIED_BY then
+            self:fire_trigger(trigger_name)
+        end
+    end
+
+    -- Check all SPIED_BY triggers for this house
+    for name, trigger in pairs(self.triggers) do
+        if trigger.event == TriggerSystem.EVENT.SPIED_BY then
+            -- Check if the trigger's house matches the building's owner
+            if trigger.house == building_owner.house or trigger.house == -1 then
+                self:fire_trigger(name)
+            end
+        end
+    end
+
+    -- EVA announcement
+    Events.emit("EVA_SPEECH", "building infiltrated", building_owner.house)
+end
+
+-- Handle building thieved (tech stolen) by thief unit
+function TriggerSystem:on_building_thieved(building, thief)
+    if not building or not building:is_alive() then return end
+
+    local building_owner = building:has("owner") and building:get("owner")
+    local thief_owner = thief and thief:has("owner") and thief:get("owner")
+
+    if not building_owner then return end
+
+    -- Check triggers attached to this building
+    local trigger_name = self.object_triggers[building.id]
+    if trigger_name then
+        local trigger = self.triggers[trigger_name]
+        if trigger and trigger.event == TriggerSystem.EVENT.THIEVED_BY then
+            self:fire_trigger(trigger_name)
+        end
+    end
+
+    -- Check all THIEVED_BY triggers for this house
+    for name, trigger in pairs(self.triggers) do
+        if trigger.event == TriggerSystem.EVENT.THIEVED_BY then
+            -- Check if the trigger's house matches the building's owner
+            if trigger.house == building_owner.house or trigger.house == -1 then
+                self:fire_trigger(name)
+            end
+        end
+    end
+
+    -- EVA announcement
+    Events.emit("EVA_SPEECH", "technology stolen", building_owner.house)
+end
+
+-- Handle building captured by engineer
+function TriggerSystem:on_building_captured(building, capturer)
+    if not building or not building:is_alive() then return end
+
+    local building_owner = building:has("owner") and building:get("owner")
+
+    if not building_owner then return end
+
+    -- Check triggers attached to this building
+    local trigger_name = self.object_triggers[building.id]
+    if trigger_name then
+        local trigger = self.triggers[trigger_name]
+        -- Capturing can trigger THIEVED_BY as well (original behavior)
+        if trigger and (trigger.event == TriggerSystem.EVENT.THIEVED_BY or
+                        trigger.event == TriggerSystem.EVENT.DESTROYED) then
+            self:fire_trigger(trigger_name)
+        end
+    end
+
+    -- EVA announcement for losing side
+    Events.emit("EVA_SPEECH", "building captured", building_owner.house)
 end
 
 -- Ensure house_stats entry exists for a house

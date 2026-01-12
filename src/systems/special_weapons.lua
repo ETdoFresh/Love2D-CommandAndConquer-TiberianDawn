@@ -190,9 +190,11 @@ function SpecialWeapons:fire(house, weapon_type, target_x, target_y)
         damage = data.damage,
         splash_damage = data.splash_damage,
         radius = data.radius,
+        house = house,
         time = 0,
         duration = 2,  -- seconds
-        phase = "charging"
+        phase = "charging",
+        warhead = data.warhead or "PB"  -- Particle beam warhead for terrain effects
     }
 
     table.insert(self.active_effects, effect)
@@ -208,8 +210,22 @@ function SpecialWeapons:fire(house, weapon_type, target_x, target_y)
     self.targeting = nil
     self.targeting_house = nil
 
-    -- Play sound/EVA
-    Events.emit("PLAY_SPEECH", data.name .. " ready")
+    -- Play EVA announcement based on weapon type
+    if weapon_type == SpecialWeapons.TYPE.ION_CANNON then
+        Events.emit("EVA_SPEECH", "ion cannon activated", house)
+        Events.emit("PLAY_SOUND", "ionfire", target_x, target_y)
+    elseif weapon_type == SpecialWeapons.TYPE.NUCLEAR_STRIKE then
+        -- Warning for all players
+        Events.emit("EVA_SPEECH", "nuclear warhead approaching", -1)  -- -1 = all houses
+        Events.emit("PLAY_SOUND", "nuke", target_x, target_y)
+    elseif weapon_type == SpecialWeapons.TYPE.AIRSTRIKE then
+        Events.emit("EVA_SPEECH", "airstrike ready", house)
+        Events.emit("PLAY_SOUND", "a10lnch", target_x, target_y)
+    elseif weapon_type == SpecialWeapons.TYPE.NAPALM_STRIKE then
+        Events.emit("EVA_SPEECH", "napalm strike ready", house)
+        Events.emit("PLAY_SOUND", "flamer", target_x, target_y)
+    end
+
     Events.emit("SPECIAL_WEAPON_FIRED", weapon_type, target_x, target_y)
 
     return true
@@ -362,9 +378,9 @@ function SpecialWeapons:apply_damage(effect)
                     damage = effect.splash_damage * damage_mult
                 end
 
-                -- Apply damage
+                -- Apply damage with warhead type for proper armor calculation
                 if self.combat_system then
-                    self.combat_system:apply_damage(entity, math.floor(damage))
+                    self.combat_system:apply_damage(entity, math.floor(damage), effect.warhead)
                 else
                     health.hp = health.hp - damage
                     if health.hp <= 0 then
@@ -375,6 +391,88 @@ function SpecialWeapons:apply_damage(effect)
             end
         end
     end
+
+    -- Apply terrain effects (craters, destroy walls, destroy tiberium)
+    self:apply_terrain_effects(effect)
+
+    -- Play impact sound
+    Events.emit("PLAY_SOUND", self:get_impact_sound(effect.type), center_x, center_y)
+end
+
+-- Apply terrain damage from super weapons
+function SpecialWeapons:apply_terrain_effects(effect)
+    local grid = self.world and self.world.grid
+    if not grid then return end
+
+    local center_cell_x = math.floor(effect.target_x / Constants.LEPTON_PER_CELL)
+    local center_cell_y = math.floor(effect.target_y / Constants.LEPTON_PER_CELL)
+    local cell_radius = effect.radius
+
+    -- Create craters and destroy terrain in radius
+    for dy = -cell_radius, cell_radius do
+        for dx = -cell_radius, cell_radius do
+            local dist = math.sqrt(dx * dx + dy * dy)
+            if dist <= cell_radius then
+                local cell = grid:get_cell(center_cell_x + dx, center_cell_y + dy)
+                if cell then
+                    -- Ion cannon creates large craters
+                    if effect.type == SpecialWeapons.TYPE.ION_CANNON then
+                        if dist <= cell_radius * 0.5 then
+                            cell:add_crater(3)  -- Large crater
+                        elseif dist <= cell_radius then
+                            cell:add_crater(1)  -- Small crater
+                        end
+                        -- Destroy tiberium
+                        cell:damage_tiberium(100)
+
+                    -- Nuke creates massive craters and scorches
+                    elseif effect.type == SpecialWeapons.TYPE.NUCLEAR_STRIKE then
+                        if dist <= cell_radius * 0.3 then
+                            cell:add_crater(5)  -- Massive crater at center
+                        elseif dist <= cell_radius * 0.6 then
+                            cell:add_crater(3)
+                        else
+                            cell:add_scorch(2)  -- Scorch marks at edge
+                        end
+                        -- Nukes destroy all tiberium
+                        cell:damage_tiberium(200)
+
+                    -- Napalm creates scorch marks
+                    elseif effect.type == SpecialWeapons.TYPE.NAPALM_STRIKE then
+                        cell:add_scorch(math.max(1, math.ceil(3 - dist)))
+                        -- Fire burns tiberium
+                        cell:damage_tiberium(50)
+
+                    -- Airstrike creates small craters
+                    elseif effect.type == SpecialWeapons.TYPE.AIRSTRIKE then
+                        if dist <= cell_radius * 0.5 then
+                            cell:add_crater(2)
+                        end
+                    end
+
+                    -- Destroy walls in blast radius
+                    if cell:has_wall() then
+                        local wall_damage = math.floor(effect.damage * (1 - dist / cell_radius))
+                        cell:damage_wall(wall_damage)
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Get impact sound for weapon type
+function SpecialWeapons:get_impact_sound(weapon_type)
+    if weapon_type == SpecialWeapons.TYPE.ION_CANNON then
+        return "ionhit"
+    elseif weapon_type == SpecialWeapons.TYPE.NUCLEAR_STRIKE then
+        return "nukexplo"
+    elseif weapon_type == SpecialWeapons.TYPE.AIRSTRIKE then
+        return "a10guns"
+    elseif weapon_type == SpecialWeapons.TYPE.NAPALM_STRIKE then
+        return "flamexp"
+    end
+    return "xplos"
 end
 
 -- Draw targeting cursor
@@ -476,20 +574,76 @@ function SpecialWeapons:draw_effect(effect, render_system)
     local radius = effect.radius * Constants.CELL_PIXEL_W
 
     if effect.effect == "ion_beam" then
-        -- Ion cannon beam effect
+        -- Ion cannon beam effect (from sky to ground)
+        local screen_top = -render_system.camera_y
+        local beam_width = 8
+        local glow_width = 20
+
         if effect.phase == "charging" then
+            -- Charging: Small targeting dot grows, beam starts forming
             local alpha = effect.time / 0.5
-            love.graphics.setColor(0.2, 0.5, 1, alpha)
-            love.graphics.circle("fill", px, py, 10)
+            local progress = effect.time / 0.5
+
+            -- Growing target marker
+            love.graphics.setColor(0.3, 0.6, 1, alpha)
+            love.graphics.circle("fill", px, py, 10 * progress)
+
+            -- Beam starting to form from sky
+            if progress > 0.3 then
+                local beam_alpha = (progress - 0.3) / 0.7
+                love.graphics.setColor(0.5, 0.8, 1, beam_alpha * 0.5)
+                love.graphics.setLineWidth(beam_width * beam_alpha)
+                love.graphics.line(px, screen_top, px, py)
+                love.graphics.setLineWidth(1)
+            end
+
         elseif effect.phase == "firing" then
-            love.graphics.setColor(0.5, 0.8, 1, 1)
-            love.graphics.circle("fill", px, py, radius)
+            -- Full power beam from sky to ground
+            -- Outer glow
+            love.graphics.setColor(0.3, 0.5, 1, 0.3)
+            love.graphics.setLineWidth(glow_width)
+            love.graphics.line(px, screen_top, px, py)
+
+            -- Main beam
+            love.graphics.setColor(0.5, 0.8, 1, 0.8)
+            love.graphics.setLineWidth(beam_width)
+            love.graphics.line(px, screen_top, px, py)
+
+            -- Core (bright white)
             love.graphics.setColor(1, 1, 1, 1)
-            love.graphics.circle("fill", px, py, radius * 0.5)
+            love.graphics.setLineWidth(3)
+            love.graphics.line(px, screen_top, px, py)
+            love.graphics.setLineWidth(1)
+
+            -- Impact flash
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.circle("fill", px, py, radius * 1.2)
+            love.graphics.setColor(0.5, 0.8, 1, 0.8)
+            love.graphics.circle("fill", px, py, radius)
+
         else
+            -- Aftermath: Fading beam and expanding shockwave
             local alpha = 1 - effect.time / effect.duration
-            love.graphics.setColor(0.5, 0.8, 1, alpha)
-            love.graphics.circle("fill", px, py, radius * (1 + effect.time))
+            local expand = 1 + effect.time * 0.8
+
+            -- Fading beam (disappears quickly)
+            if effect.time < effect.duration * 0.3 then
+                local beam_alpha = 1 - (effect.time / (effect.duration * 0.3))
+                love.graphics.setColor(0.5, 0.8, 1, beam_alpha * 0.5)
+                love.graphics.setLineWidth(beam_width * beam_alpha)
+                love.graphics.line(px, screen_top, px, py)
+                love.graphics.setLineWidth(1)
+            end
+
+            -- Expanding shockwave ring
+            love.graphics.setColor(0.5, 0.8, 1, alpha * 0.6)
+            love.graphics.setLineWidth(3)
+            love.graphics.circle("line", px, py, radius * expand)
+            love.graphics.setLineWidth(1)
+
+            -- Fading center glow
+            love.graphics.setColor(0.5, 0.8, 1, alpha * 0.4)
+            love.graphics.circle("fill", px, py, radius * (2 - expand) * alpha)
         end
 
     elseif effect.effect == "nuke" then
