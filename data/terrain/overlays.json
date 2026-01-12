@@ -1,0 +1,259 @@
+{
+  "_comment": "Overlay definitions from original C&C Tiberian Dawn (DEFINES.H)",
+
+  "overlays": {
+    "CONCRETE": {
+      "id": 0,
+      "name": "Concrete",
+      "description": "Concrete foundation",
+      "is_wall": false,
+      "buildable_on": true,
+      "blocks_building": false
+    },
+    "SANDBAG_WALL": {
+      "id": 1,
+      "name": "Sandbag Wall",
+      "description": "Piled sandbags",
+      "is_wall": true,
+      "health": 20,
+      "armor": "wood",
+      "blocks_movement": true,
+      "blocks_projectiles": false
+    },
+    "CYCLONE_WALL": {
+      "id": 2,
+      "name": "Chain Link Fence",
+      "description": "Chain-link fence",
+      "is_wall": true,
+      "health": 10,
+      "armor": "wood",
+      "blocks_movement": true,
+      "blocks_projectiles": false
+    },
+    "BRICK_WALL": {
+      "id": 3,
+      "name": "Concrete Wall",
+      "description": "Solid concrete wall",
+      "is_wall": true,
+      "health": 70,
+      "armor": "concrete",
+      "blocks_movement": true,
+      "blocks_projectiles": true
+    },
+    "BARBWIRE_WALL": {
+      "id": 4,
+      "name": "Barbed Wire",
+      "description": "Barbed-wire wall",
+      "is_wall": true,
+      "health": 2,
+      "armor": "none",
+      "blocks_movement": true,
+      "blocks_projectiles": false
+    },
+    "WOOD_WALL": {
+      "id": 5,
+      "name": "Wooden Fence",
+      "description": "Wooden fence",
+      "is_wall": true,
+      "health": 10,
+      "armor": "wood",
+      "blocks_movement": true,
+      "blocks_projectiles": false
+    },
+    "TIBERIUM1": {
+      "id": 6,
+      "name": "Tiberium",
+      "description": "Tiberium field - stage 1",
+      "is_tiberium": true,
+      "tiberium_value": 25,
+      "growth_stage": 1
+    },
+    "TIBERIUM2": {
+      "id": 7,
+      "name": "Tiberium",
+      "description": "Tiberium field - stage 2",
+      "is_tiberium": true,
+      "tiberium_value": 50,
+      "growth_stage": 2
+    },
+    "TIBERIUM3": {
+      "id": 8,
+      "name": "Tiberium",
+      "description": "Tiberium field - stage 3",
+      "is_tiberium": true,
+      "tiberium_value": 75,
+      "growth_stage": 3
+    },
+    "TIBERIUM4": {
+      "id": 9,
+      "name": "Tiberium",
+      "description": "Tiberium field - stage 4",
+      "is_tiberium": true,
+      "tiberium_value": 100,
+      "growth_stage": 4
+    },
+    "TIBERIUM5": {
+      "id": 10,
+      "name": "Tiberium",
+      "description": "Tiberium field - stage 5",
+      "is_tiberium": true,
+      "tiberium_value": 125,
+      "growth_stage": 5
+    },
+    "TIBERIUM6": {
+      "id": 11,
+      "name": "Tiberium",
+      "description": "Tiberium field - stage 6",
+      "is_tiberium": true,
+      "tiberium_value": 150,
+      "growth_stage": 6
+    },
+    "TIBERIUM7": {
+      "id": 12,
+      "name": "Tiberium",
+      "description": "Tiberium field - stage 7",
+      "is_tiberium": true,
+      "tiberium_value": 175,
+      "growth_stage": 7
+    },
+    "TIBERIUM8": {
+      "id": 13,
+      "name": "Tiberium",
+      "description": "Tiberium field - stage 8",
+      "is_tiberium": true,
+      "tiberium_value": 200,
+      "growth_stage": 8
+    },
+    "TIBERIUM9": {
+      "id": 14,
+      "name": "Tiberium",
+      "description": "Tiberium field - stage 9",
+      "is_tiberium": true,
+      "tiberium_value": 225,
+      "growth_stage": 9
+    },
+    "TIBERIUM10": {
+      "id": 15,
+      "name": "Tiberium",
+      "description": "Tiberium field - stage 10",
+      "is_tiberium": true,
+      "tiberium_value": 250,
+      "growth_stage": 10
+    },
+    "TIBERIUM11": {
+      "id": 16,
+      "name": "Tiberium",
+      "description": "Tiberium field - stage 11",
+      "is_tiberium": true,
+      "tiberium_value": 275,
+      "growth_stage": 11
+    },
+    "TIBERIUM12": {
+      "id": 17,
+      "name": "Tiberium",
+      "description": "Tiberium field - stage 12 (full)",
+      "is_tiberium": true,
+      "tiberium_value": 300,
+      "growth_stage": 12
+    },
+    "ROAD": {
+      "id": 18,
+      "name": "Road",
+      "description": "Road/concrete piece",
+      "is_road": true,
+      "speed_bonus": 1.25
+    },
+    "SQUISH": {
+      "id": 19,
+      "name": "Squish Mark",
+      "description": "Squish mark for overran infantry",
+      "is_decoration": true,
+      "decay_time": 300
+    },
+    "V12": {
+      "id": 20,
+      "name": "Haystacks",
+      "description": "Haystacks decoration",
+      "is_decoration": true
+    },
+    "V13": {
+      "id": 21,
+      "name": "Haystack",
+      "description": "Single haystack decoration",
+      "is_decoration": true
+    },
+    "V14": {
+      "id": 22,
+      "name": "Wheat Field",
+      "description": "Wheat field decoration",
+      "is_decoration": true
+    },
+    "V15": {
+      "id": 23,
+      "name": "Fallow Field",
+      "description": "Fallow field decoration",
+      "is_decoration": true
+    },
+    "V16": {
+      "id": 24,
+      "name": "Corn Field",
+      "description": "Corn field decoration",
+      "is_decoration": true
+    },
+    "V17": {
+      "id": 25,
+      "name": "Celery Field",
+      "description": "Celery field decoration",
+      "is_decoration": true
+    },
+    "V18": {
+      "id": 26,
+      "name": "Potato Field",
+      "description": "Potato field decoration",
+      "is_decoration": true
+    },
+    "FLAG_SPOT": {
+      "id": 27,
+      "name": "Flag Spot",
+      "description": "Flag start location for CTF",
+      "is_special": true
+    },
+    "WOOD_CRATE": {
+      "id": 28,
+      "name": "Wooden Crate",
+      "description": "Wooden goodie crate",
+      "is_crate": true,
+      "crate_type": "wood"
+    },
+    "STEEL_CRATE": {
+      "id": 29,
+      "name": "Steel Crate",
+      "description": "Steel goodie crate",
+      "is_crate": true,
+      "crate_type": "steel"
+    }
+  },
+
+  "tiberium_growth": {
+    "_comment": "Tiberium growth mechanics",
+    "growth_rate": 0.02,
+    "spread_chance": 0.001,
+    "max_spread_distance": 2,
+    "infantry_damage_per_tick": 2,
+    "blossom_tree_spawn_rate": 0.05
+  },
+
+  "crate_contents": {
+    "_comment": "Possible contents of goodie crates",
+    "credits": {"chance": 25, "min": 500, "max": 2000},
+    "reveal_map": {"chance": 10},
+    "heal": {"chance": 15},
+    "stealth": {"chance": 5},
+    "unit": {"chance": 15},
+    "explosion": {"chance": 10},
+    "nuke": {"chance": 5},
+    "ion_cannon": {"chance": 5},
+    "invulnerability": {"chance": 5},
+    "firepower": {"chance": 5}
+  }
+}

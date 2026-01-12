@@ -1,0 +1,347 @@
+{
+  "_comment": "Tech tree prerequisites from original C&C Tiberian Dawn",
+  "_format": "prerequisites are building types that must exist to unlock the unit/building",
+
+  "buildings": {
+    "POWER": {
+      "name": "Power Plant",
+      "cost": 300,
+      "build_level": 1,
+      "prerequisites": [],
+      "side": ["GDI", "NOD"],
+      "power_output": 100
+    },
+    "ADVANCED_POWER": {
+      "name": "Advanced Power Plant",
+      "cost": 700,
+      "build_level": 5,
+      "prerequisites": ["POWER"],
+      "side": ["GDI", "NOD"],
+      "power_output": 200
+    },
+    "REFINERY": {
+      "name": "Tiberium Refinery",
+      "cost": 2000,
+      "build_level": 1,
+      "prerequisites": ["POWER"],
+      "side": ["GDI", "NOD"],
+      "provides_harvester": true,
+      "storage_capacity": 1000
+    },
+    "STORAGE": {
+      "name": "Tiberium Silo",
+      "cost": 150,
+      "build_level": 2,
+      "prerequisites": ["REFINERY"],
+      "side": ["GDI", "NOD"],
+      "storage_capacity": 1500
+    },
+    "BARRACKS": {
+      "name": "Barracks",
+      "cost": 300,
+      "build_level": 2,
+      "prerequisites": ["POWER"],
+      "side": ["GDI"],
+      "produces": "infantry"
+    },
+    "HAND": {
+      "name": "Hand of Nod",
+      "cost": 300,
+      "build_level": 2,
+      "prerequisites": ["POWER"],
+      "side": ["NOD"],
+      "produces": "infantry"
+    },
+    "WEAP": {
+      "name": "Weapons Factory",
+      "cost": 2000,
+      "build_level": 3,
+      "prerequisites": ["POWER", "REFINERY"],
+      "side": ["GDI"],
+      "produces": "vehicles"
+    },
+    "AIRSTRIP": {
+      "name": "Airstrip",
+      "cost": 2000,
+      "build_level": 3,
+      "prerequisites": ["POWER", "REFINERY"],
+      "side": ["NOD"],
+      "produces": "vehicles"
+    },
+    "RADAR": {
+      "name": "Communications Center",
+      "cost": 1000,
+      "build_level": 4,
+      "prerequisites": ["POWER", "REFINERY"],
+      "side": ["GDI"],
+      "enables_radar": true
+    },
+    "EYE": {
+      "name": "Temple of Nod",
+      "cost": 1000,
+      "build_level": 4,
+      "prerequisites": ["POWER", "REFINERY"],
+      "side": ["NOD"],
+      "enables_radar": true
+    },
+    "HELIPAD": {
+      "name": "Helipad",
+      "cost": 1500,
+      "build_level": 6,
+      "prerequisites": ["POWER", "REFINERY", "RADAR"],
+      "side": ["GDI"],
+      "produces": "aircraft"
+    },
+    "REPAIR": {
+      "name": "Repair Bay",
+      "cost": 1200,
+      "build_level": 5,
+      "prerequisites": ["POWER", "REFINERY"],
+      "side": ["GDI", "NOD"],
+      "repairs_vehicles": true
+    },
+    "GTOWER": {
+      "name": "Guard Tower",
+      "cost": 500,
+      "build_level": 3,
+      "prerequisites": ["POWER", "BARRACKS"],
+      "side": ["GDI"],
+      "is_defense": true
+    },
+    "TURRET": {
+      "name": "Turret",
+      "cost": 600,
+      "build_level": 3,
+      "prerequisites": ["POWER", "HAND"],
+      "side": ["NOD"],
+      "is_defense": true
+    },
+    "ATOWER": {
+      "name": "Advanced Guard Tower",
+      "cost": 1000,
+      "build_level": 5,
+      "prerequisites": ["POWER", "BARRACKS", "RADAR"],
+      "side": ["GDI"],
+      "is_defense": true,
+      "anti_air": true
+    },
+    "SAM": {
+      "name": "SAM Site",
+      "cost": 750,
+      "build_level": 5,
+      "prerequisites": ["POWER", "HAND"],
+      "side": ["NOD"],
+      "is_defense": true,
+      "anti_air": true
+    },
+    "OBELISK": {
+      "name": "Obelisk of Light",
+      "cost": 1500,
+      "build_level": 7,
+      "prerequisites": ["POWER", "HAND", "EYE"],
+      "side": ["NOD"],
+      "is_defense": true,
+      "power_required": 150
+    },
+    "TEMPLE": {
+      "name": "Temple of Nod",
+      "cost": 3000,
+      "build_level": 9,
+      "prerequisites": ["POWER", "HAND", "EYE", "OBELISK"],
+      "side": ["NOD"],
+      "enables_nuke": true
+    },
+    "BIO_LAB": {
+      "name": "Bio Research Lab",
+      "cost": 1500,
+      "build_level": 8,
+      "prerequisites": ["POWER", "HAND"],
+      "side": ["NOD"],
+      "unlocks_chem_warriors": true
+    }
+  },
+
+  "infantry": {
+    "E1": {
+      "name": "Minigunner",
+      "cost": 100,
+      "build_level": 1,
+      "prerequisites": [],
+      "side": ["GDI", "NOD"]
+    },
+    "E2": {
+      "name": "Grenadier",
+      "cost": 160,
+      "build_level": 2,
+      "prerequisites": [],
+      "side": ["GDI", "NOD"]
+    },
+    "E3": {
+      "name": "Rocket Soldier",
+      "cost": 300,
+      "build_level": 3,
+      "prerequisites": [],
+      "side": ["GDI", "NOD"]
+    },
+    "E4": {
+      "name": "Flamethrower",
+      "cost": 200,
+      "build_level": 4,
+      "prerequisites": [],
+      "side": ["NOD"]
+    },
+    "E5": {
+      "name": "Chem Warrior",
+      "cost": 300,
+      "build_level": 8,
+      "prerequisites": ["BIO_LAB"],
+      "side": ["NOD"]
+    },
+    "E6": {
+      "name": "Engineer",
+      "cost": 500,
+      "build_level": 3,
+      "prerequisites": [],
+      "side": ["GDI", "NOD"]
+    },
+    "RMBO": {
+      "name": "Commando",
+      "cost": 1000,
+      "build_level": 7,
+      "prerequisites": ["RADAR"],
+      "side": ["GDI", "NOD"]
+    }
+  },
+
+  "vehicles": {
+    "HARV": {
+      "name": "Harvester",
+      "cost": 1400,
+      "build_level": 2,
+      "prerequisites": ["REFINERY"],
+      "side": ["GDI", "NOD"]
+    },
+    "MCV": {
+      "name": "Mobile Construction Vehicle",
+      "cost": 5000,
+      "build_level": 10,
+      "prerequisites": ["ADVANCED_POWER"],
+      "side": ["GDI", "NOD"]
+    },
+    "JEEP": {
+      "name": "Hum-Vee",
+      "cost": 400,
+      "build_level": 2,
+      "prerequisites": [],
+      "side": ["GDI"]
+    },
+    "BGGY": {
+      "name": "Nod Buggy",
+      "cost": 300,
+      "build_level": 2,
+      "prerequisites": [],
+      "side": ["NOD"]
+    },
+    "BIKE": {
+      "name": "Recon Bike",
+      "cost": 500,
+      "build_level": 2,
+      "prerequisites": [],
+      "side": ["NOD"]
+    },
+    "APC": {
+      "name": "APC",
+      "cost": 700,
+      "build_level": 3,
+      "prerequisites": [],
+      "side": ["GDI", "NOD"]
+    },
+    "MTNK": {
+      "name": "Medium Tank",
+      "cost": 800,
+      "build_level": 4,
+      "prerequisites": [],
+      "side": ["GDI"]
+    },
+    "LTNK": {
+      "name": "Light Tank",
+      "cost": 600,
+      "build_level": 3,
+      "prerequisites": [],
+      "side": ["NOD"]
+    },
+    "HTNK": {
+      "name": "Mammoth Tank",
+      "cost": 1500,
+      "build_level": 7,
+      "prerequisites": ["RADAR", "REPAIR"],
+      "side": ["GDI"]
+    },
+    "FTNK": {
+      "name": "Flame Tank",
+      "cost": 800,
+      "build_level": 5,
+      "prerequisites": [],
+      "side": ["NOD"]
+    },
+    "STNK": {
+      "name": "Stealth Tank",
+      "cost": 900,
+      "build_level": 6,
+      "prerequisites": ["EYE"],
+      "side": ["NOD"]
+    },
+    "ARTY": {
+      "name": "Artillery",
+      "cost": 450,
+      "build_level": 5,
+      "prerequisites": [],
+      "side": ["NOD"]
+    },
+    "MLRS": {
+      "name": "MLRS",
+      "cost": 800,
+      "build_level": 6,
+      "prerequisites": ["RADAR"],
+      "side": ["GDI"]
+    },
+    "MSAM": {
+      "name": "Mobile SAM",
+      "cost": 750,
+      "build_level": 6,
+      "prerequisites": ["RADAR"],
+      "side": ["GDI"]
+    },
+    "SSM": {
+      "name": "SSM Launcher",
+      "cost": 750,
+      "build_level": 7,
+      "prerequisites": ["EYE", "OBELISK"],
+      "side": ["NOD"]
+    }
+  },
+
+  "aircraft": {
+    "ORCA": {
+      "name": "Orca",
+      "cost": 1200,
+      "build_level": 6,
+      "prerequisites": ["HELIPAD"],
+      "side": ["GDI"]
+    },
+    "TRAN": {
+      "name": "Chinook",
+      "cost": 1500,
+      "build_level": 6,
+      "prerequisites": ["HELIPAD"],
+      "side": ["GDI"]
+    },
+    "HELI": {
+      "name": "Apache",
+      "cost": 1200,
+      "build_level": 6,
+      "prerequisites": ["HELIPAD"],
+      "side": ["NOD"]
+    }
+  }
+}

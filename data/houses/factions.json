@@ -1,0 +1,160 @@
+{
+  "_comment": "Faction/House definitions from original C&C Tiberian Dawn (DEFINES.H, HOUSE.H)",
+
+  "houses": {
+    "GOOD": {
+      "id": 0,
+      "name": "GDI",
+      "full_name": "Global Defense Initiative",
+      "description": "United Nations military force fighting to protect the world from Nod",
+      "color": {"r": 255, "g": 200, "b": 0},
+      "color_name": "Gold",
+      "side": "GDI",
+      "is_playable": true,
+      "is_human_controlled": true,
+      "starting_credits": 5000,
+      "iq": 0,
+      "allies": ["GOOD", "NEUTRAL", "JP"],
+      "enemies": ["BAD"]
+    },
+    "BAD": {
+      "id": 1,
+      "name": "NOD",
+      "full_name": "Brotherhood of Nod",
+      "description": "Militant organization led by Kane, seeking to control Tiberium",
+      "color": {"r": 200, "g": 0, "b": 0},
+      "color_name": "Red",
+      "side": "NOD",
+      "is_playable": true,
+      "is_human_controlled": true,
+      "starting_credits": 5000,
+      "iq": 0,
+      "allies": ["BAD"],
+      "enemies": ["GOOD", "NEUTRAL", "JP"]
+    },
+    "NEUTRAL": {
+      "id": 2,
+      "name": "Civilian",
+      "full_name": "Civilians",
+      "description": "Non-combatant civilians",
+      "color": {"r": 200, "g": 200, "b": 0},
+      "color_name": "Yellow",
+      "side": "NEUTRAL",
+      "is_playable": false,
+      "is_human_controlled": false,
+      "starting_credits": 0,
+      "iq": 0,
+      "allies": ["NEUTRAL", "GOOD"],
+      "enemies": ["BAD"]
+    },
+    "JP": {
+      "id": 3,
+      "name": "Special",
+      "full_name": "Disaster Containment Team",
+      "description": "Special forces for Funpark missions",
+      "color": {"r": 0, "g": 200, "b": 200},
+      "color_name": "Cyan",
+      "side": "SPECIAL",
+      "is_playable": false,
+      "is_human_controlled": false,
+      "starting_credits": 0,
+      "iq": 0,
+      "allies": ["JP", "GOOD"],
+      "enemies": ["BAD"]
+    },
+    "MULTI1": {
+      "id": 4,
+      "name": "Multi1",
+      "full_name": "Multiplayer Player 1",
+      "color": {"r": 255, "g": 200, "b": 0},
+      "color_name": "Gold",
+      "is_playable": true,
+      "is_multiplayer": true,
+      "starting_credits": 10000
+    },
+    "MULTI2": {
+      "id": 5,
+      "name": "Multi2",
+      "full_name": "Multiplayer Player 2",
+      "color": {"r": 200, "g": 0, "b": 0},
+      "color_name": "Red",
+      "is_playable": true,
+      "is_multiplayer": true,
+      "starting_credits": 10000
+    },
+    "MULTI3": {
+      "id": 6,
+      "name": "Multi3",
+      "full_name": "Multiplayer Player 3",
+      "color": {"r": 0, "g": 200, "b": 0},
+      "color_name": "Green",
+      "is_playable": true,
+      "is_multiplayer": true,
+      "starting_credits": 10000
+    },
+    "MULTI4": {
+      "id": 7,
+      "name": "Multi4",
+      "full_name": "Multiplayer Player 4",
+      "color": {"r": 0, "g": 0, "b": 200},
+      "color_name": "Blue",
+      "is_playable": true,
+      "is_multiplayer": true,
+      "starting_credits": 10000
+    },
+    "MULTI5": {
+      "id": 8,
+      "name": "Multi5",
+      "full_name": "Multiplayer Player 5",
+      "color": {"r": 200, "g": 128, "b": 0},
+      "color_name": "Orange",
+      "is_playable": true,
+      "is_multiplayer": true,
+      "starting_credits": 10000
+    },
+    "MULTI6": {
+      "id": 9,
+      "name": "Multi6",
+      "full_name": "Multiplayer Player 6",
+      "color": {"r": 200, "g": 0, "b": 200},
+      "color_name": "Purple",
+      "is_playable": true,
+      "is_multiplayer": true,
+      "starting_credits": 10000
+    }
+  },
+
+  "player_colors": {
+    "_comment": "Multiplayer color options",
+    "GOLD": {"r": 255, "g": 200, "b": 0, "remap_index": 0},
+    "RED": {"r": 200, "g": 0, "b": 0, "remap_index": 1},
+    "LTBLUE": {"r": 128, "g": 200, "b": 255, "remap_index": 2},
+    "ORANGE": {"r": 255, "g": 128, "b": 0, "remap_index": 3},
+    "GREEN": {"r": 0, "g": 200, "b": 0, "remap_index": 4},
+    "BLUE": {"r": 0, "g": 0, "b": 200, "remap_index": 5}
+  },
+
+  "difficulty_modifiers": {
+    "EASY": {
+      "player_damage_multiplier": 1.2,
+      "enemy_damage_multiplier": 0.8,
+      "player_income_multiplier": 1.2,
+      "enemy_income_multiplier": 0.8,
+      "ai_aggression": 0.5
+    },
+    "NORMAL": {
+      "player_damage_multiplier": 1.0,
+      "enemy_damage_multiplier": 1.0,
+      "player_income_multiplier": 1.0,
+      "enemy_income_multiplier": 1.0,
+      "ai_aggression": 1.0
+    },
+    "HARD": {
+      "player_damage_multiplier": 0.8,
+      "enemy_damage_multiplier": 1.2,
+      "player_income_multiplier": 0.8,
+      "enemy_income_multiplier": 1.2,
+      "ai_aggression": 1.5
+    }
+  }
+}

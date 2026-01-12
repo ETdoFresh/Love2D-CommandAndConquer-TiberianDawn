@@ -1,0 +1,188 @@
+{
+  "_comment": "Warhead definitions from original C&C Tiberian Dawn (CONST.CPP)",
+  "_armor_types": ["none", "wood", "aluminum", "steel", "concrete"],
+  "_modifier_format": "Values are percentages: 100 = full damage, 50 = half damage, 200 = double damage",
+
+  "warheads": {
+    "SA": {
+      "name": "Small Arms",
+      "description": "Good against infantry",
+      "spread_factor": 2,
+      "destroys_walls": false,
+      "destroys_wood": false,
+      "destroys_tiberium": false,
+      "modifiers": {
+        "none": 100,
+        "wood": 50,
+        "aluminum": 56,
+        "steel": 25,
+        "concrete": 25
+      }
+    },
+    "HE": {
+      "name": "High Explosive",
+      "description": "Good against buildings and infantry",
+      "spread_factor": 6,
+      "destroys_walls": true,
+      "destroys_wood": true,
+      "destroys_tiberium": true,
+      "modifiers": {
+        "none": 88,
+        "wood": 75,
+        "aluminum": 56,
+        "steel": 25,
+        "concrete": 100
+      }
+    },
+    "AP": {
+      "name": "Armor Piercing",
+      "description": "Good against armor",
+      "spread_factor": 6,
+      "destroys_walls": true,
+      "destroys_wood": true,
+      "destroys_tiberium": false,
+      "modifiers": {
+        "none": 25,
+        "wood": 75,
+        "aluminum": 75,
+        "steel": 100,
+        "concrete": 50
+      }
+    },
+    "FIRE": {
+      "name": "Incendiary",
+      "description": "Good against flammables",
+      "spread_factor": 8,
+      "destroys_walls": false,
+      "destroys_wood": true,
+      "destroys_tiberium": true,
+      "modifiers": {
+        "none": 88,
+        "wood": 100,
+        "aluminum": 69,
+        "steel": 25,
+        "concrete": 50
+      }
+    },
+    "LASER": {
+      "name": "Laser",
+      "description": "Light Amplification by Stimulated Emission of Radiation",
+      "spread_factor": 4,
+      "destroys_walls": false,
+      "destroys_wood": false,
+      "destroys_tiberium": false,
+      "modifiers": {
+        "none": 100,
+        "wood": 100,
+        "aluminum": 100,
+        "steel": 100,
+        "concrete": 100
+      }
+    },
+    "PB": {
+      "name": "Particle Beam",
+      "description": "Neutron beam weapon",
+      "spread_factor": 7,
+      "destroys_walls": true,
+      "destroys_wood": true,
+      "destroys_tiberium": true,
+      "modifiers": {
+        "none": 100,
+        "wood": 100,
+        "aluminum": 75,
+        "steel": 75,
+        "concrete": 75
+      }
+    },
+    "FIST": {
+      "name": "Fist",
+      "description": "Punching in hand-to-hand combat",
+      "spread_factor": 4,
+      "destroys_walls": false,
+      "destroys_wood": false,
+      "destroys_tiberium": false,
+      "modifiers": {
+        "none": 100,
+        "wood": 13,
+        "aluminum": 13,
+        "steel": 6,
+        "concrete": 6
+      }
+    },
+    "FOOT": {
+      "name": "Foot",
+      "description": "Kicking in hand-to-hand combat",
+      "spread_factor": 4,
+      "destroys_walls": false,
+      "destroys_wood": false,
+      "destroys_tiberium": false,
+      "modifiers": {
+        "none": 100,
+        "wood": 13,
+        "aluminum": 13,
+        "steel": 6,
+        "concrete": 6
+      }
+    },
+    "HOLLOW_POINT": {
+      "name": "Hollow Point",
+      "description": "Sniper bullet type",
+      "spread_factor": 4,
+      "destroys_walls": false,
+      "destroys_wood": false,
+      "destroys_tiberium": false,
+      "modifiers": {
+        "none": 100,
+        "wood": 3,
+        "aluminum": 3,
+        "steel": 3,
+        "concrete": 3
+      }
+    },
+    "SPORE": {
+      "name": "Spore",
+      "description": "Spores from blossom tree - affects infantry only",
+      "spread_factor": 255,
+      "destroys_walls": false,
+      "destroys_wood": false,
+      "destroys_tiberium": false,
+      "modifiers": {
+        "none": 100,
+        "wood": 1,
+        "aluminum": 1,
+        "steel": 1,
+        "concrete": 1
+      }
+    },
+    "HEADBUTT": {
+      "name": "Headbutt",
+      "description": "Dinosaurs butting into people",
+      "spread_factor": 4,
+      "destroys_walls": false,
+      "destroys_wood": false,
+      "destroys_tiberium": false,
+      "modifiers": {
+        "none": 100,
+        "wood": 25,
+        "aluminum": 25,
+        "steel": 25,
+        "concrete": 25
+      }
+    },
+    "FEEDME": {
+      "name": "Feed Me",
+      "description": "T-Rex eats people, hurts vehicles and buildings",
+      "spread_factor": 4,
+      "destroys_walls": false,
+      "destroys_wood": false,
+      "destroys_tiberium": false,
+      "modifiers": {
+        "none": 100,
+        "wood": 50,
+        "aluminum": 50,
+        "steel": 50,
+        "concrete": 50
+      }
+    }
+  }
+}

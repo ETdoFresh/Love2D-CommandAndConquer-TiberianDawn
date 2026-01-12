@@ -1,0 +1,107 @@
+{
+  "_comment": "Terrain definitions from original C&C Tiberian Dawn (DEFINES.H)",
+
+  "land_types": {
+    "CLEAR": {
+      "id": 0,
+      "name": "Clear",
+      "description": "Clear terrain - passable by all ground units",
+      "passable": true,
+      "speed_modifier": 1.0,
+      "buildable": true
+    },
+    "ROAD": {
+      "id": 1,
+      "name": "Road",
+      "description": "Road terrain - faster movement",
+      "passable": true,
+      "speed_modifier": 1.25,
+      "buildable": true
+    },
+    "WATER": {
+      "id": 2,
+      "name": "Water",
+      "description": "Water - impassable to ground units",
+      "passable": false,
+      "speed_modifier": 0,
+      "buildable": false,
+      "allows_boats": true
+    },
+    "ROCK": {
+      "id": 3,
+      "name": "Rock",
+      "description": "Impassable rock formation",
+      "passable": false,
+      "speed_modifier": 0,
+      "buildable": false
+    },
+    "WALL": {
+      "id": 4,
+      "name": "Wall",
+      "description": "Wall - blocks movement",
+      "passable": false,
+      "speed_modifier": 0,
+      "buildable": false,
+      "destructible": true
+    },
+    "TIBERIUM": {
+      "id": 5,
+      "name": "Tiberium",
+      "description": "Tiberium field - harvestable, damages infantry",
+      "passable": true,
+      "speed_modifier": 0.8,
+      "buildable": false,
+      "damages_infantry": true,
+      "harvestable": true
+    },
+    "BEACH": {
+      "id": 6,
+      "name": "Beach",
+      "description": "Beach terrain - transition between water and land",
+      "passable": true,
+      "speed_modifier": 0.75,
+      "buildable": false
+    }
+  },
+
+  "theaters": {
+    "TEMPERATE": {
+      "id": 0,
+      "name": "Temperate",
+      "description": "European theater with green grass and trees",
+      "mix_file": "TEMPERAT.MIX",
+      "palette": "temperat.pal",
+      "tiberium_color": [0.2, 0.8, 0.2]
+    },
+    "DESERT": {
+      "id": 1,
+      "name": "Desert",
+      "description": "African desert theater with sand and rocks",
+      "mix_file": "DESERT.MIX",
+      "palette": "desert.pal",
+      "tiberium_color": [0.2, 0.8, 0.2]
+    },
+    "WINTER": {
+      "id": 2,
+      "name": "Winter",
+      "description": "Winter theater with snow",
+      "mix_file": "WINTER.MIX",
+      "palette": "winter.pal",
+      "tiberium_color": [0.2, 0.6, 0.8]
+    }
+  },
+
+  "terrain_objects": {
+    "_comment": "Terrain objects like trees, rocks that block movement",
+    "TREE1": {"name": "Tree", "blocking": true, "health": 100},
+    "TREE2": {"name": "Tree", "blocking": true, "health": 100},
+    "TREE3": {"name": "Tree", "blocking": true, "health": 100},
+    "ROCK1": {"name": "Rock", "blocking": true, "health": -1},
+    "ROCK2": {"name": "Rock", "blocking": true, "health": -1},
+    "ROCK3": {"name": "Rock", "blocking": true, "health": -1},
+    "ROCK4": {"name": "Rock", "blocking": true, "health": -1},
+    "ROCK5": {"name": "Rock", "blocking": true, "health": -1},
+    "ROCK6": {"name": "Rock", "blocking": true, "health": -1},
+    "ROCK7": {"name": "Rock", "blocking": true, "health": -1}
+  }
+}
