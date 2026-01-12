@@ -12,13 +12,30 @@ local Component = require("src.ecs.component")
 local CombatSystem = setmetatable({}, {__index = System})
 CombatSystem.__index = CombatSystem
 
--- Armor modifiers for damage calculation
-CombatSystem.ARMOR_MODIFIERS = {
-    none = {small_arms = 1.0, ap = 0.8, he = 1.0, fire = 1.5, super = 1.0},
-    light = {small_arms = 0.5, ap = 1.0, he = 0.9, fire = 1.0, super = 1.0},
-    heavy = {small_arms = 0.25, ap = 1.0, he = 0.5, fire = 0.5, super = 1.0},
-    wood = {small_arms = 0.5, ap = 0.75, he = 1.0, fire = 1.5, super = 1.0},
-    steel = {small_arms = 0.25, ap = 1.0, he = 0.75, fire = 0.25, super = 1.0}
+-- Warhead data loaded from JSON (populated in init)
+CombatSystem.warheads = {}
+
+-- Warhead name mapping (weapons.json uses lowercase names, warheads.json uses uppercase)
+CombatSystem.WARHEAD_MAP = {
+    small_arms = "SA",
+    he = "HE",
+    ap = "AP",
+    fire = "FIRE",
+    laser = "LASER",
+    super = "PB",  -- Particle beam for super weapons
+    -- Direct mappings
+    SA = "SA",
+    HE = "HE",
+    AP = "AP",
+    FIRE = "FIRE",
+    LASER = "LASER",
+    PB = "PB",
+    FIST = "FIST",
+    FOOT = "FOOT",
+    HOLLOW_POINT = "HOLLOW_POINT",
+    SPORE = "SPORE",
+    HEADBUTT = "HEADBUTT",
+    FEEDME = "FEEDME"
 }
 
 function CombatSystem.new()
@@ -36,8 +53,10 @@ function CombatSystem.new()
 end
 
 function CombatSystem:init()
-    -- Load weapon data
+    -- Load weapon, warhead, and projectile data
     self:load_weapon_data()
+    self:load_warhead_data()
+    self:load_projectile_data()
 end
 
 function CombatSystem:load_weapon_data()
@@ -46,6 +65,74 @@ function CombatSystem:load_weapon_data()
     if data then
         self.weapons = data
     end
+end
+
+-- Load warhead damage modifiers from JSON
+function CombatSystem:load_warhead_data()
+    local Serialize = require("src.util.serialize")
+    local data = Serialize.load_json("data/weapons/warheads.json")
+    if data and data.warheads then
+        CombatSystem.warheads = data.warheads
+    end
+end
+
+-- Load projectile data from JSON
+function CombatSystem:load_projectile_data()
+    local Serialize = require("src.util.serialize")
+    local data = Serialize.load_json("data/weapons/projectiles.json")
+    if data and data.projectiles then
+        CombatSystem.projectile_data = data.projectiles
+    end
+end
+
+-- Get projectile speed for a projectile type
+function CombatSystem:get_projectile_speed(proj_type)
+    -- First check loaded JSON data
+    if CombatSystem.projectile_data and CombatSystem.projectile_data[proj_type] then
+        return CombatSystem.projectile_data[proj_type].speed or 100
+    end
+    -- Fall back to hardcoded speeds
+    return CombatSystem.PROJECTILE_SPEEDS[proj_type] or CombatSystem.PROJECTILE_SPEEDS.default
+end
+
+-- Get projectile behavior flags from data
+function CombatSystem:get_projectile_behavior(proj_type)
+    if CombatSystem.projectile_data and CombatSystem.projectile_data[proj_type] then
+        local data = CombatSystem.projectile_data[proj_type]
+        return {
+            homing = data.homing or false,
+            arcing = data.arcing or false,
+            dropping = data.dropping or false,
+            invisible = data.invisible or false,
+            rotates = data.rotates or false,
+            inaccurate = data.inaccurate or false,
+            high = data.high or false
+        }
+    end
+    return {}
+end
+
+-- Get damage modifier for a warhead against armor type
+-- Returns multiplier (1.0 = full damage, 0.5 = half damage)
+function CombatSystem:get_damage_modifier(warhead_name, armor_type)
+    -- Map warhead name to canonical form
+    local warhead_key = CombatSystem.WARHEAD_MAP[warhead_name] or "SA"
+    local warhead = CombatSystem.warheads[warhead_key]
+
+    if not warhead or not warhead.modifiers then
+        -- Fallback: 100% damage
+        return 1.0
+    end
+
+    -- Get modifier for armor type (default to 'none' if not specified)
+    local armor = armor_type or "none"
+    local modifier = warhead.modifiers[armor]
+
+    if modifier then
+        return modifier / 100  -- Convert percentage to multiplier
+    end
+
+    return 1.0
 end
 
 function CombatSystem:update(dt, entities)
@@ -172,9 +259,10 @@ function CombatSystem:fire_weapon(attacker, target, weapon)
     local transform = attacker:get("transform")
     local target_transform = target:get("transform")
 
-    -- Get projectile speed based on type
+    -- Get projectile type and speed from data files
     local proj_type = weapon.projectile or "default"
-    local speed = CombatSystem.PROJECTILE_SPEEDS[proj_type] or CombatSystem.PROJECTILE_SPEEDS.default
+    local speed = self:get_projectile_speed(proj_type)
+    local behavior = self:get_projectile_behavior(proj_type)
 
     -- Create projectile
     local projectile = {
@@ -189,8 +277,10 @@ function CombatSystem:fire_weapon(attacker, target, weapon)
         speed = speed,
         damage = weapon.damage,
         warhead = weapon.warhead or "ap",
-        homing = weapon.homing or false,
-        inaccurate = weapon.inaccurate or false,
+        homing = weapon.homing or behavior.homing or false,
+        inaccurate = weapon.inaccurate or behavior.inaccurate or false,
+        arcing = behavior.arcing or false,
+        high = behavior.high or false,
         alive = true
     }
 
@@ -318,10 +408,8 @@ function CombatSystem:apply_damage(target, damage, warhead, attacker)
     local health = target:get("health")
     local armor = health.armor or "none"
 
-    -- Apply armor modifier
-    local modifiers = self.ARMOR_MODIFIERS[armor] or self.ARMOR_MODIFIERS.none
-    local modifier = modifiers[warhead] or 1.0
-
+    -- Apply armor modifier using warhead data from JSON
+    local modifier = self:get_damage_modifier(warhead, armor)
     local final_damage = math.floor(damage * modifier)
 
     -- Apply damage

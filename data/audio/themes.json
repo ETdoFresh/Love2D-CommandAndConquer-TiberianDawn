@@ -1,0 +1,289 @@
+{
+  "version": "1.0",
+  "description": "C&C Tiberian Dawn music themes from DEFINES.H",
+  "themes": {
+    "AIRSTRIKE": {
+      "name": "Air Strike",
+      "file": "airstrik",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "80MX": {
+      "name": "80's Mix",
+      "file": "80mx226m",
+      "scenario": true,
+      "normal": true,
+      "duration": 226
+    },
+    "CHRG": {
+      "name": "Target",
+      "file": "chrg226m",
+      "scenario": true,
+      "normal": true,
+      "duration": 226
+    },
+    "CREP": {
+      "name": "Creeping Upon",
+      "file": "creeping",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "DRIL": {
+      "name": "The Drill",
+      "file": "dril226m",
+      "scenario": true,
+      "normal": true,
+      "duration": 226
+    },
+    "DRON": {
+      "name": "Drone",
+      "file": "drone226",
+      "scenario": true,
+      "normal": true,
+      "duration": 226
+    },
+    "FIST": {
+      "name": "Iron Fist",
+      "file": "fist226m",
+      "scenario": true,
+      "normal": true,
+      "duration": 226
+    },
+    "RECON": {
+      "name": "Recon",
+      "file": "recon226",
+      "scenario": true,
+      "normal": true,
+      "duration": 226
+    },
+    "VOICE": {
+      "name": "Voice Rhythm",
+      "file": "voic226m",
+      "scenario": true,
+      "normal": true,
+      "duration": 226
+    },
+    "HEAVYG": {
+      "name": "Heavy Glove",
+      "file": "heavyg",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "J1": {
+      "name": "Just Do It Up",
+      "file": "j1",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "JDI_V2": {
+      "name": "In The Line Of Fire (Variation)",
+      "file": "jdi_v2",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "RADIO": {
+      "name": "Radio",
+      "file": "radio226",
+      "scenario": true,
+      "normal": true,
+      "duration": 226
+    },
+    "RAIN": {
+      "name": "Rain In The Night",
+      "file": "rain226m",
+      "scenario": true,
+      "normal": true,
+      "duration": 226
+    },
+    "AOI": {
+      "name": "Act On Instinct",
+      "file": "aoi",
+      "scenario": true,
+      "normal": true,
+      "duration": 240,
+      "iconic": true
+    },
+    "CCTHANG": {
+      "name": "C&C Thang",
+      "file": "ccthang",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "DIE": {
+      "name": "Die!!",
+      "file": "die",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "FWP": {
+      "name": "Fight, Win, Prevail",
+      "file": "fwp",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "IND": {
+      "name": "Industrial",
+      "file": "ind",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "IND2": {
+      "name": "Industrial2",
+      "file": "ind2",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "JUSTDOIT": {
+      "name": "Just Do It!",
+      "file": "justdoit",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "LINEFIRE": {
+      "name": "In The Line Of Fire",
+      "file": "linefire",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "MARCH": {
+      "name": "March To Your Doom",
+      "file": "march",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "MECHMAN": {
+      "name": "Mechanical Man",
+      "file": "mechman",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "NOMERCY": {
+      "name": "No Mercy",
+      "file": "nomercy",
+      "scenario": true,
+      "normal": true,
+      "duration": 240,
+      "iconic": true
+    },
+    "OTP": {
+      "name": "On The Prowl",
+      "file": "otp",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "PRP": {
+      "name": "Prepare For Battle",
+      "file": "prp",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "ROUT": {
+      "name": "Reaching Out",
+      "file": "rout",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "HEART": {
+      "name": "Depth Charge",
+      "file": "heart",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "STOPTHEM": {
+      "name": "Stop Them",
+      "file": "stopthem",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "TROUBLE": {
+      "name": "Looks Like Trouble",
+      "file": "trouble",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "WARFARE": {
+      "name": "Warfare",
+      "file": "warfare",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "BFEARED": {
+      "name": "Enemies To Be Feared",
+      "file": "bfeared",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "IAM": {
+      "name": "I Am",
+      "file": "iam",
+      "scenario": true,
+      "normal": true,
+      "duration": 180
+    },
+    "WIN1": {
+      "name": "Great Shot!",
+      "file": "win1",
+      "scenario": false,
+      "normal": false,
+      "victory": true,
+      "duration": 60
+    },
+    "MAP1": {
+      "name": "Map Theme",
+      "file": "map1",
+      "scenario": false,
+      "normal": false,
+      "menu": true,
+      "duration": 120
+    },
+    "VALKYRIE": {
+      "name": "Ride of the Valkyries",
+      "file": "valkyrie",
+      "scenario": false,
+      "normal": false,
+      "special": true,
+      "duration": 120
+    }
+  },
+  "playlists": {
+    "gdi_campaign": [
+      "AOI", "FWP", "NOMERCY", "STOPTHEM", "TROUBLE", "WARFARE", "PRP", "MARCH"
+    ],
+    "nod_campaign": [
+      "AOI", "DIE", "NOMERCY", "IND", "IND2", "JUSTDOIT", "MECHMAN", "BFEARED"
+    ],
+    "skirmish": [
+      "AOI", "FWP", "NOMERCY", "STOPTHEM", "TROUBLE", "WARFARE", "DIE", "IND"
+    ],
+    "menu": [
+      "MAP1"
+    ]
+  },
+  "settings": {
+    "shuffle": true,
+    "fade_duration": 2.0,
+    "gap_between_tracks": 1.0
+  }
+}
