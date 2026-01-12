@@ -153,6 +153,48 @@ function Direction.turn_towards_full(current, target)
     return current
 end
 
+-- Turn towards target by multiple steps (up to rotation_speed)
+-- Returns new facing and whether we've reached the target facing
+function Direction.turn_towards_by(current, target, rotation_speed)
+    local diff = Direction.shortest_turn(current, target)
+    if diff == 0 then
+        return current, true  -- Already facing target
+    end
+
+    -- Limit rotation by speed (clamp to rotation_speed steps per tick)
+    local turn_amount = math.min(math.abs(diff), rotation_speed)
+    if diff > 0 then
+        -- Turn clockwise
+        current = (current + turn_amount) % Direction.FACING_COUNT
+    else
+        -- Turn counter-clockwise
+        current = (current - turn_amount + Direction.FACING_COUNT) % Direction.FACING_COUNT
+    end
+
+    -- Check if we've reached target
+    local new_diff = Direction.shortest_turn(current, target)
+    return current, (new_diff == 0)
+end
+
+-- Turn towards target by multiple steps using 32-direction (for smoother rotation)
+function Direction.turn_towards_full_by(current, target, rotation_speed)
+    local diff = Direction.shortest_turn_full(current, target)
+    if diff == 0 then
+        return current, true  -- Already facing target
+    end
+
+    -- Limit rotation by speed
+    local turn_amount = math.min(math.abs(diff), rotation_speed)
+    if diff > 0 then
+        current = (current + turn_amount) % Direction.FULL_COUNT
+    else
+        current = (current - turn_amount + Direction.FULL_COUNT) % Direction.FULL_COUNT
+    end
+
+    local new_diff = Direction.shortest_turn_full(current, target)
+    return current, (new_diff == 0)
+end
+
 -- Get cell offset for a direction
 function Direction.get_offset(facing)
     return Direction.OFFSETS[facing]

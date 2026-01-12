@@ -1,0 +1,154 @@
+{
+  "name": "GDI Mission 5: Obelisk Assault",
+  "intro": "gdi5",
+  "brief": "GDI5",
+  "win_movie": "gdi5win",
+  "lose_movie": "gdi5lose",
+  "player": "GoodGuy",
+  "build_level": 5,
+  "theater": "DESERT",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+
+  "briefing": {
+    "title": "GDI Mission 5: Obelisk Assault",
+    "text": "Commander, Nod has deployed their new Obelisk of Light defense system in this sector. This devastating weapon must be destroyed before we can proceed with our offensive. Intelligence indicates the obelisk requires significant power - destroying their power plants may disable it temporarily. An MCV is available for base construction. Build your forces and eliminate this threat.",
+    "objectives": [
+      "Establish a base",
+      "Destroy the Obelisk of Light",
+      "Eliminate all Nod forces"
+    ]
+  },
+
+  "houses": {
+    "GoodGuy": {
+      "credits": 7000,
+      "edge": "West",
+      "max_unit": 100,
+      "max_building": 50
+    },
+    "BadGuy": {
+      "credits": 4000,
+      "edge": "East",
+      "max_unit": 80,
+      "max_building": 40
+    }
+  },
+
+  "structures": [
+    {"house": "BadGuy", "type": "OBEL", "health": 256, "cell_x": 50, "cell_y": 32},
+    {"house": "BadGuy", "type": "HAND", "health": 256, "cell_x": 52, "cell_y": 28},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 55, "cell_y": 28},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 55, "cell_y": 32},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 47, "cell_y": 28},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 47, "cell_y": 36},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 53, "cell_y": 25}
+  ],
+
+  "units": [
+    {"house": "GoodGuy", "type": "MCV", "health": 256, "cell_x": 6, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 4, "cell_y": 30, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 4, "cell_y": 34, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 8, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 48, "cell_y": 30, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 48, "cell_y": 34, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 54, "cell_y": 30, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 56, "cell_y": 34, "facing": 192, "mission": "Guard"}
+  ],
+
+  "infantry": [
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 32, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 33, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 3, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 3, "cell_y": 33, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 30, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 34, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 35, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 51, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 51, "cell_y": 33, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 53, "cell_y": 32, "subcell": 0, "mission": "Guard", "facing": 192}
+  ],
+
+  "triggers": [
+    {
+      "name": "Win1",
+      "house": "BadGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Intro",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 3,
+      "action": 11,
+      "action_param": "Deploy your MCV and establish a base. The Obelisk is deadly - plan your assault carefully.",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack1",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 240,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Counter1",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack2",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 480,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Counter2",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "NOD_Counter1",
+      "house": "BadGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 5},
+        {"type": "LTNK", "count": 2}
+      ]
+    },
+    {
+      "name": "NOD_Counter2",
+      "house": "BadGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 3},
+        {"type": "E4", "count": 2},
+        {"type": "FTNK", "count": 1},
+        {"type": "LTNK", "count": 2}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 1536, "y": 8192},
+    {"x": 12288, "y": 8192}
+  ],
+
+  "cell_triggers": []
+}

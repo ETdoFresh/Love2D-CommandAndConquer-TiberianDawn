@@ -1,0 +1,188 @@
+{
+  "name": "GDI Mission 6: Base Assault",
+  "intro": "gdi6",
+  "brief": "GDI6",
+  "win_movie": "gdi6win",
+  "lose_movie": "gdi6lose",
+  "player": "GoodGuy",
+  "build_level": 6,
+  "theater": "TEMPERATE",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+
+  "briefing": {
+    "title": "GDI Mission 6: Base Assault",
+    "text": "Commander, we have located a major Nod forward operating base. This base must be eliminated to secure our supply lines. Nod has fortified their position with multiple defensive structures and has aircraft support. Establish your base quickly and overwhelm their defenses. Ion cannon support will be available once you construct an Advanced Communications Center.",
+    "objectives": [
+      "Establish a base with defensive structures",
+      "Destroy the Nod Construction Yard",
+      "Eliminate all Nod forces"
+    ]
+  },
+
+  "houses": {
+    "GoodGuy": {
+      "credits": 8000,
+      "edge": "West",
+      "max_unit": 120,
+      "max_building": 60
+    },
+    "BadGuy": {
+      "credits": 5000,
+      "edge": "East",
+      "max_unit": 100,
+      "max_building": 50
+    }
+  },
+
+  "structures": [
+    {"house": "BadGuy", "type": "FACT", "health": 256, "cell_x": 50, "cell_y": 30},
+    {"house": "BadGuy", "type": "HAND", "health": 256, "cell_x": 54, "cell_y": 28},
+    {"house": "BadGuy", "type": "AFLD", "health": 256, "cell_x": 54, "cell_y": 32},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 48, "cell_y": 28},
+    {"house": "BadGuy", "type": "NUKE", "health": 256, "cell_x": 48, "cell_y": 34},
+    {"house": "BadGuy", "type": "PROC", "health": 256, "cell_x": 56, "cell_y": 30},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 45, "cell_y": 28},
+    {"house": "BadGuy", "type": "GUN", "health": 256, "cell_x": 45, "cell_y": 34},
+    {"house": "BadGuy", "type": "OBEL", "health": 256, "cell_x": 47, "cell_y": 31},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 52, "cell_y": 25},
+    {"house": "BadGuy", "type": "SAM", "health": 256, "cell_x": 52, "cell_y": 37}
+  ],
+
+  "units": [
+    {"house": "GoodGuy", "type": "MCV", "health": 256, "cell_x": 6, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HTNK", "health": 256, "cell_x": 4, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 4, "cell_y": 30, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 4, "cell_y": 34, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "APC", "health": 256, "cell_x": 8, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MLRS", "health": 256, "cell_x": 6, "cell_y": 36, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 46, "cell_y": 30, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 46, "cell_y": 32, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 53, "cell_y": 30, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 55, "cell_y": 28, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 57, "cell_y": 32, "facing": 192, "mission": "Guard"},
+    {"house": "BadGuy", "type": "HARV", "health": 256, "cell_x": 58, "cell_y": 30, "facing": 192, "mission": "Harvest"}
+  ],
+
+  "infantry": [
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 30, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 33, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 5, "cell_y": 34, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 3, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 3, "cell_y": 33, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 30, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 32, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 49, "cell_y": 33, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 51, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 51, "cell_y": 33, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 53, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 192},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 55, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 192}
+  ],
+
+  "triggers": [
+    {
+      "name": "Win1",
+      "house": "BadGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Intro",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 3,
+      "action": 11,
+      "action_param": "Deploy your MCV. The Nod base is heavily defended. Build up your forces before attacking.",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack1",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 300,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Counter1",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack2",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 600,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Counter2",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "CounterAttack3",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 900,
+      "action": 4,
+      "action_param": 0,
+      "team": "NOD_Counter3",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "NOD_Counter1",
+      "house": "BadGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 6},
+        {"type": "LTNK", "count": 2}
+      ]
+    },
+    {
+      "name": "NOD_Counter2",
+      "house": "BadGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 4},
+        {"type": "E4", "count": 2},
+        {"type": "FTNK", "count": 2},
+        {"type": "LTNK", "count": 2}
+      ]
+    },
+    {
+      "name": "NOD_Counter3",
+      "house": "BadGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 4},
+        {"type": "E3", "count": 2},
+        {"type": "STNK", "count": 2},
+        {"type": "ARTY", "count": 1}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 1536, "y": 8192},
+    {"x": 12288, "y": 8192}
+  ],
+
+  "cell_triggers": []
+}

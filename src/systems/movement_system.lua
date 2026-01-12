@@ -163,6 +163,52 @@ function MovementSystem:process_entity(dt, entity)
     local dy = target_y - transform.y
     local distance = math.sqrt(dx * dx + dy * dy)
 
+    -- Calculate desired facing to reach target
+    local desired_facing = Direction.from_points(0, 0, dx, dy)
+
+    -- Vehicles need to rotate to face their destination before moving
+    -- Infantry rotate instantly, vehicles use rotation speed (ROT)
+    local is_vehicle = entity:has("vehicle")
+    local facing_correct = true
+
+    if is_vehicle and transform.facing ~= desired_facing then
+        -- Get rotation speed (degrees per tick, default 5)
+        -- In C&C, ROT is degrees per tick. 5 degrees/tick * 15 ticks = 75 deg/sec
+        -- Our facing system uses 8 directions (45 degrees each)
+        -- So ROT 5 means ~1/9 of a facing step per tick, or ~1.7 ticks per facing
+        -- We'll convert: ROT degrees -> fraction of a facing step per dt
+        local rot_speed = mobile.rot or 5
+        -- Calculate how many ticks passed (dt * TICKS_PER_SECOND)
+        local ticks_elapsed = dt * Constants.TICKS_PER_SECOND
+        -- Degrees rotated this frame
+        local degrees_this_frame = rot_speed * ticks_elapsed
+        -- Convert to facing steps (8 facings = 360 degrees, so 1 facing = 45 degrees)
+        local facing_steps = degrees_this_frame / 45
+
+        -- If we can turn at least one facing step, do it
+        if facing_steps >= 1 then
+            transform.facing, facing_correct = Direction.turn_towards_by(
+                transform.facing, desired_facing, math.floor(facing_steps)
+            )
+        else
+            -- Accumulate rotation for slow turners (like artillery with ROT=2)
+            mobile.rot_accumulator = (mobile.rot_accumulator or 0) + facing_steps
+            if mobile.rot_accumulator >= 1 then
+                transform.facing, facing_correct = Direction.turn_towards_by(
+                    transform.facing, desired_facing, 1
+                )
+                mobile.rot_accumulator = mobile.rot_accumulator - 1
+            else
+                facing_correct = false
+            end
+        end
+
+        -- If not yet facing correct direction, don't move yet
+        if not facing_correct then
+            return
+        end
+    end
+
     -- Calculate movement speed (leptons per frame, adjusted for tick rate)
     local speed = mobile.speed * (dt * Constants.TICKS_PER_SECOND)
 
@@ -194,13 +240,66 @@ function MovementSystem:process_entity(dt, entity)
         transform.cell_x = math.floor(transform.x / Constants.LEPTON_PER_CELL)
         transform.cell_y = math.floor(transform.y / Constants.LEPTON_PER_CELL)
 
-        -- Update facing
-        transform.facing = Direction.from_points(0, 0, dx, dy)
+        -- Update facing for infantry (they rotate instantly while moving)
+        if not is_vehicle then
+            transform.facing = desired_facing
+        end
     end
 
     -- Update cell occupancy if cell changed
     if transform.cell_x ~= prev_cell_x or transform.cell_y ~= prev_cell_y then
+        -- Check for crushing before updating occupancy
+        self:check_crushing(entity, transform.cell_x, transform.cell_y)
         self:update_cell_occupancy(entity, prev_cell_x, prev_cell_y, transform.cell_x, transform.cell_y)
+    end
+end
+
+-- Check if a vehicle with crusher capability crushes infantry in a cell
+function MovementSystem:check_crushing(entity, cell_x, cell_y)
+    if not self.world then return end
+
+    -- Check if entity is a crusher (tank/heavy vehicle)
+    local vehicle = entity:get("vehicle")
+    if not vehicle or not vehicle.crusher then return end
+
+    -- Find all infantry in this cell
+    local entities = self.world:get_entities_with("infantry")
+    for _, target in ipairs(entities) do
+        if target ~= entity and target:is_alive() then
+            local target_transform = target:get("transform")
+            if target_transform.cell_x == cell_x and target_transform.cell_y == cell_y then
+                -- Check if target is crushable
+                local infantry = target:get("infantry")
+                if infantry and infantry.crushable ~= false then
+                    -- Crush the infantry!
+                    self:crush_unit(entity, target)
+                end
+            end
+        end
+    end
+end
+
+-- Apply crushing damage/death to a unit
+function MovementSystem:crush_unit(crusher, victim)
+    -- Play crushing sound
+    Events.emit("PLAY_SOUND", "squish2")
+
+    -- Kill the infantry
+    if victim:has("health") then
+        local health = victim:get("health")
+        health.hp = 0
+    end
+
+    -- Clear cell occupancy before destroying
+    self:clear_cell_occupancy(victim)
+
+    -- Emit kill event (crusher is the killer)
+    Events.emit(Events.EVENTS.ENTITY_KILLED, victim, crusher)
+    Events.emit(Events.EVENTS.ENTITY_DESTROYED, victim, crusher)
+
+    -- Destroy the victim
+    if self.world then
+        self.world:destroy_entity(victim)
     end
 end
 

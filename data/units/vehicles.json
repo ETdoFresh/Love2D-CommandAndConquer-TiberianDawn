@@ -8,6 +8,7 @@
     "hitpoints": 600,
     "armor": "heavy",
     "speed": 12,
+    "rot": 5,
     "sight": 4,
     "primary_weapon": "120mm",
     "secondary_weapon": "MammothTusk",
@@ -16,6 +17,7 @@
     "techlevel": 10,
     "points": 375,
     "crushable": false,
+    "crusher": true,
     "sprite": "htnk.shp"
   },
   "MTNK": {
@@ -27,6 +29,7 @@
     "hitpoints": 400,
     "armor": "heavy",
     "speed": 18,
+    "rot": 5,
     "sight": 3,
     "primary_weapon": "105mm",
     "turret": true,
@@ -34,6 +37,7 @@
     "techlevel": 5,
     "points": 200,
     "crushable": false,
+    "crusher": true,
     "sprite": "mtnk.shp"
   },
   "LTNK": {
@@ -45,6 +49,7 @@
     "hitpoints": 300,
     "armor": "heavy",
     "speed": 24,
+    "rot": 5,
     "sight": 3,
     "primary_weapon": "75mm",
     "turret": true,
@@ -52,6 +57,7 @@
     "techlevel": 3,
     "points": 150,
     "crushable": false,
+    "crusher": true,
     "sprite": "ltnk.shp"
   },
   "STNK": {
@@ -63,6 +69,7 @@
     "hitpoints": 110,
     "armor": "light",
     "speed": 30,
+    "rot": 5,
     "sight": 4,
     "primary_weapon": "Dragon",
     "turret": false,
@@ -82,6 +89,7 @@
     "hitpoints": 300,
     "armor": "heavy",
     "speed": 18,
+    "rot": 5,
     "sight": 3,
     "primary_weapon": "Napalm",
     "turret": false,
@@ -89,6 +97,7 @@
     "techlevel": 5,
     "points": 200,
     "crushable": false,
+    "crusher": true,
     "sprite": "ftnk.shp"
   },
   "APC": {
@@ -100,6 +109,7 @@
     "hitpoints": 200,
     "armor": "heavy",
     "speed": 30,
+    "rot": 5,
     "sight": 3,
     "primary_weapon": "M60mg",
     "turret": true,
@@ -109,6 +119,7 @@
     "techlevel": 4,
     "points": 175,
     "crushable": false,
+    "crusher": true,
     "sprite": "apc.shp"
   },
   "MLRS": {
@@ -120,6 +131,7 @@
     "hitpoints": 100,
     "armor": "light",
     "speed": 18,
+    "rot": 5,
     "sight": 5,
     "primary_weapon": "Honest John",
     "turret": true,
@@ -138,6 +150,7 @@
     "hitpoints": 75,
     "armor": "light",
     "speed": 12,
+    "rot": 2,
     "sight": 5,
     "primary_weapon": "155mm",
     "turret": false,
@@ -156,6 +169,7 @@
     "hitpoints": 600,
     "armor": "heavy",
     "speed": 12,
+    "rot": 5,
     "sight": 2,
     "primary_weapon": null,
     "turret": false,
@@ -164,6 +178,7 @@
     "techlevel": 1,
     "points": 350,
     "crushable": false,
+    "crusher": true,
     "sprite": "harv.shp"
   },
   "MCV": {
@@ -175,6 +190,7 @@
     "hitpoints": 600,
     "armor": "heavy",
     "speed": 12,
+    "rot": 5,
     "sight": 2,
     "primary_weapon": null,
     "turret": false,
@@ -183,6 +199,7 @@
     "techlevel": 10,
     "points": 1250,
     "crushable": false,
+    "crusher": true,
     "sprite": "mcv.shp"
   },
   "JEEP": {
@@ -194,6 +211,7 @@
     "hitpoints": 150,
     "armor": "light",
     "speed": 40,
+    "rot": 10,
     "sight": 2,
     "primary_weapon": "M60mg",
     "turret": true,
@@ -212,6 +230,7 @@
     "hitpoints": 140,
     "armor": "light",
     "speed": 44,
+    "rot": 10,
     "sight": 2,
     "primary_weapon": "M60mg",
     "turret": true,
@@ -230,6 +249,7 @@
     "hitpoints": 160,
     "armor": "light",
     "speed": 50,
+    "rot": 10,
     "sight": 2,
     "primary_weapon": "Dragon",
     "turret": false,
@@ -248,6 +268,7 @@
     "hitpoints": 110,
     "armor": "light",
     "speed": 30,
+    "rot": 127,
     "sight": 4,
     "primary_weapon": "Nike",
     "turret": true,

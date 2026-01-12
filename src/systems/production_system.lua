@@ -356,6 +356,7 @@ function ProductionSystem:create_unit(unit_type, house, x, y)
     if data.speed then
         entity:add("mobile", Component.create("mobile", {
             speed = data.speed,
+            rot = data.rot or 5,  -- Rotation speed in degrees per tick (default 5)
             locomotor = data.type == "infantry" and "foot" or
                         (data.type == "aircraft" and "fly" or "track")
         }))
@@ -383,12 +384,14 @@ function ProductionSystem:create_unit(unit_type, house, x, y)
         entity:add("infantry", Component.create("infantry", {
             infantry_type = unit_type,
             can_capture = data.can_capture or false,
-            immune_tiberium = data.immune_tiberium or false
+            immune_tiberium = data.immune_tiberium or false,
+            crushable = data.crushable ~= false  -- Default to true unless explicitly false
         }))
         entity:add_tag("infantry")
     elseif data.type == "vehicle" then
         entity:add("vehicle", Component.create("vehicle", {
-            vehicle_type = unit_type
+            vehicle_type = unit_type,
+            crusher = data.crusher or false
         }))
         entity:add_tag("vehicle")
 
