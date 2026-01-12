@@ -12,6 +12,15 @@
   "map_width": 40,
   "map_height": 40,
 
+  "briefing": {
+    "title": "GDI Mission 1: First Strike",
+    "text": "Commander, welcome to the Global Defense Initiative. Intelligence reports indicate Nod forces have established defensive positions in this sector. Your mission is to eliminate all hostile forces and secure the area. A strike team consisting of infantry and armor has been deployed under your command. Good luck, Commander.",
+    "objectives": [
+      "Destroy all enemy forces",
+      "Secure the area"
+    ]
+  },
+
   "houses": {
     "GoodGuy": {
       "credits": 2000,

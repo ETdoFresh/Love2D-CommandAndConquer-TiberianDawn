@@ -1260,16 +1260,53 @@ function Game:show_briefing(faction, mission_num)
     self.current_mission = string.lower(faction) .. string.format("%02d", mission_num)
     self.mode = Game.MODE.CAMPAIGN
 
-    -- Build briefing data
-    self.current_briefing = {
-        faction = faction,
-        mission = mission_num,
-        title = faction .. " Mission " .. mission_num,
-        text = self:get_mission_briefing_text(faction, mission_num),
-        objectives = self:get_mission_objectives(faction, mission_num)
-    }
+    -- Try to load briefing from scenario file
+    local scenario_path = "data/scenarios/" .. self.current_mission .. ".json"
+    local scenario_briefing = self:load_scenario_briefing(scenario_path)
+
+    -- Build briefing data - use scenario data if available, fallback to hardcoded
+    if scenario_briefing then
+        self.current_briefing = {
+            faction = faction,
+            mission = mission_num,
+            title = scenario_briefing.title or (faction .. " Mission " .. mission_num),
+            text = scenario_briefing.text or self:get_mission_briefing_text(faction, mission_num),
+            objectives = scenario_briefing.objectives or self:get_mission_objectives(faction, mission_num)
+        }
+    else
+        self.current_briefing = {
+            faction = faction,
+            mission = mission_num,
+            title = faction .. " Mission " .. mission_num,
+            text = self:get_mission_briefing_text(faction, mission_num),
+            objectives = self:get_mission_objectives(faction, mission_num)
+        }
+    end
 
     self.state = Game.STATE.BRIEFING
+end
+
+-- Load briefing data from scenario JSON file
+function Game:load_scenario_briefing(scenario_path)
+    if not love.filesystem.getInfo(scenario_path) then
+        return nil
+    end
+
+    local content = love.filesystem.read(scenario_path)
+    if not content then
+        return nil
+    end
+
+    local json = require("lib.json")
+    local success, data = pcall(function()
+        return json.decode(content)
+    end)
+
+    if success and data and data.briefing then
+        return data.briefing
+    end
+
+    return nil
 end
 
 -- Get mission briefing text (placeholder - would come from scenario files)

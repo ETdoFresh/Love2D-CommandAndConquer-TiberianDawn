@@ -12,6 +12,15 @@
   "map_width": 45,
   "map_height": 45,
 
+  "briefing": {
+    "title": "Nod Mission 1: Silencing Nikoomba",
+    "text": "Brother, the Brotherhood of Nod welcomes you to our cause. Kane has decreed that the village elder Nikoomba must be silenced - he speaks against the Brotherhood and poisons the minds of the people. Take your squad into the village and eliminate him. Show the people what happens to those who oppose Nod. Peace through power!",
+    "objectives": [
+      "Kill Nikoomba",
+      "Destroy all who oppose you"
+    ]
+  },
+
   "houses": {
     "BadGuy": {
       "credits": 1500,
