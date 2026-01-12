@@ -488,17 +488,80 @@ function TeamSystem:find_team_target(team)
     return best_target
 end
 
--- Update waypoint-based movement
+-- Update waypoint-based movement with cohesion
 function TeamSystem:update_waypoint_movement(team)
     if #team.waypoints == 0 then return end
+
+    -- Constants for team cohesion (matching original C&C behavior)
+    local COHESION_RADIUS = 384   -- Units try to stay within 1.5 cells of each other
+    local WAYPOINT_REACH = 256    -- 1 cell tolerance for reaching waypoint
+    local GATHER_TIMEOUT = 120    -- 8 seconds max gather time at 15 FPS
 
     -- Resolve waypoint (can be index into scenario waypoints or direct coords)
     local waypoint = self:resolve_waypoint(team.waypoints[team.current_waypoint])
     if not waypoint then return end
 
+    -- Calculate team center and check spread
+    local center_x, center_y = 0, 0
+    local count = 0
+    local max_spread = 0
+
+    for _, entity in ipairs(team.members) do
+        local transform = entity:get("transform")
+        if transform then
+            center_x = center_x + transform.x
+            center_y = center_y + transform.y
+            count = count + 1
+        end
+    end
+
+    if count == 0 then return end
+    center_x = center_x / count
+    center_y = center_y / count
+
+    -- Calculate how spread out the team is
+    for _, entity in ipairs(team.members) do
+        local transform = entity:get("transform")
+        if transform then
+            local dx = transform.x - center_x
+            local dy = transform.y - center_y
+            max_spread = math.max(max_spread, math.sqrt(dx * dx + dy * dy))
+        end
+    end
+
+    -- Check if we need to gather first (team too spread out)
+    if not team.waypoint_gathered and max_spread > COHESION_RADIUS * 2 then
+        -- Team is too spread out, gather first
+        team.waypoint_gather_time = (team.waypoint_gather_time or 0) + 1
+
+        if team.waypoint_gather_time < GATHER_TIMEOUT then
+            -- Move stragglers toward center
+            for _, entity in ipairs(team.members) do
+                local transform = entity:get("transform")
+                local mobile = entity:get("mobile")
+                if transform and mobile then
+                    local dx = transform.x - center_x
+                    local dy = transform.y - center_y
+                    local dist = math.sqrt(dx * dx + dy * dy)
+                    if dist > COHESION_RADIUS and not mobile.is_moving then
+                        self:move_entity_to(entity, center_x, center_y)
+                    end
+                end
+            end
+            return  -- Wait for gathering
+        else
+            -- Timeout - continue anyway
+            team.waypoint_gathered = true
+        end
+    else
+        team.waypoint_gathered = true
+    end
+
     -- Check if all members reached waypoint
     local all_reached = true
     local any_moving = false
+    local slowest_entity = nil
+    local slowest_dist = 0
 
     for _, entity in ipairs(team.members) do
         local transform = entity:get("transform")
@@ -509,14 +572,44 @@ function TeamSystem:update_waypoint_movement(team)
             local dy = transform.y - waypoint.y
             local dist = math.sqrt(dx * dx + dy * dy)
 
-            if dist > 256 then  -- 1 cell tolerance
+            if dist > WAYPOINT_REACH then
                 all_reached = false
+
+                -- Track who is furthest from waypoint
+                if dist > slowest_dist then
+                    slowest_dist = dist
+                    slowest_entity = entity
+                end
 
                 -- Issue move command if not already moving
                 if mobile and not mobile.is_moving then
                     self:move_entity_to(entity, waypoint.x, waypoint.y)
                 else
                     any_moving = true
+                end
+            end
+        end
+    end
+
+    -- Cohesive movement: faster units wait for slower ones
+    if not all_reached and slowest_entity then
+        for _, entity in ipairs(team.members) do
+            if entity ~= slowest_entity then
+                local transform = entity:get("transform")
+                local mobile = entity:get("mobile")
+                if transform and mobile then
+                    local dx = transform.x - waypoint.x
+                    local dy = transform.y - waypoint.y
+                    local my_dist = math.sqrt(dx * dx + dy * dy)
+
+                    -- If I'm much closer than the slowest, slow down by stopping briefly
+                    if my_dist < slowest_dist * 0.5 and my_dist < COHESION_RADIUS then
+                        -- I'm way ahead - wait for others
+                        if mobile.is_moving then
+                            mobile.is_moving = false
+                            mobile.path = nil
+                        end
+                    end
                 end
             end
         end
@@ -530,6 +623,10 @@ function TeamSystem:update_waypoint_movement(team)
     end
 
     if all_reached then
+        -- Reset gather state for next waypoint
+        team.waypoint_gathered = false
+        team.waypoint_gather_time = 0
+
         -- Move to next waypoint
         team.current_waypoint = team.current_waypoint + 1
 

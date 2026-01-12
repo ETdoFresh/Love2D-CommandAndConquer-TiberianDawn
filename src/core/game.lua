@@ -127,6 +127,10 @@ function Game.new()
     self.current_message = nil
     self.message_timer = 0
 
+    -- Mission objectives (stored for in-game display)
+    self.mission_objectives = {}
+    self.show_objectives = false  -- Toggle with O key
+
     return self
 end
 
@@ -766,6 +770,11 @@ function Game:draw()
         -- Draw in-game messages
         self:draw_messages()
 
+        -- Draw mission objectives overlay
+        if self.show_objectives then
+            self:draw_objectives_overlay()
+        end
+
         -- Draw special weapon targeting cursor
         self:draw_targeting_cursor()
 
@@ -1255,6 +1264,11 @@ function Game:start_mission_from_briefing()
     -- Reset game state for new mission
     self:reset_game_state()
 
+    -- Store mission objectives from briefing for in-game display
+    if self.current_briefing and self.current_briefing.objectives then
+        self.mission_objectives = self.current_briefing.objectives
+    end
+
     -- Load the scenario
     local scenario_path = "data/scenarios/" .. self.current_mission .. ".json"
     if self.scenario_loader then
@@ -1263,6 +1277,8 @@ function Game:start_mission_from_briefing()
             self.state = Game.STATE.PLAYING
             -- Center camera on player start position
             self:center_camera_on_player()
+            -- Show objectives briefly at mission start
+            self.show_objectives = true
         else
             -- Scenario doesn't exist yet - show error and return
             self.current_message = "Scenario not yet available: " .. self.current_mission
@@ -1577,6 +1593,68 @@ function Game:draw_messages()
     love.graphics.printf(self.current_message, msg_x + 10, msg_y + 20, msg_w - 20, "center")
 end
 
+-- Draw mission objectives overlay (toggle with O key)
+function Game:draw_objectives_overlay()
+    if #self.mission_objectives == 0 then
+        -- No objectives to display
+        love.graphics.setColor(0, 0, 0, 0.7)
+        love.graphics.rectangle("fill", 10, 10, 250, 40)
+        love.graphics.setColor(0.7, 0.7, 0.7, 1)
+        love.graphics.print("No mission objectives", 20, 20)
+        love.graphics.setColor(0.5, 0.5, 0.5, 0.8)
+        love.graphics.print("Press O to hide", 20, 35)
+        return
+    end
+
+    local w = love.graphics.getWidth()
+    local sidebar_w = self.sidebar and self.sidebar.width or 0
+
+    -- Calculate overlay size based on number of objectives
+    local padding = 15
+    local line_height = 22
+    local header_height = 30
+    local obj_count = #self.mission_objectives
+    local overlay_w = 350
+    local overlay_h = header_height + (obj_count * line_height) + padding * 2 + 20
+
+    -- Position at top-left of game area
+    local overlay_x = 10
+    local overlay_y = 10
+
+    -- Semi-transparent background
+    love.graphics.setColor(0, 0, 0, 0.85)
+    love.graphics.rectangle("fill", overlay_x, overlay_y, overlay_w, overlay_h, 5, 5)
+
+    -- Border with faction color
+    local faction_color = self.player_house == Constants.HOUSE.BAD
+        and {0.8, 0.2, 0.2, 1}
+        or {0.9, 0.7, 0.2, 1}
+
+    love.graphics.setColor(faction_color)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", overlay_x, overlay_y, overlay_w, overlay_h, 5, 5)
+
+    -- Header
+    love.graphics.setColor(faction_color)
+    love.graphics.printf("MISSION OBJECTIVES", overlay_x + padding, overlay_y + padding, overlay_w - padding * 2, "center")
+
+    -- Divider line
+    love.graphics.setColor(faction_color[1] * 0.5, faction_color[2] * 0.5, faction_color[3] * 0.5, 1)
+    love.graphics.line(overlay_x + padding, overlay_y + header_height + padding,
+                       overlay_x + overlay_w - padding, overlay_y + header_height + padding)
+
+    -- Objectives list
+    love.graphics.setColor(0.9, 0.9, 0.85, 1)
+    for i, objective in ipairs(self.mission_objectives) do
+        local obj_y = overlay_y + header_height + padding + 5 + (i - 1) * line_height
+        love.graphics.print(string.format("%d. %s", i, objective), overlay_x + padding, obj_y)
+    end
+
+    -- Instructions
+    love.graphics.setColor(0.5, 0.5, 0.5, 0.8)
+    love.graphics.printf("Press O to hide", overlay_x, overlay_y + overlay_h - 18, overlay_w, "center")
+end
+
 -- Draw special weapon targeting cursor
 function Game:draw_targeting_cursor()
     if not self.special_weapons or not self.special_weapons.targeting then
@@ -1757,6 +1835,9 @@ function Game:handle_playing_input(key)
     elseif key == "tab" then
         -- Toggle sidebar
         self.show_sidebar = not self.show_sidebar
+    elseif key == "o" then
+        -- Toggle objectives overlay
+        self.show_objectives = not self.show_objectives
     elseif key == "f5" then
         -- Quick save
         self:save_game("quicksave.sav")
