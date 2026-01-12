@@ -3,3 +3,5 @@ tmp/
 extracted/
 extracted_sounds/
 assets/
+.worktrees
+.worktree-metadata.json
