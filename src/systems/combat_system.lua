@@ -511,9 +511,13 @@ function CombatSystem:kill_unit(target, killer)
     -- Spawn death/explosion effect based on unit type
     self:spawn_death_effect(target)
 
-    -- Emit kill event
+    -- Emit kill event (ENTITY_KILLED is for game logic like scoring)
     self:emit(Events.EVENTS.UNIT_KILLED, target, killer)
     self:emit(Events.EVENTS.ENTITY_KILLED, target, killer)
+
+    -- Emit ENTITY_DESTROYED for trigger system (before removal from world)
+    -- This must happen before destroy_entity so triggers can evaluate it
+    self:emit(Events.EVENTS.ENTITY_DESTROYED, target, killer)
 
     -- Mark for destruction
     self.world:destroy_entity(target)

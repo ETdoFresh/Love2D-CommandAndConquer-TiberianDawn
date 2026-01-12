@@ -9,6 +9,31 @@ local Events = require("src.core.events")
 local ScenarioLoader = {}
 ScenarioLoader.__index = ScenarioLoader
 
+-- Mission string to constant mapping
+ScenarioLoader.MISSION_MAP = {
+    Sleep = Constants.MISSION.SLEEP,
+    Attack = Constants.MISSION.ATTACK,
+    Move = Constants.MISSION.MOVE,
+    Retreat = Constants.MISSION.RETREAT,
+    Guard = Constants.MISSION.GUARD,
+    Sticky = Constants.MISSION.STICKY,
+    Enter = Constants.MISSION.ENTER,
+    Capture = Constants.MISSION.CAPTURE,
+    Harvest = Constants.MISSION.HARVEST,
+    ["Guard Area"] = Constants.MISSION.GUARD_AREA,
+    Area_Guard = Constants.MISSION.GUARD_AREA,
+    Return = Constants.MISSION.RETURN,
+    Stop = Constants.MISSION.STOP,
+    Ambush = Constants.MISSION.AMBUSH,
+    Hunt = Constants.MISSION.HUNT,
+    ["Timed Hunt"] = Constants.MISSION.TIMED_HUNT,
+    Unload = Constants.MISSION.UNLOAD,
+    Sabotage = Constants.MISSION.SABOTAGE,
+    Construction = Constants.MISSION.CONSTRUCTION,
+    Repair = Constants.MISSION.REPAIR,
+    Rescue = Constants.MISSION.RESCUE
+}
+
 function ScenarioLoader.new(world, grid, production_system)
     local self = setmetatable({}, ScenarioLoader)
 
@@ -19,17 +44,22 @@ function ScenarioLoader.new(world, grid, production_system)
     -- Systems for scenario integration (set via set_systems)
     self.trigger_system = nil
     self.team_system = nil
+    self.ai_system = nil
 
     -- Current scenario data
     self.scenario = nil
+
+    -- Entities pending mission assignment (done after all spawning)
+    self.pending_missions = {}
 
     return self
 end
 
 -- Set trigger and team system references
-function ScenarioLoader:set_systems(trigger_system, team_system)
+function ScenarioLoader:set_systems(trigger_system, team_system, ai_system)
     self.trigger_system = trigger_system
     self.team_system = team_system
+    self.ai_system = ai_system
 end
 
 -- Load scenario from JSON file
@@ -349,15 +379,44 @@ function ScenarioLoader:load_scenario_data(data)
         end
     end
 
+    -- Clear pending missions
+    self.pending_missions = {}
+
     -- Create entities (these will also bind to triggers)
     self:create_structures(data.structures or {})
     self:create_units(data.units or {})
     self:create_infantry(data.infantry or {})
 
+    -- Apply initial missions to all spawned entities
+    self:apply_initial_missions()
+
     -- Store scenario info
     Events.emit("SCENARIO_LOADED", data)
 
     return data
+end
+
+-- Apply initial missions to entities after they're all spawned
+function ScenarioLoader:apply_initial_missions()
+    if not self.ai_system then
+        return
+    end
+
+    for _, pending in ipairs(self.pending_missions) do
+        local entity = pending.entity
+        local mission_str = pending.mission
+
+        -- Convert mission string to constant
+        local mission_const = self.MISSION_MAP[mission_str]
+        if mission_const then
+            self.ai_system:set_mission(entity, mission_const)
+        else
+            -- Default to GUARD if unknown mission
+            self.ai_system:set_mission(entity, Constants.MISSION.GUARD)
+        end
+    end
+
+    self.pending_missions = {}
 end
 
 -- Create structure entities
@@ -418,9 +477,12 @@ function ScenarioLoader:create_units(units)
                     transform.facing = u.facing
                 end
 
-                -- Set mission
-                if u.mission then
-                    entity.initial_mission = u.mission
+                -- Queue mission for later application (after all entities spawned)
+                if u.mission and u.mission ~= "None" then
+                    table.insert(self.pending_missions, {
+                        entity = entity,
+                        mission = u.mission
+                    })
                 end
 
                 -- Store trigger reference and bind to trigger system
@@ -477,9 +539,12 @@ function ScenarioLoader:create_infantry(infantry)
                     transform.facing = i.facing
                 end
 
-                -- Set mission
-                if i.mission then
-                    entity.initial_mission = i.mission
+                -- Queue mission for later application (after all entities spawned)
+                if i.mission and i.mission ~= "None" then
+                    table.insert(self.pending_missions, {
+                        entity = entity,
+                        mission = i.mission
+                    })
                 end
 
                 -- Store trigger reference and bind to trigger system
@@ -639,6 +704,23 @@ function ScenarioLoader:parse_json(str)
     end
 
     return parse_value()
+end
+
+-- Load scenario from file (auto-detect format)
+function ScenarioLoader:load_scenario(filepath)
+    if not filepath then
+        return nil, "No filepath provided"
+    end
+
+    -- Detect format by extension
+    if filepath:match("%.json$") then
+        return self:load_json(filepath)
+    elseif filepath:match("%.ini$") then
+        return self:load_ini(filepath)
+    else
+        -- Default to JSON
+        return self:load_json(filepath)
+    end
 end
 
 -- Get current scenario info

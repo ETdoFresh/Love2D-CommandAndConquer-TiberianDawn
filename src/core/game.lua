@@ -223,8 +223,8 @@ function Game:init()
     local TeamSystem = require("src.scenario.team")
     self.team_system = TeamSystem.new(self.world, self.ai_system)
 
-    -- Link trigger and team systems to scenario loader
-    self.scenario_loader:set_systems(self.trigger_system, self.team_system)
+    -- Link trigger, team, and AI systems to scenario loader
+    self.scenario_loader:set_systems(self.trigger_system, self.team_system, self.ai_system)
 
     -- Create special weapons system
     self.special_weapons = Systems.SpecialWeapons.new(self.world, self.combat_system)

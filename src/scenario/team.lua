@@ -3,6 +3,7 @@
     Handles team creation, missions, and behavior matching original C&C
 ]]
 
+local Constants = require("src.core.constants")
 local Events = require("src.core.events")
 
 local TeamSystem = {}
@@ -138,33 +139,53 @@ end
 function TeamSystem:recruit_units(team, team_type)
     local recruited = {}
 
+    -- Convert house string to constant if needed
+    local target_house = team_type.house
+    if type(target_house) == "string" then
+        if target_house == "BadGuy" or target_house == "BAD" then
+            target_house = Constants.HOUSE.BAD
+        elseif target_house == "GoodGuy" or target_house == "GOOD" then
+            target_house = Constants.HOUSE.GOOD
+        elseif target_house == "Neutral" then
+            target_house = Constants.HOUSE.NEUTRAL
+        end
+    end
+
     for _, requirement in ipairs(team_type.members) do
         local unit_type = requirement.type
         local count = requirement.count
 
-        -- Find available units of this type
-        local entities = self.world:get_entities_with_tag("unit")
+        -- Find available units of this type - try both infantry and vehicle tags
         local found = 0
 
-        for _, entity in ipairs(entities) do
+        -- Check vehicles first
+        local vehicles = self.world:get_entities_tagged("vehicle")
+        for _, entity in ipairs(vehicles) do
             if found >= count then break end
 
             local owner = entity:get("owner")
-            if owner and owner.house == team_type.house then
-                -- Check if unit is right type and not in a team
+            if owner and owner.house == target_house then
                 local vehicle = entity:get("vehicle")
-                local infantry = entity:get("infantry")
-
-                local entity_type = nil
-                if vehicle then
-                    entity_type = vehicle.vehicle_type
-                elseif infantry then
-                    entity_type = infantry.infantry_type
-                end
-
-                if entity_type == unit_type and not entity.team_id then
+                if vehicle and vehicle.vehicle_type == unit_type and not entity.team_id then
                     table.insert(recruited, entity)
                     found = found + 1
+                end
+            end
+        end
+
+        -- Then check infantry
+        if found < count then
+            local infantry = self.world:get_entities_tagged("infantry")
+            for _, entity in ipairs(infantry) do
+                if found >= count then break end
+
+                local owner = entity:get("owner")
+                if owner and owner.house == target_house then
+                    local inf = entity:get("infantry")
+                    if inf and inf.infantry_type == unit_type and not entity.team_id then
+                        table.insert(recruited, entity)
+                        found = found + 1
+                    end
                 end
             end
         end
@@ -192,31 +213,36 @@ function TeamSystem:assign_team_mission(team)
         if mission == TeamSystem.MISSION.ATTACK_BASE then
             -- Find enemy base and attack
             if self.ai_system then
-                self.ai_system:set_mission(entity, "ATTACK")
+                self.ai_system:set_mission(entity, Constants.MISSION.ATTACK)
             end
 
         elseif mission == TeamSystem.MISSION.ATTACK_UNITS then
             if self.ai_system then
-                self.ai_system:set_mission(entity, "HUNT")
+                self.ai_system:set_mission(entity, Constants.MISSION.HUNT)
             end
 
         elseif mission == TeamSystem.MISSION.MOVE then
             -- Move to first waypoint
             local waypoint = team.waypoints[1]
             if waypoint and self.ai_system then
-                self.ai_system:set_mission(entity, "MOVE")
+                self.ai_system:set_mission(entity, Constants.MISSION.MOVE)
                 entity.target_x = waypoint.x
                 entity.target_y = waypoint.y
             end
 
         elseif mission == TeamSystem.MISSION.GUARD then
             if self.ai_system then
-                self.ai_system:set_mission(entity, "GUARD")
+                self.ai_system:set_mission(entity, Constants.MISSION.GUARD)
             end
 
         elseif mission == TeamSystem.MISSION.DEFEND_BASE then
             if self.ai_system then
-                self.ai_system:set_mission(entity, "AREA_GUARD")
+                self.ai_system:set_mission(entity, Constants.MISSION.GUARD_AREA)
+            end
+
+        elseif mission == TeamSystem.MISSION.RAMPAGE then
+            if self.ai_system then
+                self.ai_system:set_mission(entity, Constants.MISSION.HUNT)
             end
         end
     end
@@ -296,7 +322,7 @@ function TeamSystem:update_waypoint_movement(team)
         if next_wp then
             for _, entity in ipairs(team.members) do
                 if self.ai_system then
-                    self.ai_system:set_mission(entity, "MOVE")
+                    self.ai_system:set_mission(entity, Constants.MISSION.MOVE)
                     entity.target_x = next_wp.x
                     entity.target_y = next_wp.y
                 end
@@ -334,13 +360,19 @@ end
 
 -- Send all units of a house to hunt mode
 function TeamSystem:all_to_hunt(house)
-    local entities = self.world:get_entities_with_tag("unit")
+    -- Get all combat units (vehicles and infantry)
+    local vehicles = self.world:get_entities_tagged("vehicle")
+    local infantry = self.world:get_entities_tagged("infantry")
 
-    for _, entity in ipairs(entities) do
+    local all_units = {}
+    for _, e in ipairs(vehicles) do table.insert(all_units, e) end
+    for _, e in ipairs(infantry) do table.insert(all_units, e) end
+
+    for _, entity in ipairs(all_units) do
         local owner = entity:get("owner")
         if owner and owner.house == house then
             if self.ai_system then
-                self.ai_system:set_mission(entity, "HUNT")
+                self.ai_system:set_mission(entity, Constants.MISSION.HUNT)
             end
         end
     end
