@@ -402,17 +402,61 @@ function Sidebar:draw_button(x, y, w, h, item)
     -- Can afford?
     local can_afford = self.credits >= item.cost
 
+    -- Check if this item is currently being built
+    local is_building = false
+    local progress = 0
+    local is_ready = false
+
+    if self.active_tab == Sidebar.TAB.BUILDINGS then
+        if self.building_in_production == item.name then
+            is_building = true
+            progress = self.building_progress
+            is_ready = self.building_ready
+        end
+    else
+        if self.unit_in_production == item.name then
+            is_building = true
+            progress = self.unit_progress
+            is_ready = self.unit_ready
+        end
+    end
+
     -- Background
-    if can_afford then
+    if is_ready then
+        -- Ready to place - flash green
+        local flash = (math.floor(love.timer.getTime() * 4) % 2 == 0)
+        if flash then
+            love.graphics.setColor(0.2, 0.5, 0.2, 1)
+        else
+            love.graphics.setColor(0.3, 0.7, 0.3, 1)
+        end
+    elseif is_building then
+        love.graphics.setColor(0.2, 0.3, 0.4, 1)  -- Building - blue tint
+    elseif can_afford then
         love.graphics.setColor(0.25, 0.25, 0.3, 1)
     else
         love.graphics.setColor(0.2, 0.15, 0.15, 1)
     end
     love.graphics.rectangle("fill", x, y, w, h)
 
+    -- Progress bar overlay if building
+    if is_building and not is_ready then
+        -- Draw progress bar across the button
+        local progress_height = h * (progress / 100)
+        love.graphics.setColor(0.2, 0.5, 0.8, 0.5)
+        love.graphics.rectangle("fill", x, y + h - progress_height, w, progress_height)
+
+        -- Clock/percentage overlay
+        love.graphics.setColor(1, 1, 1, 0.9)
+        love.graphics.printf(math.floor(progress) .. "%", x, y + h/2 - 6, w, "center")
+    end
+
     -- Border
     if self.selected_item == item.name then
         love.graphics.setColor(0, 1, 0, 1)
+        love.graphics.setLineWidth(2)
+    elseif is_building then
+        love.graphics.setColor(0.4, 0.7, 1, 1)  -- Blue border when building
         love.graphics.setLineWidth(2)
     else
         love.graphics.setColor(0.4, 0.4, 0.4, 1)
@@ -421,17 +465,29 @@ function Sidebar:draw_button(x, y, w, h, item)
     love.graphics.rectangle("line", x, y, w, h)
     love.graphics.setLineWidth(1)
 
-    -- Icon/name
-    if can_afford then
-        love.graphics.setColor(1, 1, 1, 1)
+    -- Icon/name (don't show if building progress is displayed)
+    if not is_building or is_ready then
+        if can_afford then
+            love.graphics.setColor(1, 1, 1, 1)
+        else
+            love.graphics.setColor(0.5, 0.5, 0.5, 1)
+        end
+        love.graphics.printf(item.name, x, y + 4, w, "center")
     else
-        love.graphics.setColor(0.5, 0.5, 0.5, 1)
+        -- Show name at top when building
+        love.graphics.setColor(0.8, 0.8, 0.8, 1)
+        love.graphics.printf(item.name, x, y + 2, w, "center")
     end
-    love.graphics.printf(item.name, x, y + 4, w, "center")
 
-    -- Cost
-    love.graphics.setColor(1, 0.9, 0, can_afford and 1 or 0.5)
-    love.graphics.printf("$" .. item.cost, x, y + h - 12, w, "center")
+    -- Cost (only if not building)
+    if not is_building then
+        love.graphics.setColor(1, 0.9, 0, can_afford and 1 or 0.5)
+        love.graphics.printf("$" .. item.cost, x, y + h - 12, w, "center")
+    elseif is_ready then
+        -- Show "READY" when complete
+        love.graphics.setColor(0.2, 1, 0.2, 1)
+        love.graphics.printf("READY", x, y + h/2 - 6, w, "center")
+    end
 end
 
 function Sidebar:mousepressed(mx, my, button)

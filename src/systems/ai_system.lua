@@ -369,6 +369,130 @@ AISystem.mission_handlers[Constants.MISSION.ENTER] = function(self, entity, miss
     end
 end
 
+-- RETREAT: Run away from enemies
+AISystem.mission_handlers[Constants.MISSION.RETREAT] = function(self, entity, mission)
+    if not entity:has("mobile") or not self.movement_system then
+        return
+    end
+
+    local transform = entity:get("transform")
+    local owner = entity:get("owner")
+
+    -- Find nearest enemy
+    local enemies = self.world:get_entities_with("combat", "transform", "owner")
+    local closest_enemy = nil
+    local closest_dist = math.huge
+
+    for _, enemy in ipairs(enemies) do
+        if enemy:is_alive() then
+            local enemy_owner = enemy:get("owner")
+            if enemy_owner.house ~= owner.house then
+                local enemy_transform = enemy:get("transform")
+                local dx = enemy_transform.x - transform.x
+                local dy = enemy_transform.y - transform.y
+                local dist = dx * dx + dy * dy
+
+                if dist < closest_dist then
+                    closest_dist = dist
+                    closest_enemy = enemy
+                end
+            end
+        end
+    end
+
+    if closest_enemy then
+        -- Run away from enemy
+        local enemy_transform = closest_enemy:get("transform")
+        local dx = transform.x - enemy_transform.x
+        local dy = transform.y - enemy_transform.y
+        local dist = math.sqrt(dx * dx + dy * dy)
+
+        if dist > 0 then
+            -- Normalize and run 5 cells away
+            dx = dx / dist * 5 * Constants.LEPTON_PER_CELL
+            dy = dy / dist * 5 * Constants.LEPTON_PER_CELL
+            self.movement_system:move_to(entity, transform.x + dx, transform.y + dy)
+        end
+    else
+        -- No enemies nearby, switch to guard
+        self:set_mission(entity, Constants.MISSION.GUARD)
+    end
+end
+
+-- AMBUSH: Wait in hiding until enemy comes near
+AISystem.mission_handlers[Constants.MISSION.AMBUSH] = function(self, entity, mission)
+    if not entity:has("combat") then
+        return
+    end
+
+    local combat = entity:get("combat")
+    local transform = entity:get("transform")
+
+    -- Look for enemies in close range (closer than normal sight)
+    if self.combat_system then
+        local target = self.combat_system:find_target(entity)
+        if target then
+            local target_transform = target:get("transform")
+            local dist = self.combat_system:calculate_distance(transform, target_transform)
+
+            -- Only reveal if very close
+            if dist <= combat.attack_range * 0.75 then
+                combat.target = target.id
+                self:set_mission(entity, Constants.MISSION.ATTACK, target)
+            end
+        end
+    end
+end
+
+-- UNLOAD: Unload passengers from transport
+AISystem.mission_handlers[Constants.MISSION.UNLOAD] = function(self, entity, mission)
+    if not entity:has("cargo") then
+        self:set_mission(entity, Constants.MISSION.GUARD)
+        return
+    end
+
+    local cargo = entity:get("cargo")
+    local transform = entity:get("transform")
+
+    -- Unload one passenger at a time
+    if #cargo.passengers > 0 then
+        if cargo.unload_timer > 0 then
+            cargo.unload_timer = cargo.unload_timer - 1
+        else
+            -- Pop a passenger and place them near the transport
+            local passenger_id = table.remove(cargo.passengers, 1)
+            local passenger = self.world:get_entity(passenger_id)
+
+            if passenger and passenger:is_alive() then
+                local passenger_transform = passenger:get("transform")
+
+                -- Place passenger next to transport
+                local offset_x = (math.random() - 0.5) * Constants.LEPTON_PER_CELL
+                local offset_y = (math.random() - 0.5) * Constants.LEPTON_PER_CELL
+                passenger_transform.x = transform.x + offset_x
+                passenger_transform.y = transform.y + offset_y
+                passenger_transform.cell_x = math.floor(passenger_transform.x / Constants.LEPTON_PER_CELL)
+                passenger_transform.cell_y = math.floor(passenger_transform.y / Constants.LEPTON_PER_CELL)
+
+                -- Make passenger visible again
+                if passenger:has("renderable") then
+                    passenger:get("renderable").visible = true
+                end
+
+                -- Set passenger to guard
+                self:set_mission(passenger, Constants.MISSION.GUARD)
+
+                self:emit(Events.EVENTS.UNIT_UNLOADED, entity, passenger)
+            end
+
+            cargo.unload_timer = 15  -- Delay before next unload
+        end
+    else
+        -- All passengers unloaded
+        self:set_mission(entity, Constants.MISSION.GUARD)
+    end
+end
+
 -- CAPTURE: Capture an enemy building
 AISystem.mission_handlers[Constants.MISSION.CAPTURE] = function(self, entity, mission)
     if not entity:has("infantry") then

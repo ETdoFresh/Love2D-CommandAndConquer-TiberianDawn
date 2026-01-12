@@ -23,6 +23,24 @@ function AnimationSystem:update(dt, entities)
     for _, entity in ipairs(entities) do
         self:update_entity(entity)
     end
+
+    -- Clean up expired effects
+    self:cleanup_effects()
+end
+
+-- Clean up death effects and other temporary animations
+function AnimationSystem:cleanup_effects()
+    local effects = self.world:get_entities_with_tag("death_effect")
+
+    for _, effect in ipairs(effects) do
+        if effect.effect_lifetime then
+            effect.effect_timer = (effect.effect_timer or 0) + 1
+
+            if effect.effect_timer >= effect.effect_lifetime then
+                self.world:destroy_entity(effect)
+            end
+        end
+    end
 end
 
 function AnimationSystem:update_entity(entity)

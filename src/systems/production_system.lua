@@ -11,6 +11,14 @@ local Component = require("src.ecs.component")
 local ProductionSystem = setmetatable({}, {__index = System})
 ProductionSystem.__index = ProductionSystem
 
+-- Unit limits from original C&C (DEFINES.H)
+-- UNIT_MAX = 500, EACH_UNIT_MAX = 500/4 = 125
+-- BUILDING_MAX = 500, EACH_BUILDING_MAX = 500/4 = 125
+ProductionSystem.DEFAULT_MAX_UNITS = 125
+ProductionSystem.DEFAULT_MAX_BUILDINGS = 125
+ProductionSystem.DEFAULT_MAX_INFANTRY = 125  -- From RA AI extension
+ProductionSystem.DEFAULT_MAX_AIRCRAFT = 100
+
 function ProductionSystem.new()
     local self = System.new("production", {"production"})
     setmetatable(self, ProductionSystem)
@@ -244,7 +252,8 @@ function ProductionSystem:create_unit(unit_type, house, x, y)
     if data.type == "infantry" then
         entity:add("infantry", Component.create("infantry", {
             infantry_type = unit_type,
-            can_capture = data.can_capture or false
+            can_capture = data.can_capture or false,
+            immune_tiberium = data.immune_tiberium or false
         }))
         entity:add_tag("infantry")
     elseif data.type == "vehicle" then
@@ -381,6 +390,62 @@ function ProductionSystem:create_building(building_type, house, cell_x, cell_y)
     return entity
 end
 
+-- Count entities of a specific type owned by a house
+function ProductionSystem:count_units(house, unit_type_filter)
+    local count = 0
+    local entities = self.world:get_entities_with("owner")
+
+    for _, entity in ipairs(entities) do
+        if entity:is_alive() then
+            local owner = entity:get("owner")
+            if owner.house == house then
+                -- Count based on filter
+                if unit_type_filter == "infantry" and entity:has("infantry") then
+                    count = count + 1
+                elseif unit_type_filter == "vehicle" and entity:has("vehicle") then
+                    count = count + 1
+                elseif unit_type_filter == "aircraft" and entity:has("aircraft") then
+                    count = count + 1
+                elseif unit_type_filter == "unit" and entity:has_tag("unit") then
+                    count = count + 1
+                elseif unit_type_filter == "building" and entity:has("building") then
+                    count = count + 1
+                end
+            end
+        end
+    end
+
+    return count
+end
+
+-- Check if house is at unit limit for a specific type
+function ProductionSystem:is_at_unit_limit(house, unit_type)
+    local count = self:count_units(house, unit_type)
+    local limit
+
+    if unit_type == "infantry" then
+        limit = self.max_infantry or ProductionSystem.DEFAULT_MAX_INFANTRY
+    elseif unit_type == "vehicle" then
+        limit = self.max_units or ProductionSystem.DEFAULT_MAX_UNITS
+    elseif unit_type == "aircraft" then
+        limit = self.max_aircraft or ProductionSystem.DEFAULT_MAX_AIRCRAFT
+    elseif unit_type == "building" then
+        limit = self.max_buildings or ProductionSystem.DEFAULT_MAX_BUILDINGS
+    else
+        limit = self.max_units or ProductionSystem.DEFAULT_MAX_UNITS
+    end
+
+    return count >= limit, count, limit
+end
+
+-- Set unit limits (can be overridden by scenario settings)
+function ProductionSystem:set_unit_limits(max_units, max_buildings, max_infantry, max_aircraft)
+    self.max_units = max_units or ProductionSystem.DEFAULT_MAX_UNITS
+    self.max_buildings = max_buildings or ProductionSystem.DEFAULT_MAX_BUILDINGS
+    self.max_infantry = max_infantry or ProductionSystem.DEFAULT_MAX_INFANTRY
+    self.max_aircraft = max_aircraft or ProductionSystem.DEFAULT_MAX_AIRCRAFT
+end
+
 -- Queue a unit for production
 function ProductionSystem:queue_unit(factory, unit_type)
     if not factory:has("production") then
@@ -398,6 +463,12 @@ function ProductionSystem:queue_unit(factory, unit_type)
     -- Check if this factory can build this unit type
     if data.type ~= production.factory_type then
         return false, "Wrong factory type"
+    end
+
+    -- Check unit limits
+    local at_limit, count, limit = self:is_at_unit_limit(factory_owner.house, data.type)
+    if at_limit then
+        return false, string.format("Unit limit reached (%d/%d)", count, limit)
     end
 
     -- Check if house can build it
@@ -491,6 +562,12 @@ function ProductionSystem:queue_building(construction_yard, building_type)
     local data = self.building_data[building_type]
     if not data then
         return false, "Unknown building type"
+    end
+
+    -- Check building limits
+    local at_limit, count, limit = self:is_at_unit_limit(owner.house, "building")
+    if at_limit then
+        return false, string.format("Building limit reached (%d/%d)", count, limit)
     end
 
     -- Check if house can build it

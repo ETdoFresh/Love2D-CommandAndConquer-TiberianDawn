@@ -22,6 +22,10 @@ HarvestSystem.TIBERIUM_MAX_LEVEL = 11         -- Max overlay data level (0-11 = 
 HarvestSystem.TIBERIUM_SPREAD_THRESHOLD = 6   -- Min level to spread (high-value tiberium)
 HarvestSystem.TIBERIUM_OVERLAY_BASE = 6       -- OVERLAY_TIBERIUM1 in DEFINES.H
 
+-- Tiberium damage constants (from original INFANTRY.CPP Per_Cell_Process)
+HarvestSystem.TIBERIUM_DAMAGE = 2           -- Damage per cell when standing on Tiberium
+HarvestSystem.TIBERIUM_DAMAGE_INTERVAL = 15 -- Ticks between damage (~1 second at 15 FPS)
+
 function HarvestSystem.new(grid)
     local self = System.new("harvest", {"harvester"})
     setmetatable(self, HarvestSystem)
@@ -44,6 +48,9 @@ function HarvestSystem.new(grid)
     self.growth_timer = 0
     self.spread_timer = 0
     self.tiberium_enabled = true  -- Can be disabled in scenario settings
+
+    -- Tiberium damage tracking
+    self.tiberium_damage_timer = 0
 
     return self
 end
@@ -95,6 +102,7 @@ function HarvestSystem:update(dt, entities)
     if self.tiberium_enabled then
         self:update_tiberium_growth()
         self:update_tiberium_spread()
+        self:update_tiberium_damage()
     end
 end
 
@@ -213,6 +221,54 @@ function HarvestSystem:try_spread_tiberium(source_cell)
     end
 
     return false
+end
+
+-- Damage infantry standing on Tiberium (from original INFANTRY.CPP Per_Cell_Process)
+-- Infantry takes 2 damage per tick when standing on Tiberium, except Chem Warriors (E5)
+function HarvestSystem:update_tiberium_damage()
+    self.tiberium_damage_timer = self.tiberium_damage_timer + 1
+
+    if self.tiberium_damage_timer < HarvestSystem.TIBERIUM_DAMAGE_INTERVAL then
+        return
+    end
+    self.tiberium_damage_timer = 0
+
+    if not self.world or not self.grid then return end
+
+    -- Get all infantry units
+    local infantry = self.world:get_entities_with("infantry", "transform", "health")
+
+    for _, entity in ipairs(infantry) do
+        if entity:is_alive() then
+            local infantry_data = entity:get("infantry")
+            local transform = entity:get("transform")
+            local health = entity:get("health")
+
+            -- Check if immune to Tiberium (Chem Warriors)
+            if infantry_data and infantry_data.immune_tiberium then
+                goto continue
+            end
+
+            -- Get cell at infantry position
+            local cell = self.grid:get_cell(transform.cell_x, transform.cell_y)
+            if cell and cell:has_tiberium() then
+                -- Apply Tiberium damage with WARHEAD_FIRE type
+                local damage = HarvestSystem.TIBERIUM_DAMAGE
+
+                -- Reduce health
+                health.hp = health.hp - damage
+
+                -- Check for death
+                if health.hp <= 0 then
+                    health.hp = 0
+                    -- Emit death event (combat system will handle destruction)
+                    Events.emit(Events.EVENTS.UNIT_KILLED, entity, nil, "tiberium")
+                end
+            end
+
+            ::continue::
+        end
+    end
 end
 
 function HarvestSystem:process_harvester(dt, entity)

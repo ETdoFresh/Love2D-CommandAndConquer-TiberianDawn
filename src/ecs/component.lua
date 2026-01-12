@@ -212,7 +212,8 @@ function Component.register_all()
         infantry_type = nil,    -- Infantry type name
         sub_position = 0,       -- Position within cell (0-4: center, NW, NE, SW, SE)
         prone = false,          -- Is prone
-        can_capture = false     -- Can capture buildings
+        can_capture = false,    -- Can capture buildings
+        immune_tiberium = false -- Immune to Tiberium damage (Chem Warriors)
     })
 
     -- Vehicle: Vehicle-specific properties

@@ -285,12 +285,90 @@ function CombatSystem:apply_damage(target, damage, warhead, attacker)
 end
 
 function CombatSystem:kill_unit(target, killer)
+    -- Spawn death/explosion effect based on unit type
+    self:spawn_death_effect(target)
+
     -- Emit kill event
     self:emit(Events.EVENTS.UNIT_KILLED, target, killer)
     self:emit(Events.EVENTS.ENTITY_KILLED, target, killer)
 
     -- Mark for destruction
     self.world:destroy_entity(target)
+end
+
+-- Spawn death/explosion animation at target's position
+function CombatSystem:spawn_death_effect(target)
+    if not target:has("transform") then
+        return
+    end
+
+    local transform = target:get("transform")
+    local effect_type = "explosion_small"  -- Default
+
+    -- Determine effect type based on what died
+    if target:has("infantry") then
+        effect_type = "infantry_death"
+    elseif target:has("vehicle") then
+        effect_type = "explosion_medium"
+    elseif target:has("aircraft") then
+        effect_type = "explosion_large"
+    elseif target:has("building") then
+        effect_type = "explosion_large"
+    end
+
+    -- Create effect entity
+    local Entity = require("src.ecs.entity")
+    local Component = require("src.ecs.component")
+
+    local effect = Entity.new()
+
+    -- Transform at death location
+    effect:add("transform", Component.create("transform", {
+        x = transform.x,
+        y = transform.y,
+        cell_x = transform.cell_x,
+        cell_y = transform.cell_y
+    }))
+
+    -- Renderable
+    effect:add("renderable", Component.create("renderable", {
+        visible = true,
+        layer = Constants.LAYER.TOP or 3,  -- Render on top
+        sprite = effect_type .. ".shp",
+        color = {1, 1, 1, 1}
+    }))
+
+    -- Animation component for death animation
+    effect:add("animation", Component.create("animation", {
+        current = "play",
+        frame = 0,
+        timer = 0,
+        looping = false,
+        playing = true
+    }))
+
+    -- Tag for cleanup
+    effect:add_tag("effect")
+    effect:add_tag("death_effect")
+
+    -- Set effect lifetime (will be cleaned up by animation system when done)
+    effect.effect_lifetime = self:get_effect_duration(effect_type)
+    effect.effect_timer = 0
+
+    self.world:add_entity(effect)
+
+    return effect
+end
+
+-- Get effect duration in ticks based on effect type
+function CombatSystem:get_effect_duration(effect_type)
+    local durations = {
+        infantry_death = 15,    -- 1 second at 15 FPS
+        explosion_small = 10,
+        explosion_medium = 15,
+        explosion_large = 20
+    }
+    return durations[effect_type] or 15
 end
 
 -- Set target for an entity
