@@ -120,6 +120,15 @@ function TriggerSystem.new(world, game)
     -- Object triggers (entity id -> trigger name)
     self.object_triggers = {}
 
+    -- Zone triggers (waypoint zones for ZONE_ENTRY)
+    self.zone_triggers = {}  -- zone_id -> {trigger_name, cells = {}}
+
+    -- Line crossing triggers for CROSSES_HORIZONTAL/VERTICAL
+    self.line_triggers = {}  -- {x1, y1, x2, y2, trigger_name, horizontal}
+
+    -- Track unit positions for line crossing detection
+    self.unit_last_positions = {}  -- entity_id -> {x, y}
+
     -- Mission timer
     self.mission_timer = 0
     self.mission_timer_running = false
@@ -450,10 +459,150 @@ function TriggerSystem:check_periodic_events()
                 if stats and stats.power_drain > stats.power_output then
                     should_fire = true
                 end
+
+            elseif trigger.event == TriggerSystem.EVENT.NOFACTORY then
+                -- Check if house has no production buildings (WEAP, HAND, PYLE, AFLD)
+                local stats = self.house_stats[trigger.house]
+                if stats then
+                    local has_factory = false
+                    local factory_types = {"WEAP", "HAND", "PYLE", "AFLD", "HPAD"}
+                    for _, ftype in ipairs(factory_types) do
+                        if (stats.building_type_counts[ftype] or 0) > 0 then
+                            has_factory = true
+                            break
+                        end
+                    end
+                    if not has_factory then
+                        should_fire = true
+                    end
+                end
+
+            elseif trigger.event == TriggerSystem.EVENT.BUILDING_EXISTS then
+                -- Check if specific building type exists (param is building type string)
+                local stats = self.house_stats[trigger.house]
+                if stats then
+                    local btype = trigger.event_param_str or trigger.event_param
+                    if type(btype) == "string" then
+                        if (stats.building_type_counts[btype] or 0) > 0 then
+                            should_fire = true
+                        end
+                    end
+                end
             end
 
             if should_fire then
                 self:fire_trigger(trigger)
+            end
+        end
+    end
+
+    -- Check line crossing triggers
+    self:check_line_crossings()
+end
+
+-- Check if any units crossed trigger lines this frame
+function TriggerSystem:check_line_crossings()
+    if not self.world then return end
+
+    local units = self.world:get_entities_with("transform", "mobile", "owner")
+
+    for _, entity in ipairs(units) do
+        if entity:is_alive() then
+            local transform = entity:get("transform")
+            local cell_x = math.floor(transform.x / Constants.LEPTON_PER_CELL)
+            local cell_y = math.floor(transform.y / Constants.LEPTON_PER_CELL)
+
+            local last_pos = self.unit_last_positions[entity.id]
+            if last_pos then
+                -- Check each line trigger
+                for _, line in ipairs(self.line_triggers) do
+                    local crossed = false
+
+                    if line.horizontal then
+                        -- Horizontal line at y = line.y1, from x = line.x1 to line.x2
+                        -- Check if unit crossed from above/below
+                        if cell_x >= line.x1 and cell_x <= line.x2 then
+                            if (last_pos.y < line.y1 and cell_y >= line.y1) or
+                               (last_pos.y > line.y1 and cell_y <= line.y1) then
+                                crossed = true
+                            end
+                        end
+                    else
+                        -- Vertical line at x = line.x1, from y = line.y1 to line.y2
+                        -- Check if unit crossed from left/right
+                        if cell_y >= line.y1 and cell_y <= line.y2 then
+                            if (last_pos.x < line.x1 and cell_x >= line.x1) or
+                               (last_pos.x > line.x1 and cell_x <= line.x1) then
+                                crossed = true
+                            end
+                        end
+                    end
+
+                    if crossed then
+                        local trigger = self.triggers[line.trigger_name]
+                        if trigger and trigger.enabled and not trigger.fired then
+                            local owner = entity:get("owner")
+                            -- Only fire for enemy crossings (or specified house)
+                            if trigger.house ~= owner.house then
+                                self:fire_trigger(trigger)
+                            end
+                        end
+                    end
+                end
+            end
+
+            -- Update last position
+            self.unit_last_positions[entity.id] = {x = cell_x, y = cell_y}
+        end
+    end
+end
+
+-- Add a line trigger for CROSSES_HORIZONTAL or CROSSES_VERTICAL
+function TriggerSystem:add_line_trigger(x1, y1, x2, y2, trigger_name, is_horizontal)
+    table.insert(self.line_triggers, {
+        x1 = math.min(x1, x2),
+        y1 = math.min(y1, y2),
+        x2 = math.max(x1, x2),
+        y2 = math.max(y1, y2),
+        trigger_name = trigger_name,
+        horizontal = is_horizontal
+    })
+end
+
+-- Add a zone trigger (rectangular area)
+function TriggerSystem:add_zone_trigger(zone_id, trigger_name, x1, y1, x2, y2)
+    local cells = {}
+    for y = math.min(y1, y2), math.max(y1, y2) do
+        for x = math.min(x1, x2), math.max(x1, x2) do
+            cells[x .. "," .. y] = true
+        end
+    end
+
+    self.zone_triggers[zone_id] = {
+        trigger_name = trigger_name,
+        cells = cells,
+        x1 = math.min(x1, x2),
+        y1 = math.min(y1, y2),
+        x2 = math.max(x1, x2),
+        y2 = math.max(y1, y2)
+    }
+end
+
+-- Check if entity entered a zone
+function TriggerSystem:check_zone_entry(cell_x, cell_y, entity)
+    local key = cell_x .. "," .. cell_y
+
+    for zone_id, zone in pairs(self.zone_triggers) do
+        if zone.cells[key] then
+            local trigger = self.triggers[zone.trigger_name]
+            if trigger and trigger.enabled and not trigger.fired then
+                if trigger.event == TriggerSystem.EVENT.ZONE_ENTRY then
+                    local owner = entity:get("owner")
+                    -- Fire for enemy entry (or specified house match)
+                    if trigger.house ~= owner.house then
+                        self:fire_trigger(trigger)
+                    end
+                end
             end
         end
     end
@@ -522,16 +671,23 @@ function TriggerSystem:execute_action(trigger, action, param)
         Events.emit(Events.EVENTS.GAME_LOSE, trigger.house)
 
     elseif action == TriggerSystem.ACTION.CREATE_TEAM then
+        -- param is team type name
         Events.emit("CREATE_TEAM", param)
 
     elseif action == TriggerSystem.ACTION.DESTROY_TEAM then
+        -- param is team type name
         Events.emit("DESTROY_TEAM", param)
 
     elseif action == TriggerSystem.ACTION.ALL_TO_HUNT then
+        -- Set all units of this house to hunt mission
         Events.emit("ALL_TO_HUNT", trigger.house)
 
     elseif action == TriggerSystem.ACTION.REINFORCEMENT then
-        Events.emit("REINFORCEMENT", trigger.team, param)
+        -- Spawn reinforcement team at waypoint
+        -- trigger.team is team type name, param is waypoint name/number
+        local team_name = trigger.team or param
+        local waypoint = trigger.waypoint or (type(param) == "string" and param or nil)
+        Events.emit("REINFORCEMENT", team_name, waypoint)
 
     elseif action == TriggerSystem.ACTION.DROP_ZONE_FLARE then
         Events.emit("DROP_FLARE", param)
@@ -689,11 +845,12 @@ function TriggerSystem:on_building_built(entity, house)
     self:check_event(TriggerSystem.EVENT.BUILD_BUILDING_TYPE, house, 0)
 end
 
--- Check cell entry
+-- Check cell entry (called when unit moves to new cell)
 function TriggerSystem:on_cell_entered(cell_x, cell_y, entity)
     local key = cell_x .. "," .. cell_y
     local trigger_name = self.cell_triggers[key]
 
+    -- Check specific cell triggers (ENTERED_BY)
     if trigger_name then
         local trigger = self.triggers[trigger_name]
         if trigger and trigger.enabled and trigger.event == TriggerSystem.EVENT.ENTERED_BY then
@@ -706,6 +863,9 @@ function TriggerSystem:on_cell_entered(cell_x, cell_y, entity)
             end
         end
     end
+
+    -- Also check zone entry triggers
+    self:check_zone_entry(cell_x, cell_y, entity)
 end
 
 -- Update house statistics
@@ -729,6 +889,9 @@ function TriggerSystem:reset()
     self.triggers = {}
     self.cell_triggers = {}
     self.object_triggers = {}
+    self.zone_triggers = {}
+    self.line_triggers = {}
+    self.unit_last_positions = {}
     self.pending_actions = {}
     self.house_stats = {}
 

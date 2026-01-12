@@ -144,6 +144,10 @@ function CombatSystem:update(dt, entities)
 
     -- Update projectiles
     self:update_projectiles(dt)
+
+    -- Update visual effects
+    self:update_smoke_particles()
+    self:update_impact_effects()
 end
 
 function CombatSystem:process_entity(dt, entity)
@@ -341,6 +345,12 @@ function CombatSystem:update_projectiles(dt)
                     proj.x = proj.target_x
                     proj.y = proj.target_y
                     proj.alive = false
+
+                    -- Spawn impact effect at hit location
+                    local impact_x = proj.x / Constants.PIXEL_LEPTON_W
+                    local impact_y = proj.y / Constants.PIXEL_LEPTON_H
+                    local impact_type = self:get_impact_type(proj.warhead)
+                    self:spawn_impact_effect(impact_x, impact_y, impact_type)
 
                     -- Apply damage to target (unless already applied for instant weapons)
                     if not proj.damage_applied then
@@ -946,20 +956,56 @@ end
 
 -- Projectile visual definitions (from BULLET.CPP)
 CombatSystem.PROJECTILE_VISUALS = {
-    shell = {color = {1, 0.8, 0, 1}, size = 2, trail = false, shape = "circle"},
-    rocket = {color = {1, 0.5, 0, 1}, size = 3, trail = true, shape = "triangle"},
-    sam = {color = {1, 0.3, 0, 1}, size = 3, trail = true, shape = "triangle"},
-    mlrs_rocket = {color = {1, 0.4, 0, 1}, size = 4, trail = true, shape = "triangle"},
-    grenade = {color = {0.3, 0.3, 0.3, 1}, size = 3, trail = false, shape = "circle"},
-    flame = {color = {1, 0.5, 0, 0.8}, size = 4, trail = true, shape = "flame"},
-    napalm = {color = {1, 0.3, 0, 0.9}, size = 5, trail = true, shape = "flame"},
-    chem = {color = {0.2, 0.9, 0.2, 0.8}, size = 4, trail = true, shape = "spray"},
-    artillery = {color = {0.4, 0.4, 0.4, 1}, size = 3, trail = false, shape = "circle"},
-    laser = {color = {1, 0, 0, 1}, size = 2, trail = false, shape = "line"},
-    nuke = {color = {1, 1, 0, 1}, size = 6, trail = true, shape = "triangle"},
-    ion_beam = {color = {0.5, 0.5, 1, 1}, size = 8, trail = false, shape = "beam"},
-    default = {color = {1, 1, 0, 1}, size = 2, trail = false, shape = "circle"}
+    shell = {color = {1, 0.8, 0, 1}, size = 2, trail = false, shape = "circle", smoke = false},
+    rocket = {color = {1, 0.5, 0, 1}, size = 3, trail = true, shape = "triangle", smoke = true, smoke_color = {0.5, 0.5, 0.5, 0.6}},
+    sam = {color = {1, 0.3, 0, 1}, size = 3, trail = true, shape = "triangle", smoke = true, smoke_color = {0.6, 0.6, 0.6, 0.5}},
+    mlrs_rocket = {color = {1, 0.4, 0, 1}, size = 4, trail = true, shape = "triangle", smoke = true, smoke_color = {0.4, 0.4, 0.4, 0.7}},
+    grenade = {color = {0.3, 0.3, 0.3, 1}, size = 3, trail = false, shape = "circle", smoke = false, arc = true},
+    flame = {color = {1, 0.5, 0, 0.8}, size = 4, trail = true, shape = "flame", smoke = false},
+    napalm = {color = {1, 0.3, 0, 0.9}, size = 5, trail = true, shape = "flame", smoke = true, smoke_color = {0.2, 0.2, 0.2, 0.8}},
+    chem = {color = {0.2, 0.9, 0.2, 0.8}, size = 4, trail = true, shape = "spray", smoke = false},
+    artillery = {color = {0.4, 0.4, 0.4, 1}, size = 3, trail = false, shape = "circle", smoke = false, arc = true},
+    laser = {color = {1, 0, 0, 1}, size = 2, trail = false, shape = "line", smoke = false},
+    nuke = {color = {1, 1, 0, 1}, size = 6, trail = true, shape = "triangle", smoke = true, smoke_color = {0.3, 0.3, 0.3, 0.9}},
+    ion_beam = {color = {0.5, 0.5, 1, 1}, size = 8, trail = false, shape = "beam", smoke = false},
+    default = {color = {1, 1, 0, 1}, size = 2, trail = false, shape = "circle", smoke = false}
 }
+
+-- Smoke trail particles
+CombatSystem.smoke_particles = {}
+CombatSystem.MAX_SMOKE_PARTICLES = 200
+
+-- Impact effect types
+CombatSystem.IMPACT_EFFECTS = {
+    explosion = {radius = 12, duration = 8, color = {1, 0.6, 0, 1}},
+    fire = {radius = 10, duration = 12, color = {1, 0.3, 0, 0.8}},
+    smoke = {radius = 8, duration = 15, color = {0.4, 0.4, 0.4, 0.6}},
+    spark = {radius = 6, duration = 4, color = {1, 1, 0.5, 1}},
+    chem = {radius = 14, duration = 20, color = {0.2, 0.8, 0.2, 0.5}}
+}
+
+-- Active impact effects
+CombatSystem.impact_effects = {}
+
+-- Map warhead types to impact effects
+function CombatSystem:get_impact_type(warhead)
+    if not warhead then return "spark" end
+
+    local warhead_key = type(warhead) == "table" and warhead.name or tostring(warhead)
+    warhead_key = string.lower(warhead_key)
+
+    if warhead_key:find("fire") or warhead_key:find("flame") or warhead_key:find("napalm") then
+        return "fire"
+    elseif warhead_key:find("he") or warhead_key:find("ap") or warhead_key:find("arty") then
+        return "explosion"
+    elseif warhead_key:find("chem") then
+        return "chem"
+    elseif warhead_key:find("sa") then  -- Small arms
+        return "spark"
+    else
+        return "explosion"
+    end
+end
 
 -- Projectile speeds (leptons per tick) from BULLET.CPP
 CombatSystem.PROJECTILE_SPEEDS = {
@@ -976,6 +1022,134 @@ CombatSystem.PROJECTILE_SPEEDS = {
     default = 100
 }
 
+-- Add smoke particle at projectile position
+function CombatSystem:add_smoke_particle(x, y, color)
+    if #self.smoke_particles >= self.MAX_SMOKE_PARTICLES then
+        table.remove(self.smoke_particles, 1)
+    end
+
+    table.insert(self.smoke_particles, {
+        x = x,
+        y = y,
+        size = 2 + math.random() * 2,
+        alpha = color[4] or 0.6,
+        color = {color[1], color[2], color[3]},
+        lifetime = 15 + math.random(10),
+        timer = 0,
+        vx = (math.random() - 0.5) * 0.5,
+        vy = (math.random() - 0.5) * 0.5 - 0.3  -- Drift upward
+    })
+end
+
+-- Update smoke particles
+function CombatSystem:update_smoke_particles()
+    local i = 1
+    while i <= #self.smoke_particles do
+        local p = self.smoke_particles[i]
+        p.timer = p.timer + 1
+        p.x = p.x + p.vx
+        p.y = p.y + p.vy
+        p.size = p.size + 0.1  -- Expand
+        p.alpha = p.alpha * 0.95  -- Fade
+
+        if p.timer >= p.lifetime or p.alpha < 0.05 then
+            table.remove(self.smoke_particles, i)
+        else
+            i = i + 1
+        end
+    end
+end
+
+-- Spawn impact effect at location
+function CombatSystem:spawn_impact_effect(x, y, effect_type)
+    local effect_def = self.IMPACT_EFFECTS[effect_type] or self.IMPACT_EFFECTS.explosion
+
+    table.insert(self.impact_effects, {
+        x = x,
+        y = y,
+        radius = effect_def.radius,
+        max_radius = effect_def.radius,
+        duration = effect_def.duration,
+        timer = 0,
+        color = effect_def.color,
+        type = effect_type
+    })
+end
+
+-- Update impact effects
+function CombatSystem:update_impact_effects()
+    local i = 1
+    while i <= #self.impact_effects do
+        local e = self.impact_effects[i]
+        e.timer = e.timer + 1
+
+        if e.timer >= e.duration then
+            table.remove(self.impact_effects, i)
+        else
+            i = i + 1
+        end
+    end
+end
+
+-- Draw smoke particles
+function CombatSystem:draw_smoke_particles()
+    for _, p in ipairs(self.smoke_particles) do
+        love.graphics.setColor(p.color[1], p.color[2], p.color[3], p.alpha)
+        love.graphics.circle("fill", p.x, p.y, p.size)
+    end
+end
+
+-- Draw impact effects
+function CombatSystem:draw_impact_effects()
+    for _, e in ipairs(self.impact_effects) do
+        local progress = e.timer / e.duration
+        local alpha = e.color[4] * (1 - progress)
+        local radius = e.max_radius * (0.3 + progress * 0.7)
+
+        if e.type == "explosion" then
+            -- Expanding ring with fading center
+            love.graphics.setColor(e.color[1], e.color[2], e.color[3], alpha)
+            love.graphics.circle("fill", e.x, e.y, radius)
+            love.graphics.setColor(1, 1, 0.8, alpha * 0.5)
+            love.graphics.circle("fill", e.x, e.y, radius * 0.4)
+        elseif e.type == "fire" then
+            -- Flickering fire effect
+            local flicker = math.sin(e.timer * 3) * 0.3 + 0.7
+            love.graphics.setColor(1, 0.5 * flicker, 0, alpha)
+            love.graphics.circle("fill", e.x, e.y, radius)
+            love.graphics.setColor(1, 0.8, 0.2, alpha * 0.6)
+            love.graphics.circle("fill", e.x, e.y, radius * 0.5)
+        elseif e.type == "smoke" then
+            -- Rising smoke puff
+            local rise = progress * 5
+            love.graphics.setColor(e.color[1], e.color[2], e.color[3], alpha)
+            love.graphics.circle("fill", e.x, e.y - rise, radius * (1 + progress))
+        elseif e.type == "spark" then
+            -- Quick bright spark
+            love.graphics.setColor(1, 1, 1, alpha)
+            love.graphics.circle("fill", e.x, e.y, radius * (1 - progress))
+        elseif e.type == "chem" then
+            -- Spreading chemical cloud
+            love.graphics.setColor(e.color[1], e.color[2], e.color[3], alpha * 0.7)
+            love.graphics.circle("fill", e.x, e.y, radius * (1 + progress * 0.5))
+        end
+    end
+end
+
+-- Draw all combat effects (call this from render system)
+function CombatSystem:draw_effects(render_system)
+    -- Draw smoke particles first (behind projectiles)
+    self:draw_smoke_particles()
+
+    -- Draw projectiles
+    self:draw_projectiles(render_system)
+
+    -- Draw impact effects on top
+    self:draw_impact_effects()
+
+    love.graphics.setColor(1, 1, 1, 1)
+end
+
 -- Draw projectiles with proper visuals
 function CombatSystem:draw_projectiles(render_system)
     for _, proj in ipairs(self.projectiles) do
@@ -987,6 +1161,17 @@ function CombatSystem:draw_projectiles(render_system)
             -- Get visual style for this projectile type
             local proj_type = proj.weapon.projectile or "default"
             local visual = CombatSystem.PROJECTILE_VISUALS[proj_type] or CombatSystem.PROJECTILE_VISUALS.default
+
+            -- Add smoke particles for rockets/missiles
+            if visual.smoke and visual.smoke_color then
+                -- Add smoke every few frames
+                if not proj.smoke_timer then proj.smoke_timer = 0 end
+                proj.smoke_timer = proj.smoke_timer + 1
+                if proj.smoke_timer >= 2 then
+                    proj.smoke_timer = 0
+                    self:add_smoke_particle(px, py, visual.smoke_color)
+                end
+            end
 
             love.graphics.setColor(unpack(visual.color))
 
@@ -1005,9 +1190,21 @@ function CombatSystem:draw_projectiles(render_system)
                 end
             end
 
+            -- Handle arcing projectiles (grenades, artillery)
+            local draw_y = py
+            if visual.arc and proj.start_x and proj.start_y then
+                -- Calculate arc height based on distance traveled
+                local total_dist = math.sqrt((proj.target_x - proj.start_x)^2 + (proj.target_y - proj.start_y)^2)
+                local current_dist = math.sqrt((proj.x - proj.start_x)^2 + (proj.y - proj.start_y)^2)
+                local progress = total_dist > 0 and (current_dist / total_dist) or 0
+                -- Parabolic arc: highest at midpoint
+                local arc_height = 20 * math.sin(progress * math.pi)
+                draw_y = py - arc_height
+            end
+
             -- Draw projectile based on shape
             if visual.shape == "circle" then
-                love.graphics.circle("fill", px, py, visual.size)
+                love.graphics.circle("fill", px, draw_y, visual.size)
             elseif visual.shape == "triangle" then
                 -- Oriented towards target
                 local dx = proj.target_x - proj.x
@@ -1015,23 +1212,23 @@ function CombatSystem:draw_projectiles(render_system)
                 local angle = math.atan2(dy, dx)
                 local s = visual.size
                 love.graphics.polygon("fill",
-                    px + math.cos(angle) * s * 1.5, py + math.sin(angle) * s * 1.5,
-                    px + math.cos(angle + 2.5) * s, py + math.sin(angle + 2.5) * s,
-                    px + math.cos(angle - 2.5) * s, py + math.sin(angle - 2.5) * s
+                    px + math.cos(angle) * s * 1.5, draw_y + math.sin(angle) * s * 1.5,
+                    px + math.cos(angle + 2.5) * s, draw_y + math.sin(angle + 2.5) * s,
+                    px + math.cos(angle - 2.5) * s, draw_y + math.sin(angle - 2.5) * s
                 )
             elseif visual.shape == "flame" then
                 -- Animated flame effect
                 local flicker = math.sin(love.timer.getTime() * 20) * 0.5 + 0.5
                 love.graphics.setColor(1, 0.5 + flicker * 0.3, 0, 0.8)
-                love.graphics.circle("fill", px, py, visual.size + flicker * 2)
+                love.graphics.circle("fill", px, draw_y, visual.size + flicker * 2)
                 love.graphics.setColor(1, 0.8, 0.2, 0.6)
-                love.graphics.circle("fill", px, py, visual.size * 0.6)
+                love.graphics.circle("fill", px, draw_y, visual.size * 0.6)
             elseif visual.shape == "spray" then
                 -- Chemical spray effect
                 for i = 1, 3 do
                     local offset_x = (math.random() - 0.5) * 6
                     local offset_y = (math.random() - 0.5) * 6
-                    love.graphics.circle("fill", px + offset_x, py + offset_y, visual.size * 0.5)
+                    love.graphics.circle("fill", px + offset_x, draw_y + offset_y, visual.size * 0.5)
                 end
             elseif visual.shape == "line" then
                 -- Laser line from source
@@ -1041,16 +1238,16 @@ function CombatSystem:draw_projectiles(render_system)
                     local sx = st.x / Constants.PIXEL_LEPTON_W
                     local sy = st.y / Constants.PIXEL_LEPTON_H
                     love.graphics.setLineWidth(2)
-                    love.graphics.line(sx, sy, px, py)
+                    love.graphics.line(sx, sy, px, draw_y)
                     love.graphics.setLineWidth(1)
                 end
             elseif visual.shape == "beam" then
                 -- Ion cannon beam
                 love.graphics.setLineWidth(4)
-                love.graphics.line(px, 0, px, py)
+                love.graphics.line(px, 0, px, draw_y)
                 love.graphics.setLineWidth(1)
             else
-                love.graphics.circle("fill", px, py, visual.size)
+                love.graphics.circle("fill", px, draw_y, visual.size)
             end
         end
     end
