@@ -144,6 +144,31 @@ function TriggerSystem:register_events()
     Events.on(Events.EVENTS.BUILDING_BUILT, function(entity, house)
         self:on_building_built(entity, house)
     end)
+
+    -- Automated house statistics tracking
+    Events.on(Events.EVENTS.CREDITS_CHANGED, function(house, credits)
+        self:ensure_house_stats(house)
+        self.house_stats[house].credits = credits
+    end)
+
+    Events.on(Events.EVENTS.POWER_CHANGED, function(house, produced, consumed)
+        self:ensure_house_stats(house)
+        self.house_stats[house].power_output = produced
+        self.house_stats[house].power_drain = consumed
+    end)
+end
+
+-- Ensure house_stats entry exists for a house
+function TriggerSystem:ensure_house_stats(house)
+    if not self.house_stats[house] then
+        self.house_stats[house] = {
+            credits = 0,
+            units = 0,
+            buildings = 0,
+            power_output = 0,
+            power_drain = 0
+        }
+    end
 end
 
 -- Load triggers from scenario data
@@ -481,13 +506,14 @@ function TriggerSystem:on_entity_destroyed(entity, attacker)
     end
 
     -- Update house stats
-    if entity_house and self.house_stats[entity_house] then
+    if entity_house then
+        self:ensure_house_stats(entity_house)
         if entity:has_tag("building") then
             self.house_stats[entity_house].buildings =
-                self.house_stats[entity_house].buildings - 1
+                math.max(0, self.house_stats[entity_house].buildings - 1)
         elseif entity:has_tag("unit") then
             self.house_stats[entity_house].units =
-                self.house_stats[entity_house].units - 1
+                math.max(0, self.house_stats[entity_house].units - 1)
         end
     end
 
@@ -507,10 +533,18 @@ function TriggerSystem:on_entity_attacked(entity, attacker)
 end
 
 function TriggerSystem:on_unit_built(entity, house)
+    -- Update house stats
+    self:ensure_house_stats(house)
+    self.house_stats[house].units = self.house_stats[house].units + 1
+
     self:check_event(TriggerSystem.EVENT.BUILD_UNIT_TYPE, house, 0)
 end
 
 function TriggerSystem:on_building_built(entity, house)
+    -- Update house stats
+    self:ensure_house_stats(house)
+    self.house_stats[house].buildings = self.house_stats[house].buildings + 1
+
     self:check_event(TriggerSystem.EVENT.BUILD_BUILDING_TYPE, house, 0)
 end
 

@@ -16,10 +16,20 @@ function ScenarioLoader.new(world, grid, production_system)
     self.grid = grid
     self.production_system = production_system
 
+    -- Systems for scenario integration (set via set_systems)
+    self.trigger_system = nil
+    self.team_system = nil
+
     -- Current scenario data
     self.scenario = nil
 
     return self
+end
+
+-- Set trigger and team system references
+function ScenarioLoader:set_systems(trigger_system, team_system)
+    self.trigger_system = trigger_system
+    self.team_system = team_system
 end
 
 -- Load scenario from JSON file
@@ -317,7 +327,29 @@ function ScenarioLoader:load_scenario_data(data)
         self.world:clear()
     end
 
-    -- Create entities
+    -- Reset and load trigger system
+    if self.trigger_system then
+        self.trigger_system:reset()
+        if data.triggers then
+            self.trigger_system:load_triggers(data.triggers)
+        end
+        -- Load cell triggers
+        if data.cell_triggers then
+            for _, ct in ipairs(data.cell_triggers) do
+                self.trigger_system:add_cell_trigger(ct.cell_x, ct.cell_y, ct.trigger)
+            end
+        end
+    end
+
+    -- Reset and load team system
+    if self.team_system then
+        self.team_system:reset()
+        if data.teams then
+            self.team_system:load_team_types(data.teams)
+        end
+    end
+
+    -- Create entities (these will also bind to triggers)
     self:create_structures(data.structures or {})
     self:create_units(data.units or {})
     self:create_infantry(data.infantry or {})
@@ -346,9 +378,12 @@ function ScenarioLoader:create_structures(structures)
                     health.hp = math.floor(health.max_hp * s.health / 256)
                 end
 
-                -- Store trigger reference
+                -- Store trigger reference and bind to trigger system
                 if s.trigger and s.trigger ~= "None" then
                     entity.trigger_name = s.trigger
+                    if self.trigger_system then
+                        self.trigger_system:attach_to_entity(entity.id, s.trigger)
+                    end
                 end
 
                 self.world:add_entity(entity)
@@ -388,9 +423,12 @@ function ScenarioLoader:create_units(units)
                     entity.initial_mission = u.mission
                 end
 
-                -- Store trigger reference
+                -- Store trigger reference and bind to trigger system
                 if u.trigger and u.trigger ~= "None" then
                     entity.trigger_name = u.trigger
+                    if self.trigger_system then
+                        self.trigger_system:attach_to_entity(entity.id, u.trigger)
+                    end
                 end
 
                 self.world:add_entity(entity)
@@ -444,9 +482,12 @@ function ScenarioLoader:create_infantry(infantry)
                     entity.initial_mission = i.mission
                 end
 
-                -- Store trigger reference
+                -- Store trigger reference and bind to trigger system
                 if i.trigger and i.trigger ~= "None" then
                     entity.trigger_name = i.trigger
+                    if self.trigger_system then
+                        self.trigger_system:attach_to_entity(entity.id, i.trigger)
+                    end
                 end
 
                 self.world:add_entity(entity)

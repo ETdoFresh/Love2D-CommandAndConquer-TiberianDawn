@@ -115,6 +115,9 @@ function Game.new()
     -- Trigger system (for scenarios)
     self.trigger_system = nil
 
+    -- Team system (for AI teams)
+    self.team_system = nil
+
     return self
 end
 
@@ -206,6 +209,13 @@ function Game:init()
     -- Create trigger system
     local TriggerSystem = require("src.scenario.trigger")
     self.trigger_system = TriggerSystem.new(self.world, self)
+
+    -- Create team system (for AI team coordination)
+    local TeamSystem = require("src.scenario.team")
+    self.team_system = TeamSystem.new(self.world, self.ai_system)
+
+    -- Link trigger and team systems to scenario loader
+    self.scenario_loader:set_systems(self.trigger_system, self.team_system)
 
     -- Create special weapons system
     self.special_weapons = Systems.SpecialWeapons.new(self.world, self.combat_system)
