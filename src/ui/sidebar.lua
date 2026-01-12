@@ -108,77 +108,77 @@ function Sidebar:refresh_items()
     self.building_items = {}
     self.unit_items = {}
 
-    if not self.production_system then
+    -- Use production system if available for data-driven items with prerequisites
+    if self.production_system then
+        self.building_items = self.production_system:get_buildable_items(self.house, "building")
+        self.unit_items = self.production_system:get_buildable_items(self.house, "unit")
         return
     end
 
-    -- Get available buildings
-    -- We need a construction yard to check
-    -- For now, use hardcoded list based on house
-
+    -- Fallback to hardcoded list if production system not available
     local house_name = self.house == Constants.HOUSE.GOOD and "GDI" or "NOD"
 
     -- Building items
     local buildings = {
-        {name = "NUKE", icon = "Power Plant", cost = 300},
-        {name = "NUK2", icon = "Advanced Power", cost = 700},
-        {name = "PROC", icon = "Refinery", cost = 2000},
-        {name = "SILO", icon = "Silo", cost = 150},
-        {name = "HQ", icon = "Comm Center", cost = 1000},
+        {name = "NUKE", icon = "Power Plant", cost = 300, available = true},
+        {name = "NUK2", icon = "Advanced Power", cost = 700, available = true},
+        {name = "PROC", icon = "Refinery", cost = 2000, available = true},
+        {name = "SILO", icon = "Silo", cost = 150, available = true},
+        {name = "HQ", icon = "Comm Center", cost = 1000, available = true},
     }
 
     if house_name == "GDI" then
-        table.insert(buildings, {name = "PYLE", icon = "Barracks", cost = 300})
-        table.insert(buildings, {name = "GTWR", icon = "Guard Tower", cost = 500})
-        table.insert(buildings, {name = "ATWR", icon = "Adv Guard Tower", cost = 1000})
-        table.insert(buildings, {name = "EYE", icon = "Adv Comm Center", cost = 2800})
+        table.insert(buildings, {name = "PYLE", icon = "Barracks", cost = 300, available = true})
+        table.insert(buildings, {name = "GTWR", icon = "Guard Tower", cost = 500, available = true})
+        table.insert(buildings, {name = "ATWR", icon = "Adv Guard Tower", cost = 1000, available = true})
+        table.insert(buildings, {name = "EYE", icon = "Adv Comm Center", cost = 2800, available = true})
     else
-        table.insert(buildings, {name = "HAND", icon = "Hand of Nod", cost = 300})
-        table.insert(buildings, {name = "GUN", icon = "Turret", cost = 600})
-        table.insert(buildings, {name = "SAM", icon = "SAM Site", cost = 750})
-        table.insert(buildings, {name = "OBLI", icon = "Obelisk", cost = 1500})
-        table.insert(buildings, {name = "TMPL", icon = "Temple of Nod", cost = 3000})
+        table.insert(buildings, {name = "HAND", icon = "Hand of Nod", cost = 300, available = true})
+        table.insert(buildings, {name = "GUN", icon = "Turret", cost = 600, available = true})
+        table.insert(buildings, {name = "SAM", icon = "SAM Site", cost = 750, available = true})
+        table.insert(buildings, {name = "OBLI", icon = "Obelisk", cost = 1500, available = true})
+        table.insert(buildings, {name = "TMPL", icon = "Temple of Nod", cost = 3000, available = true})
     end
 
-    table.insert(buildings, {name = "WEAP", icon = "Weapons Factory", cost = 2000})
-    table.insert(buildings, {name = "HPAD", icon = "Helipad", cost = 1500})
-    table.insert(buildings, {name = "FIX", icon = "Repair Pad", cost = 1200})
+    table.insert(buildings, {name = "WEAP", icon = "Weapons Factory", cost = 2000, available = true})
+    table.insert(buildings, {name = "HPAD", icon = "Helipad", cost = 1500, available = true})
+    table.insert(buildings, {name = "FIX", icon = "Repair Pad", cost = 1200, available = true})
 
     self.building_items = buildings
 
     -- Unit items
     local units = {
-        {name = "E1", icon = "Minigunner", cost = 100, type = "infantry"},
-        {name = "E3", icon = "Rocket Soldier", cost = 300, type = "infantry"},
-        {name = "E6", icon = "Engineer", cost = 500, type = "infantry"},
+        {name = "E1", icon = "Minigunner", cost = 100, type = "infantry", available = true},
+        {name = "E3", icon = "Rocket Soldier", cost = 300, type = "infantry", available = true},
+        {name = "E6", icon = "Engineer", cost = 500, type = "infantry", available = true},
     }
 
     if house_name == "GDI" then
-        table.insert(units, {name = "E2", icon = "Grenadier", cost = 160, type = "infantry"})
-        table.insert(units, {name = "RMBO", icon = "Commando", cost = 1000, type = "infantry"})
-        table.insert(units, {name = "JEEP", icon = "Humvee", cost = 400, type = "vehicle"})
-        table.insert(units, {name = "MTNK", icon = "Medium Tank", cost = 800, type = "vehicle"})
-        table.insert(units, {name = "HTNK", icon = "Mammoth Tank", cost = 1500, type = "vehicle"})
-        table.insert(units, {name = "MLRS", icon = "MLRS", cost = 800, type = "vehicle"})
-        table.insert(units, {name = "MSAM", icon = "Mobile SAM", cost = 750, type = "vehicle"})
-        table.insert(units, {name = "ORCA", icon = "Orca", cost = 1200, type = "aircraft"})
+        table.insert(units, {name = "E2", icon = "Grenadier", cost = 160, type = "infantry", available = true})
+        table.insert(units, {name = "RMBO", icon = "Commando", cost = 1000, type = "infantry", available = true})
+        table.insert(units, {name = "JEEP", icon = "Humvee", cost = 400, type = "vehicle", available = true})
+        table.insert(units, {name = "MTNK", icon = "Medium Tank", cost = 800, type = "vehicle", available = true})
+        table.insert(units, {name = "HTNK", icon = "Mammoth Tank", cost = 1500, type = "vehicle", available = true})
+        table.insert(units, {name = "MLRS", icon = "MLRS", cost = 800, type = "vehicle", available = true})
+        table.insert(units, {name = "MSAM", icon = "Mobile SAM", cost = 750, type = "vehicle", available = true})
+        table.insert(units, {name = "ORCA", icon = "Orca", cost = 1200, type = "aircraft", available = true})
     else
-        table.insert(units, {name = "E4", icon = "Flamethrower", cost = 200, type = "infantry"})
-        table.insert(units, {name = "E5", icon = "Chem Warrior", cost = 300, type = "infantry"})
-        table.insert(units, {name = "BGGY", icon = "Buggy", cost = 300, type = "vehicle"})
-        table.insert(units, {name = "BIKE", icon = "Recon Bike", cost = 500, type = "vehicle"})
-        table.insert(units, {name = "LTNK", icon = "Light Tank", cost = 600, type = "vehicle"})
-        table.insert(units, {name = "FTNK", icon = "Flame Tank", cost = 800, type = "vehicle"})
-        table.insert(units, {name = "STNK", icon = "Stealth Tank", cost = 900, type = "vehicle"})
-        table.insert(units, {name = "ARTY", icon = "Artillery", cost = 450, type = "vehicle"})
-        table.insert(units, {name = "HELI", icon = "Apache", cost = 1200, type = "aircraft"})
+        table.insert(units, {name = "E4", icon = "Flamethrower", cost = 200, type = "infantry", available = true})
+        table.insert(units, {name = "E5", icon = "Chem Warrior", cost = 300, type = "infantry", available = true})
+        table.insert(units, {name = "BGGY", icon = "Buggy", cost = 300, type = "vehicle", available = true})
+        table.insert(units, {name = "BIKE", icon = "Recon Bike", cost = 500, type = "vehicle", available = true})
+        table.insert(units, {name = "LTNK", icon = "Light Tank", cost = 600, type = "vehicle", available = true})
+        table.insert(units, {name = "FTNK", icon = "Flame Tank", cost = 800, type = "vehicle", available = true})
+        table.insert(units, {name = "STNK", icon = "Stealth Tank", cost = 900, type = "vehicle", available = true})
+        table.insert(units, {name = "ARTY", icon = "Artillery", cost = 450, type = "vehicle", available = true})
+        table.insert(units, {name = "HELI", icon = "Apache", cost = 1200, type = "aircraft", available = true})
     end
 
     -- Common units
-    table.insert(units, {name = "HARV", icon = "Harvester", cost = 1400, type = "vehicle"})
-    table.insert(units, {name = "MCV", icon = "MCV", cost = 5000, type = "vehicle"})
-    table.insert(units, {name = "APC", icon = "APC", cost = 700, type = "vehicle"})
-    table.insert(units, {name = "TRAN", icon = "Chinook", cost = 1500, type = "aircraft"})
+    table.insert(units, {name = "HARV", icon = "Harvester", cost = 1400, type = "vehicle", available = true})
+    table.insert(units, {name = "MCV", icon = "MCV", cost = 5000, type = "vehicle", available = true})
+    table.insert(units, {name = "APC", icon = "APC", cost = 700, type = "vehicle", available = true})
+    table.insert(units, {name = "TRAN", icon = "Chinook", cost = 1500, type = "aircraft", available = true})
 
     self.unit_items = units
 end
@@ -490,8 +490,14 @@ function Sidebar:draw_special_weapons(x, y)
 end
 
 function Sidebar:draw_button(x, y, w, h, item)
+    -- Check prerequisites (item.available is set by production system)
+    local has_prereqs = item.available ~= false  -- Default true if not set
+
     -- Can afford?
     local can_afford = self.credits >= item.cost
+
+    -- Can build? (need both prerequisites and money)
+    local can_build = has_prereqs and can_afford
 
     -- Check if this item is currently being built
     local is_building = false
@@ -523,6 +529,8 @@ function Sidebar:draw_button(x, y, w, h, item)
         end
     elseif is_building then
         love.graphics.setColor(0.2, 0.3, 0.4, 1)  -- Building - blue tint
+    elseif not has_prereqs then
+        love.graphics.setColor(0.15, 0.15, 0.15, 1)  -- Dark - no prereqs
     elseif can_afford then
         love.graphics.setColor(0.25, 0.25, 0.3, 1)
     else
@@ -558,7 +566,9 @@ function Sidebar:draw_button(x, y, w, h, item)
 
     -- Icon/name (don't show if building progress is displayed)
     if not is_building or is_ready then
-        if can_afford then
+        if not has_prereqs then
+            love.graphics.setColor(0.4, 0.4, 0.4, 1)  -- Greyed out - no prereqs
+        elseif can_afford then
             love.graphics.setColor(1, 1, 1, 1)
         else
             love.graphics.setColor(0.5, 0.5, 0.5, 1)
@@ -570,10 +580,16 @@ function Sidebar:draw_button(x, y, w, h, item)
         love.graphics.printf(item.name, x, y + 2, w, "center")
     end
 
-    -- Cost (only if not building)
+    -- Cost or status indicator
     if not is_building then
-        love.graphics.setColor(1, 0.9, 0, can_afford and 1 or 0.5)
-        love.graphics.printf("$" .. item.cost, x, y + h - 12, w, "center")
+        if not has_prereqs then
+            -- Show lock/requires indicator
+            love.graphics.setColor(0.6, 0.3, 0.3, 1)
+            love.graphics.printf("LOCKED", x, y + h - 12, w, "center")
+        else
+            love.graphics.setColor(1, 0.9, 0, can_afford and 1 or 0.5)
+            love.graphics.printf("$" .. item.cost, x, y + h - 12, w, "center")
+        end
     elseif is_ready then
         -- Show "READY" when complete
         love.graphics.setColor(0.2, 1, 0.2, 1)
@@ -648,7 +664,8 @@ function Sidebar:mousepressed(mx, my, button)
             if mx >= bx and mx < bx + button_w and
                my >= by and my < by + button_h then
                 -- Clicked on this item
-                if self.credits >= item.cost then
+                local has_prereqs = item.available ~= false
+                if has_prereqs and self.credits >= item.cost then
                     -- For buildings, select for placement
                     -- For units, trigger production callback immediately
                     if self.active_tab == Sidebar.TAB.BUILDINGS then
@@ -660,6 +677,12 @@ function Sidebar:mousepressed(mx, my, button)
                         else
                             self.selected_item = item.name
                         end
+                    end
+                    return true
+                elseif not has_prereqs then
+                    -- Show tooltip or message about missing prerequisites
+                    if item.prereq_reason then
+                        Events.emit("UI_MESSAGE", item.prereq_reason)
                     end
                     return true
                 end

@@ -769,6 +769,48 @@ function ProductionSystem:get_available_buildings(construction_yard)
     return available
 end
 
+-- Get all buildable items for a house with prerequisite status
+function ProductionSystem:get_buildable_items(house, item_type)
+    local house_name = house == Constants.HOUSE.GOOD and "GDI" or "NOD"
+    local items = {}
+
+    local data_source = item_type == "building" and self.building_data or self.unit_data
+    local is_unit = item_type ~= "building"
+
+    for name, data in pairs(data_source) do
+        -- Check house ownership
+        local can_own = false
+        if data.house then
+            for _, h in ipairs(data.house) do
+                if h == house_name then
+                    can_own = true
+                    break
+                end
+            end
+        else
+            can_own = true  -- No house restriction
+        end
+
+        if can_own then
+            local has_prereqs, prereq_reason = self:has_prerequisites(house, data.prerequisites, is_unit)
+            table.insert(items, {
+                name = name,
+                icon = data.name or name,
+                cost = data.cost or 0,
+                type = data.type or "unknown",
+                available = has_prereqs,
+                prereq_reason = prereq_reason,
+                data = data
+            })
+        end
+    end
+
+    -- Sort by cost
+    table.sort(items, function(a, b) return a.cost < b.cost end)
+
+    return items
+end
+
 -- Deploy a unit (MCV -> Construction Yard)
 -- Returns the building entity if successful, nil and error message if not
 function ProductionSystem:deploy_unit(unit, grid)
