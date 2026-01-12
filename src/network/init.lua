@@ -6,7 +6,8 @@ local Network = {
     Protocol = require("src.network.protocol"),
     Lockstep = require("src.network.lockstep"),
     Lobby = require("src.network.lobby"),
-    Spectator = require("src.network.spectator")
+    Spectator = require("src.network.spectator"),
+    Socket = require("src.network.socket")
 }
 
 return Network

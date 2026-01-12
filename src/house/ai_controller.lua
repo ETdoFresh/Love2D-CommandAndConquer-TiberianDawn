@@ -1,10 +1,11 @@
 --[[
     AI Controller - Computer player decision making
     Implements original C&C AI behavior patterns
-    Reference: HOUSE.CPP AI functions, MISSION.H
+    Reference: HOUSE.CPP AI functions, MISSION.H, TEAM.H
 ]]
 
 local Events = require("src.core.events")
+local Constants = require("src.core.constants")
 
 local AIController = {}
 AIController.__index = AIController
@@ -16,24 +17,99 @@ AIController.DIFFICULTY = {
     HARD = 3
 }
 
--- AI states
+-- AI states (based on original C&C)
 AIController.STATE = {
     BUILDING = "building",      -- Building up base
-    DEFENDING = "defending",    -- Under attack
-    ATTACKING = "attacking",    -- Launching attack
+    DEFENDING = "defending",    -- Under attack, rally defense
+    ATTACKING = "attacking",    -- Launching coordinated attack
     HARVESTING = "harvesting",  -- Focus on economy
-    RETREATING = "retreating"   -- Falling back
+    RETREATING = "retreating",  -- Falling back after defeat
+    REGROUPING = "regrouping"   -- Gathering forces for next attack
 }
 
--- Build priorities
-AIController.BUILD_PRIORITY = {
-    POWER = 1,
-    REFINERY = 2,
-    BARRACKS = 3,
-    FACTORY = 4,
-    DEFENSE = 5,
-    TECH = 6,
-    SUPERWEAPON = 7
+-- Build categories for prioritization
+AIController.BUILD_CATEGORY = {
+    POWER = "power",
+    ECONOMY = "economy",
+    INFANTRY = "infantry",
+    VEHICLE = "vehicle",
+    AIRCRAFT = "aircraft",
+    DEFENSE = "defense",
+    TECH = "tech",
+    SUPERWEAPON = "superweapon"
+}
+
+-- GDI building types
+AIController.GDI_BUILDINGS = {
+    power = {"NUKE", "NUK2"},
+    economy = {"PROC"},
+    infantry = {"PYLE"},
+    vehicle = {"WEAP"},
+    aircraft = {"AFLD"},
+    defense = {"GTWR", "GUN", "SAM"},
+    tech = {"HQ", "EYE", "FIX"},
+    superweapon = {"TMPL"}
+}
+
+-- Nod building types
+AIController.NOD_BUILDINGS = {
+    power = {"NUKE", "NUK2"},
+    economy = {"PROC"},
+    infantry = {"HAND"},
+    vehicle = {"WEAP"},
+    aircraft = {"AFLD"},
+    defense = {"ATWR", "GUN", "SAM", "OBLI"},
+    tech = {"HQ", "EYE", "FIX", "TMPL"},
+    superweapon = {"TMPL"}
+}
+
+-- GDI unit build priorities
+AIController.GDI_UNITS = {
+    infantry = {
+        {type = "E1", weight = 40},   -- Minigunner
+        {type = "E2", weight = 30},   -- Grenadier
+        {type = "E3", weight = 15},   -- Rocket soldier
+        {type = "E6", weight = 10},   -- Engineer
+        {type = "RMBO", weight = 5}   -- Commando
+    },
+    vehicle = {
+        {type = "HTNK", weight = 35}, -- Mammoth
+        {type = "MTNK", weight = 30}, -- Medium tank
+        {type = "MSAM", weight = 15}, -- Rocket launcher
+        {type = "APC", weight = 10},  -- APC
+        {type = "JEEP", weight = 10}  -- Humvee
+    },
+    aircraft = {
+        {type = "ORCA", weight = 100} -- Orca
+    },
+    harvester = {
+        {type = "HARV", weight = 100}
+    }
+}
+
+-- Nod unit build priorities
+AIController.NOD_UNITS = {
+    infantry = {
+        {type = "E1", weight = 35},   -- Minigunner
+        {type = "E3", weight = 25},   -- Rocket soldier
+        {type = "E4", weight = 20},   -- Flamethrower
+        {type = "E5", weight = 10},   -- Chem warrior
+        {type = "E6", weight = 10}    -- Engineer
+    },
+    vehicle = {
+        {type = "LTNK", weight = 35}, -- Light tank
+        {type = "FTNK", weight = 20}, -- Flame tank
+        {type = "STNK", weight = 15}, -- Stealth tank
+        {type = "BIKE", weight = 15}, -- Recon bike
+        {type = "BGGY", weight = 10}, -- Nod buggy
+        {type = "APC", weight = 5}    -- APC
+    },
+    aircraft = {
+        {type = "APCH", weight = 100} -- Apache
+    },
+    harvester = {
+        {type = "HARV", weight = 100}
+    }
 }
 
 function AIController.new(house)
@@ -45,37 +121,150 @@ function AIController.new(house)
     -- AI settings
     self.difficulty = AIController.DIFFICULTY.NORMAL
     self.enabled = true
-    self.iq = 100  -- AI intelligence (0-200)
+    self.iq = 100  -- AI intelligence (0-200), affects decision quality
 
     -- Current state
     self.state = AIController.STATE.BUILDING
 
-    -- Timers
+    -- Timers (in game ticks, 15 per second)
     self.think_timer = 0
-    self.think_interval = 1.0  -- Seconds between AI decisions
+    self.think_interval = 15  -- 1 second
     self.attack_timer = 0
-    self.attack_interval = 120  -- Seconds between attacks
+    self.attack_interval = 15 * 120  -- 2 minutes
+    self.production_timer = 0
+    self.production_interval = 15  -- Check production every second
 
     -- Build queue management
-    self.build_list = {}
-    self.current_build = nil
+    self.building_queue = {}
+    self.unit_queue = {}
+    self.current_building = nil
+    self.current_unit = nil
 
     -- Attack management
     self.attack_force = {}
     self.min_attack_force = 5
+    self.max_attack_force = 15
     self.attack_target = nil
+    self.attack_waypoint = nil
 
     -- Defense tracking
     self.threat_level = 0
+    self.threat_decay = 1
     self.last_attack_time = 0
+    self.defense_radius = 10  -- Cells from base center
 
-    -- Harvester management
+    -- Economy management
     self.desired_harvesters = 2
+    self.max_harvesters = 4
+    self.credits_reserve = 1000  -- Keep this much for emergencies
+    self.low_credits_threshold = 500
 
     -- Team management
     self.teams = {}
+    self.team_counter = 0
+
+    -- Base expansion
+    self.base_center_x = nil
+    self.base_center_y = nil
+    self.expansion_direction = nil
+
+    -- Statistics
+    self.stats = {
+        buildings_built = 0,
+        units_built = 0,
+        attacks_launched = 0,
+        times_attacked = 0
+    }
+
+    -- Difficulty-based adjustments
+    self:set_difficulty(self.difficulty)
+
+    -- Register events
+    self:register_events()
 
     return self
+end
+
+-- Register event listeners
+function AIController:register_events()
+    Events.on("ENTITY_ATTACKED", function(victim, attacker)
+        if self.house and victim.owner and victim.owner.house == self.house then
+            self:on_entity_attacked(victim, attacker)
+        end
+    end)
+
+    Events.on("UNIT_BUILT", function(entity)
+        if self.house and entity.owner and entity.owner.house == self.house then
+            self:on_unit_built(entity)
+        end
+    end)
+
+    Events.on("BUILDING_BUILT", function(entity)
+        if self.house and entity.owner and entity.owner.house == self.house then
+            self:on_building_built(entity)
+        end
+    end)
+
+    Events.on("ENTITY_DESTROYED", function(entity)
+        if self.house and entity.owner and entity.owner.house == self.house then
+            self:on_entity_destroyed(entity)
+        end
+    end)
+
+    Events.on("AI_FIND_TARGET", function(house)
+        if house == self.house then
+            local target = self:find_attack_target()
+            self.attack_target = target
+        end
+    end)
+end
+
+-- Handle being attacked
+function AIController:on_entity_attacked(victim, attacker)
+    self.threat_level = math.min(100, self.threat_level + 15)
+    self.stats.times_attacked = self.stats.times_attacked + 1
+
+    -- High value target attacked - increase threat more
+    if victim:has("building") then
+        self.threat_level = math.min(100, self.threat_level + 25)
+    end
+
+    -- Remember attacker position for counterattack
+    if attacker and attacker:has("transform") then
+        local transform = attacker:get("transform")
+        self.last_attack_direction = {
+            x = transform.cell_x,
+            y = transform.cell_y
+        }
+    end
+end
+
+-- Handle unit built
+function AIController:on_unit_built(entity)
+    self.stats.units_built = self.stats.units_built + 1
+
+    -- Add combat units to attack force
+    if entity:has("combat") then
+        local unit_type = entity.unit_type or ""
+
+        -- Don't add harvesters or MCVs to attack force
+        if unit_type ~= "HARV" and unit_type ~= "MCV" then
+            self:add_to_attack_force(entity)
+        end
+    end
+end
+
+-- Handle building built
+function AIController:on_building_built(entity)
+    self.stats.buildings_built = self.stats.buildings_built + 1
+
+    -- Update base center
+    self:update_base_center()
+end
+
+-- Handle entity destroyed
+function AIController:on_entity_destroyed(entity)
+    self:remove_from_attack_force(entity)
 end
 
 -- Update AI (call each game tick)
@@ -83,14 +272,26 @@ function AIController:update(dt)
     if not self.enabled or not self.house then return end
 
     -- Update think timer
-    self.think_timer = self.think_timer + dt
+    self.think_timer = self.think_timer + 1
     if self.think_timer >= self.think_interval then
         self.think_timer = 0
         self:think()
     end
 
     -- Update attack timer
-    self.attack_timer = self.attack_timer + dt
+    self.attack_timer = self.attack_timer + 1
+
+    -- Update production
+    self.production_timer = self.production_timer + 1
+    if self.production_timer >= self.production_interval then
+        self.production_timer = 0
+        self:manage_production()
+    end
+
+    -- Decay threat level
+    if self.threat_level > 0 then
+        self.threat_level = math.max(0, self.threat_level - self.threat_decay * dt)
+    end
 end
 
 -- Main AI decision loop
@@ -107,30 +308,38 @@ function AIController:think()
         self:think_attacking()
     elseif self.state == AIController.STATE.HARVESTING then
         self:think_harvesting()
+    elseif self.state == AIController.STATE.REGROUPING then
+        self:think_regrouping()
     end
-
-    -- Always consider production
-    self:manage_production()
 end
 
 -- Update AI state based on situation
 function AIController:update_state()
-    -- Check if under attack
-    if self.threat_level > 50 then
+    -- High threat = defend
+    if self.threat_level > 60 then
         self.state = AIController.STATE.DEFENDING
         return
     end
 
-    -- Check if should attack
-    if self.attack_timer >= self.attack_interval and #self.attack_force >= self.min_attack_force then
+    -- Attack ready
+    if self.attack_timer >= self.attack_interval and
+       #self.attack_force >= self.min_attack_force then
         self.state = AIController.STATE.ATTACKING
         return
     end
 
-    -- Check economy
-    local harvester_count = self:count_harvesters()
-    if harvester_count < self.desired_harvesters then
+    -- Need more harvesters
+    local harvester_count = self:count_unit_type("HARV")
+    local refinery_count = self:count_building_type("PROC")
+
+    if harvester_count < math.min(self.desired_harvesters, refinery_count) then
         self.state = AIController.STATE.HARVESTING
+        return
+    end
+
+    -- Need more attack units
+    if #self.attack_force < self.min_attack_force then
+        self.state = AIController.STATE.REGROUPING
         return
     end
 
@@ -138,144 +347,363 @@ function AIController:update_state()
     self.state = AIController.STATE.BUILDING
 end
 
--- Building phase logic
+-- Building phase logic - construct base infrastructure
 function AIController:think_building()
-    -- Check what we need
-    if not self.house:has_building_type("NUKE") and not self.house:has_building_type("NUK2") then
-        -- Need power
-        self:queue_build("NUKE", AIController.BUILD_PRIORITY.POWER)
+    local buildings = self:get_building_list()
+    local credits = self.house.credits or 0
+
+    -- Priority 1: Power
+    local power_balance = self:get_power_balance()
+    if power_balance < 50 then
+        self:try_build_building(buildings.power)
+        return
     end
 
-    if not self.house:has_building_type("PROC") then
-        -- Need refinery
-        self:queue_build("PROC", AIController.BUILD_PRIORITY.REFINERY)
+    -- Priority 2: Economy (Refinery)
+    if self:count_building_type("PROC") < 2 then
+        self:try_build_building(buildings.economy)
+        return
     end
 
-    -- Check for barracks
+    -- Priority 3: Infantry production
     local barracks = self.house.side == "GDI" and "PYLE" or "HAND"
-    if not self.house:has_building_type(barracks) then
-        self:queue_build(barracks, AIController.BUILD_PRIORITY.BARRACKS)
+    if not self:has_building_type(barracks) then
+        self:try_build_building(buildings.infantry)
+        return
     end
 
-    -- Check for war factory
-    if not self.house:has_building_type("WEAP") then
-        self:queue_build("WEAP", AIController.BUILD_PRIORITY.FACTORY)
+    -- Priority 4: Vehicle production
+    if not self:has_building_type("WEAP") then
+        self:try_build_building(buildings.vehicle)
+        return
     end
 
-    -- Add defenses
+    -- Priority 5: Defenses
     local defense_count = self:count_defenses()
-    if defense_count < 3 then
-        local defense = self.house.side == "GDI" and "GTWR" or "ATWR"
-        self:queue_build(defense, AIController.BUILD_PRIORITY.DEFENSE)
+    if defense_count < 3 + self.difficulty then
+        self:try_build_building(buildings.defense)
+        return
+    end
+
+    -- Priority 6: Tech buildings
+    if credits > 2000 then
+        if not self:has_building_type("HQ") then
+            self:try_build_building({"HQ"})
+            return
+        end
+        if not self:has_building_type("EYE") then
+            self:try_build_building({"EYE"})
+            return
+        end
+    end
+
+    -- Priority 7: Aircraft
+    if credits > 3000 and not self:has_building_type("AFLD") then
+        self:try_build_building(buildings.aircraft)
+        return
+    end
+
+    -- Priority 8: Additional defenses
+    if defense_count < 6 + self.difficulty * 2 then
+        self:try_build_building(buildings.defense)
+        return
+    end
+
+    -- Priority 9: More power for expansion
+    if power_balance < 200 then
+        self:try_build_building(buildings.power)
     end
 end
 
--- Defense phase logic
+-- Defense phase logic - rally units to defend base
 function AIController:think_defending()
-    -- Rally units to defend base
     local base_x, base_y = self:get_base_center()
 
-    for _, unit in ipairs(self.house.units) do
-        -- Don't pull harvesters
-        if unit.unit_type ~= "HARV" then
-            -- Send to defend
+    -- Rally all combat units to defend
+    for _, unit in ipairs(self.attack_force) do
+        if unit:is_alive() and unit:has("mission") then
             Events.emit("AI_ORDER_UNIT", unit, "guard_area", base_x, base_y)
         end
     end
 
-    -- Reduce threat over time
-    self.threat_level = self.threat_level - 1
-    if self.threat_level < 0 then
-        self.threat_level = 0
+    -- Build defensive units
+    self:queue_unit_by_category("infantry")
+    self:queue_unit_by_category("vehicle")
+
+    -- If threat is decreasing, start building defenses
+    if self.threat_level < 40 then
+        local buildings = self:get_building_list()
+        self:try_build_building(buildings.defense)
     end
 end
 
--- Attack phase logic
+-- Attack phase logic - coordinate attack on enemy
 function AIController:think_attacking()
-    -- Find target
+    -- Find target if not set
     if not self.attack_target then
         self.attack_target = self:find_attack_target()
     end
 
-    if self.attack_target then
-        -- Send attack force
-        for _, unit in ipairs(self.attack_force) do
-            Events.emit("AI_ORDER_UNIT", unit, "attack", self.attack_target)
-        end
-
-        -- Reset attack timer
-        self.attack_timer = 0
-        self.attack_force = {}
-        self.attack_target = nil
-
-        -- Return to building state
+    if not self.attack_target then
+        -- No targets found, go back to building
         self.state = AIController.STATE.BUILDING
+        return
+    end
+
+    -- Get target position
+    local target_x, target_y
+    if self.attack_target:has("transform") then
+        local transform = self.attack_target:get("transform")
+        target_x = transform.x
+        target_y = transform.y
+    else
+        self.attack_target = nil
+        return
+    end
+
+    -- Send attack force
+    local units_sent = 0
+    for _, unit in ipairs(self.attack_force) do
+        if unit:is_alive() then
+            Events.emit("AI_ORDER_UNIT", unit, "attack_move", target_x, target_y)
+            units_sent = units_sent + 1
+        end
+    end
+
+    -- Log attack
+    self.stats.attacks_launched = self.stats.attacks_launched + 1
+
+    -- Reset for next attack
+    self.attack_timer = 0
+    self.attack_force = {}
+    self.attack_target = nil
+
+    -- Return to building state
+    self.state = AIController.STATE.BUILDING
+end
+
+-- Harvesting focus logic - ensure economy
+function AIController:think_harvesting()
+    -- Build harvesters
+    if self:has_building_type("WEAP") then
+        self:queue_unit_build("HARV")
+    end
+
+    -- Also build refinery if we don't have enough
+    local refinery_count = self:count_building_type("PROC")
+    if refinery_count < 2 then
+        self:try_build_building({"PROC"})
     end
 end
 
--- Harvesting focus logic
-function AIController:think_harvesting()
-    -- Build harvesters
-    if self.house:has_building_type("PROC") then
-        self:queue_unit_build("HARV")
+-- Regrouping logic - build up attack force
+function AIController:think_regrouping()
+    -- Build balanced attack force
+    local infantry_count = self:count_attack_force_type("infantry")
+    local vehicle_count = self:count_attack_force_type("vehicle")
+
+    -- Aim for 2:1 infantry to vehicle ratio
+    if infantry_count < vehicle_count * 2 then
+        self:queue_unit_by_category("infantry")
+    else
+        self:queue_unit_by_category("vehicle")
+    end
+
+    -- Also build some aircraft if available
+    if self:has_building_type("AFLD") then
+        self:queue_unit_by_category("aircraft")
     end
 end
 
 -- Manage unit production
 function AIController:manage_production()
-    -- Build units for attack force
-    if #self.attack_force < self.min_attack_force * 2 then
-        -- Infantry
-        self:queue_unit_build("E1")
+    local credits = self.house.credits or 0
 
-        -- Vehicles based on side
-        if self.house.side == "GDI" then
-            self:queue_unit_build("MTNK")
-        else
-            self:queue_unit_build("LTNK")
-        end
-    end
-end
-
--- Queue a building for construction
-function AIController:queue_build(building_type, priority)
-    -- Check if already in queue
-    for _, item in ipairs(self.build_list) do
-        if item.type == building_type then
-            return
-        end
-    end
-
-    -- Check if we can build it
-    if self.house.tech_tree and not self.house.tech_tree:can_build_building(building_type) then
+    -- Don't produce if low on credits
+    if credits < self.low_credits_threshold then
         return
     end
 
-    table.insert(self.build_list, {
-        type = building_type,
-        priority = priority,
-        category = "building"
-    })
+    -- Always maintain harvesters
+    local harvester_count = self:count_unit_type("HARV")
+    local refinery_count = self:count_building_type("PROC")
 
-    -- Sort by priority
-    table.sort(self.build_list, function(a, b)
-        return a.priority < b.priority
-    end)
+    if harvester_count < math.min(self.max_harvesters, refinery_count + 1) then
+        self:queue_unit_build("HARV")
+    end
 
-    Events.emit("AI_QUEUE_BUILD", self.house, building_type)
+    -- Build attack units based on state
+    if self.state ~= AIController.STATE.DEFENDING then
+        if #self.attack_force < self.max_attack_force then
+            -- Mix of infantry and vehicles
+            if math.random() < 0.4 then
+                self:queue_unit_by_category("infantry")
+            else
+                self:queue_unit_by_category("vehicle")
+            end
+        end
+    end
 end
 
--- Queue a unit for construction
+-- Try to build a building from a list
+function AIController:try_build_building(building_types)
+    if not building_types or #building_types == 0 then
+        return false
+    end
+
+    local credits = self.house.credits or 0
+
+    for _, building_type in ipairs(building_types) do
+        -- Check if we can build it
+        if self:can_build_building(building_type) then
+            local cost = self:get_building_cost(building_type)
+            if credits >= cost then
+                self:queue_building(building_type)
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+-- Queue a building for construction
+function AIController:queue_building(building_type)
+    -- Check if already building something
+    if self.current_building then
+        return false
+    end
+
+    Events.emit("AI_QUEUE_BUILD", self.house, building_type, "building")
+    self.current_building = building_type
+    return true
+end
+
+-- Queue a unit for production
 function AIController:queue_unit_build(unit_type)
-    Events.emit("AI_QUEUE_UNIT", self.house, unit_type)
+    Events.emit("AI_QUEUE_BUILD", self.house, unit_type, "unit")
 end
 
--- Count harvesters
-function AIController:count_harvesters()
+-- Queue unit by category with weighted random selection
+function AIController:queue_unit_by_category(category)
+    local units = self:get_unit_list()
+    local unit_pool = units[category]
+
+    if not unit_pool or #unit_pool == 0 then
+        return
+    end
+
+    -- Calculate total weight
+    local total_weight = 0
+    local available = {}
+
+    for _, unit_def in ipairs(unit_pool) do
+        if self:can_build_unit(unit_def.type) then
+            total_weight = total_weight + unit_def.weight
+            table.insert(available, unit_def)
+        end
+    end
+
+    if total_weight == 0 then
+        return
+    end
+
+    -- Weighted random selection
+    local roll = math.random() * total_weight
+    local cumulative = 0
+
+    for _, unit_def in ipairs(available) do
+        cumulative = cumulative + unit_def.weight
+        if roll <= cumulative then
+            self:queue_unit_build(unit_def.type)
+            return
+        end
+    end
+end
+
+-- Get building list for faction
+function AIController:get_building_list()
+    if self.house.side == "GDI" then
+        return AIController.GDI_BUILDINGS
+    else
+        return AIController.NOD_BUILDINGS
+    end
+end
+
+-- Get unit list for faction
+function AIController:get_unit_list()
+    if self.house.side == "GDI" then
+        return AIController.GDI_UNITS
+    else
+        return AIController.NOD_UNITS
+    end
+end
+
+-- Check if can build a building
+function AIController:can_build_building(building_type)
+    if self.house.tech_tree then
+        return self.house.tech_tree:can_build_building(building_type)
+    end
+    return true
+end
+
+-- Check if can build a unit
+function AIController:can_build_unit(unit_type)
+    if self.house.tech_tree then
+        return self.house.tech_tree:can_build_unit(unit_type)
+    end
+    return true
+end
+
+-- Get building cost
+function AIController:get_building_cost(building_type)
+    -- Would look up from data files
+    local costs = {
+        NUKE = 300, NUK2 = 700,
+        PROC = 2000,
+        PYLE = 300, HAND = 300,
+        WEAP = 2000,
+        AFLD = 2000,
+        GTWR = 500, ATWR = 600, GUN = 600, OBLI = 1500, SAM = 750,
+        HQ = 1000, EYE = 2000, FIX = 1200,
+        TMPL = 3000
+    }
+    return costs[building_type] or 1000
+end
+
+-- Check if house has building type
+function AIController:has_building_type(building_type)
+    if self.house.buildings then
+        for _, building in ipairs(self.house.buildings) do
+            if building.building_type == building_type then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- Count building type
+function AIController:count_building_type(building_type)
     local count = 0
-    for _, unit in ipairs(self.house.units) do
-        if unit.unit_type == "HARV" then
-            count = count + 1
+    if self.house.buildings then
+        for _, building in ipairs(self.house.buildings) do
+            if building.building_type == building_type then
+                count = count + 1
+            end
+        end
+    end
+    return count
+end
+
+-- Count unit type
+function AIController:count_unit_type(unit_type)
+    local count = 0
+    if self.house.units then
+        for _, unit in ipairs(self.house.units) do
+            if unit.unit_type == unit_type then
+                count = count + 1
+            end
         end
     end
     return count
@@ -286,31 +714,74 @@ function AIController:count_defenses()
     local count = 0
     local defense_types = {"GTWR", "ATWR", "GUN", "OBLI", "SAM"}
 
-    for _, building in ipairs(self.house.buildings) do
-        for _, def_type in ipairs(defense_types) do
-            if building.building_type == def_type then
-                count = count + 1
-                break
+    if self.house.buildings then
+        for _, building in ipairs(self.house.buildings) do
+            for _, def_type in ipairs(defense_types) do
+                if building.building_type == def_type then
+                    count = count + 1
+                    break
+                end
             end
         end
     end
     return count
 end
 
--- Get base center position
-function AIController:get_base_center()
+-- Count attack force by type
+function AIController:count_attack_force_type(category)
+    local count = 0
+    for _, unit in ipairs(self.attack_force) do
+        if unit:is_alive() then
+            if category == "infantry" and unit:has("infantry") then
+                count = count + 1
+            elseif category == "vehicle" and unit:has("vehicle") then
+                count = count + 1
+            elseif category == "aircraft" and unit:has("aircraft") then
+                count = count + 1
+            end
+        end
+    end
+    return count
+end
+
+-- Get power balance
+function AIController:get_power_balance()
+    if self.house.power then
+        return self.house.power.produced - self.house.power.consumed
+    end
+    return 0
+end
+
+-- Update base center position
+function AIController:update_base_center()
     local x, y, count = 0, 0, 0
 
-    for _, building in ipairs(self.house.buildings) do
-        if building.x and building.y then
-            x = x + building.x
-            y = y + building.y
-            count = count + 1
+    if self.house.buildings then
+        for _, building in ipairs(self.house.buildings) do
+            if building:has("transform") then
+                local transform = building:get("transform")
+                x = x + transform.cell_x
+                y = y + transform.cell_y
+                count = count + 1
+            end
         end
     end
 
     if count > 0 then
-        return x / count, y / count
+        self.base_center_x = math.floor(x / count)
+        self.base_center_y = math.floor(y / count)
+    end
+end
+
+-- Get base center position
+function AIController:get_base_center()
+    if not self.base_center_x then
+        self:update_base_center()
+    end
+
+    if self.base_center_x then
+        return self.base_center_x * Constants.LEPTON_PER_CELL,
+               self.base_center_y * Constants.LEPTON_PER_CELL
     end
 
     return 0, 0
@@ -318,9 +789,37 @@ end
 
 -- Find attack target (enemy building or unit)
 function AIController:find_attack_target()
-    -- This would be implemented by the game to find enemy entities
-    Events.emit("AI_FIND_TARGET", self.house)
-    return nil  -- Will be set by event handler
+    -- Priority: Harvesters > Construction Yard > War Factory > Refineries > Other
+    local priority_targets = {"HARV", "FACT", "WEAP", "PROC", "NUKE", "NUK2"}
+
+    -- Get all enemy entities
+    local enemies = {}
+
+    -- Would query world for enemy entities
+    Events.emit("AI_GET_ENEMIES", self.house, function(entity_list)
+        enemies = entity_list or {}
+    end)
+
+    -- Find highest priority target
+    for _, target_type in ipairs(priority_targets) do
+        for _, enemy in ipairs(enemies) do
+            if enemy:is_alive() then
+                local etype = enemy.unit_type or enemy.building_type
+                if etype == target_type then
+                    return enemy
+                end
+            end
+        end
+    end
+
+    -- Fall back to any enemy
+    for _, enemy in ipairs(enemies) do
+        if enemy:is_alive() then
+            return enemy
+        end
+    end
+
+    return nil
 end
 
 -- Set attack target (called by game)
@@ -330,15 +829,19 @@ end
 
 -- Report threat (called when attacked)
 function AIController:report_threat(attacker, target)
-    self.threat_level = self.threat_level + 25
-    if self.threat_level > 100 then
-        self.threat_level = 100
-    end
+    self.threat_level = math.min(100, self.threat_level + 25)
     self.last_attack_time = love.timer.getTime()
 end
 
 -- Add unit to attack force
 function AIController:add_to_attack_force(unit)
+    -- Don't add duplicates
+    for _, u in ipairs(self.attack_force) do
+        if u == unit then
+            return
+        end
+    end
+
     table.insert(self.attack_force, unit)
 end
 
@@ -358,20 +861,80 @@ function AIController:set_difficulty(difficulty)
 
     -- Adjust parameters based on difficulty
     if difficulty == AIController.DIFFICULTY.EASY then
-        self.think_interval = 2.0
-        self.attack_interval = 180
+        self.think_interval = 30      -- Think every 2 seconds
+        self.attack_interval = 15 * 180  -- Attack every 3 minutes
         self.min_attack_force = 3
+        self.max_attack_force = 8
         self.iq = 50
+        self.threat_decay = 2
+        self.desired_harvesters = 1
+        self.credits_reserve = 500
     elseif difficulty == AIController.DIFFICULTY.NORMAL then
-        self.think_interval = 1.0
-        self.attack_interval = 120
+        self.think_interval = 15      -- Think every second
+        self.attack_interval = 15 * 120  -- Attack every 2 minutes
         self.min_attack_force = 5
+        self.max_attack_force = 12
         self.iq = 100
+        self.threat_decay = 1
+        self.desired_harvesters = 2
+        self.credits_reserve = 1000
     elseif difficulty == AIController.DIFFICULTY.HARD then
-        self.think_interval = 0.5
-        self.attack_interval = 60
+        self.think_interval = 8       -- Think twice per second
+        self.attack_interval = 15 * 60   -- Attack every minute
         self.min_attack_force = 8
+        self.max_attack_force = 20
         self.iq = 150
+        self.threat_decay = 0.5
+        self.desired_harvesters = 3
+        self.credits_reserve = 500  -- More aggressive spending
+    end
+end
+
+-- Create an attack team
+function AIController:create_team(name, units)
+    self.team_counter = self.team_counter + 1
+    local team = {
+        id = self.team_counter,
+        name = name,
+        units = units or {},
+        mission = nil,
+        target = nil
+    }
+    table.insert(self.teams, team)
+    return team
+end
+
+-- Order team to attack
+function AIController:order_team_attack(team, target)
+    if not team or not target then return end
+
+    team.mission = "attack"
+    team.target = target
+
+    local target_x, target_y
+    if target:has("transform") then
+        local t = target:get("transform")
+        target_x = t.x
+        target_y = t.y
+    end
+
+    for _, unit in ipairs(team.units) do
+        if unit:is_alive() then
+            Events.emit("AI_ORDER_UNIT", unit, "attack_move", target_x, target_y)
+        end
+    end
+end
+
+-- Order team to guard
+function AIController:order_team_guard(team, x, y)
+    if not team then return end
+
+    team.mission = "guard"
+
+    for _, unit in ipairs(team.units) do
+        if unit:is_alive() then
+            Events.emit("AI_ORDER_UNIT", unit, "guard_area", x, y)
+        end
     end
 end
 
@@ -383,6 +946,19 @@ end
 -- Get current state
 function AIController:get_state()
     return self.state
+end
+
+-- Get AI statistics
+function AIController:get_stats()
+    return {
+        state = self.state,
+        threat_level = self.threat_level,
+        attack_force_size = #self.attack_force,
+        attack_timer = self.attack_timer,
+        buildings_built = self.stats.buildings_built,
+        units_built = self.stats.units_built,
+        attacks_launched = self.stats.attacks_launched
+    }
 end
 
 return AIController
