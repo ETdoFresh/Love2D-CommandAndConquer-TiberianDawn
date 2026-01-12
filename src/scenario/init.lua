@@ -5,7 +5,8 @@
 local Scenario = {
     TriggerSystem = require("src.scenario.trigger"),
     TeamSystem = require("src.scenario.team"),
-    Loader = require("src.scenario.loader")
+    Loader = require("src.scenario.loader"),
+    Waypoints = require("src.scenario.waypoints")
 }
 
 return Scenario

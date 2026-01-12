@@ -5,7 +5,8 @@
 local Map = {
     Cell = require("src.map.cell"),
     Grid = require("src.map.grid"),
-    Theater = require("src.map.theater")
+    Theater = require("src.map.theater"),
+    Pathfinding = require("src.map.pathfinding")
 }
 
 return Map
