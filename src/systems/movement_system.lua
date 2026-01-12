@@ -29,6 +29,26 @@ function MovementSystem:process_entity(dt, entity)
     local transform = entity:get("transform")
     local mobile = entity:get("mobile")
 
+    -- Check for tiberium damage to infantry
+    if entity:has("infantry") and entity:has("health") and self.grid then
+        local cell = self.grid:get_cell(transform.cell_x, transform.cell_y)
+        if cell and cell:has_tiberium() then
+            -- Infantry take damage on tiberium (1 damage per tick)
+            local health = entity:get("health")
+            health.hp = health.hp - 1
+            if health.hp <= 0 then
+                health.hp = 0
+                -- Unit dies from tiberium
+                local Events = require("src.core.events")
+                Events.emit(Events.EVENTS.ENTITY_KILLED, entity, nil)
+                if self.world then
+                    self.world:destroy_entity(entity)
+                end
+                return
+            end
+        end
+    end
+
     if not mobile.is_moving then
         return
     end

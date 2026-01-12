@@ -300,8 +300,18 @@ AISystem.mission_handlers[Constants.MISSION.HARVEST] = function(self, entity, mi
     local mobile = entity:get("mobile")
 
     if not mobile.is_moving then
-        -- Look for nearby tiberium
-        -- TODO: Implement tiberium field finding
+        -- Look for nearby tiberium using harvest system
+        local harvest_system = self.world:get_system("harvest")
+        if harvest_system then
+            local tib_cell = harvest_system:find_tiberium(transform.cell_x, transform.cell_y)
+            if tib_cell then
+                local movement_system = self.world:get_system("movement")
+                if movement_system then
+                    local lx, ly = tib_cell:to_leptons()
+                    movement_system:move_to(entity, lx, ly)
+                end
+            end
+        end
     end
 end
 

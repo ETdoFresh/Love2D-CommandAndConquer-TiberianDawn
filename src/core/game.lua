@@ -318,8 +318,11 @@ end
 
 -- Create test entities for development
 function Game:create_test_entities()
-    -- Keep it very simple for now
-    self.player_credits = 5000
+    -- Set initial credits through harvest system (the source of truth)
+    if self.harvest_system then
+        self.harvest_system:set_credits(self.player_house, 5000)
+    end
+    self.player_credits = 5000  -- Also sync local copy
 
     -- Set camera to origin
     if self.render_system then
@@ -426,6 +429,11 @@ function Game:update(dt)
 
     -- Update sidebar and radar in any playing state
     if self.state == Game.STATE.PLAYING or self.state == Game.STATE.PAUSED then
+        -- Sync credits from harvest system (the source of truth for economy)
+        if self.harvest_system then
+            self.player_credits = self.harvest_system:get_credits(self.player_house)
+        end
+
         if self.sidebar then
             self.sidebar:set_credits(self.player_credits)
             self.sidebar:update(dt)
@@ -936,28 +944,43 @@ function Game:handle_playing_input(key)
         self.render_system:set_camera(0, 0)
     end
 
-    -- Camera controls (24 pixels = 1 cell)
+    -- Camera controls (arrow keys and WASD)
     local camera_speed = 48  -- 2 cells per keypress
-    if key == "w" then
+    if key == "up" or key == "w" then
         self.render_system:set_camera(
             self.render_system.camera_x,
             self.render_system.camera_y - camera_speed
         )
-    elseif key == "s" then
+    elseif key == "down" then
         self.render_system:set_camera(
             self.render_system.camera_x,
             self.render_system.camera_y + camera_speed
         )
-    elseif key == "a" then
+    elseif key == "left" or key == "a" then
         self.render_system:set_camera(
             self.render_system.camera_x - camera_speed,
             self.render_system.camera_y
         )
-    elseif key == "d" then
+    elseif key == "right" or key == "d" then
         self.render_system:set_camera(
             self.render_system.camera_x + camera_speed,
             self.render_system.camera_y
         )
+    end
+
+    -- Stop command (S key) - stop all selected units
+    if key == "s" then
+        self:issue_stop_command()
+    end
+
+    -- Guard command (G key) - put selected units in guard mode
+    if key == "g" then
+        self:issue_guard_command()
+    end
+
+    -- Sell building (Delete key) - sell selected buildings for credits
+    if key == "delete" then
+        self:sell_selected_buildings()
     end
 
     -- Zoom controls
@@ -1296,6 +1319,10 @@ function Game:start_unit_production(unit_type)
 
     local success, err = self.production_system:queue_unit(factory, unit_type)
     if success then
+        -- Spend credits through harvest system (source of truth)
+        if self.harvest_system then
+            self.harvest_system:spend_credits(self.player_house, cost)
+        end
         self.player_credits = self.player_credits - cost
         print(string.format("Started production of %s ($%d)", unit_type, cost))
         return true
@@ -1411,6 +1438,10 @@ function Game:handle_right_click(screen_x, screen_y)
                         self.world:add_entity(entity)
                         -- Mark cells as occupied
                         self.grid:place_building(cell_x, cell_y, size_x, size_y, entity.id, self.player_house)
+                        -- Spend credits through harvest system
+                        if self.harvest_system then
+                            self.harvest_system:spend_credits(self.player_house, cost)
+                        end
                         self.player_credits = self.player_credits - cost
                         self.sidebar:clear_selection()
                         print(string.format("Built %s at (%d,%d)", item, cell_x, cell_y))
@@ -1428,6 +1459,10 @@ function Game:handle_right_click(screen_x, screen_y)
                 local entity = self.production_system:create_unit(item, self.player_house, dest_x, dest_y)
                 if entity then
                     self.world:add_entity(entity)
+                    -- Spend credits through harvest system
+                    if self.harvest_system then
+                        self.harvest_system:spend_credits(self.player_house, cost)
+                    end
                     self.player_credits = self.player_credits - cost
                     self.sidebar:clear_selection()
                     print(string.format("Created %s at (%d,%d)", item, cell_x, cell_y))
@@ -1470,6 +1505,16 @@ function Game:handle_right_click(screen_x, screen_y)
         return
     end
 
+    -- Check if target is an enemy - issue attack command
+    if target_entity and target_entity:has("owner") then
+        local target_owner = target_entity:get("owner")
+        if target_owner.house ~= self.player_house then
+            -- Right-click on enemy = attack
+            self:issue_attack(selected, target_entity)
+            return
+        end
+    end
+
     -- Normal move command
     for _, entity in ipairs(selected) do
         if entity:has("mobile") then
@@ -1508,6 +1553,30 @@ function Game:get_entity_at_position(lx, ly)
     end
 
     return best_entity
+end
+
+-- Issue normal attack command (right-click on enemy)
+function Game:issue_attack(units, target)
+    for _, entity in ipairs(units) do
+        if entity:has("combat") then
+            local combat = entity:get("combat")
+            combat.target = target.id
+            combat.force_fire = false
+
+            -- Set mission to attack
+            if entity:has("mission") then
+                entity:get("mission").mission_type = Constants.MISSION.ATTACK
+            end
+
+            -- Move towards target if mobile
+            if entity:has("mobile") then
+                local target_transform = target:get("transform")
+                self.movement_system:move_to(entity, target_transform.x, target_transform.y)
+            end
+        end
+    end
+
+    Events.emit(Events.EVENTS.COMMAND_ATTACK, units, target)
 end
 
 -- Issue force attack command (attack regardless of allegiance)
@@ -1577,6 +1646,129 @@ function Game:issue_attack_move(units, dest_x, dest_y)
     end
 
     Events.emit(Events.EVENTS.COMMAND_ATTACK_MOVE, units, dest_x, dest_y)
+end
+
+-- Issue stop command to selected units
+function Game:issue_stop_command()
+    local selected = self.selection_system:get_selected_entities()
+    if #selected == 0 then return end
+
+    for _, entity in ipairs(selected) do
+        -- Stop movement
+        if entity:has("mobile") then
+            local mobile = entity:get("mobile")
+            mobile.is_moving = false
+            mobile.path = {}
+            mobile.path_index = 0
+            mobile.attack_move = false
+        end
+
+        -- Clear attack target
+        if entity:has("combat") then
+            local combat = entity:get("combat")
+            combat.target = nil
+            combat.force_fire = false
+            combat.attack_ground_x = nil
+            combat.attack_ground_y = nil
+        end
+
+        -- Set mission to stop/guard
+        if entity:has("mission") then
+            entity:get("mission").mission_type = Constants.MISSION.STOP
+        end
+    end
+
+    Events.emit(Events.EVENTS.COMMAND_STOP, selected)
+end
+
+-- Issue guard command to selected units
+function Game:issue_guard_command()
+    local selected = self.selection_system:get_selected_entities()
+    if #selected == 0 then return end
+
+    for _, entity in ipairs(selected) do
+        -- Stop movement but keep position
+        if entity:has("mobile") then
+            local mobile = entity:get("mobile")
+            mobile.is_moving = false
+            mobile.path = {}
+            mobile.attack_move = false
+        end
+
+        -- Set mission to guard (will auto-attack enemies in range)
+        if entity:has("mission") then
+            entity:get("mission").mission_type = Constants.MISSION.GUARD
+        end
+    end
+
+    Events.emit(Events.EVENTS.COMMAND_GUARD, selected)
+end
+
+-- Sell selected buildings for credits (50% refund)
+function Game:sell_selected_buildings()
+    local selected = self.selection_system:get_selected_entities()
+    if #selected == 0 then return end
+
+    local total_refund = 0
+    local sold_any = false
+
+    for _, entity in ipairs(selected) do
+        -- Only sell buildings owned by player
+        if entity:has("building") and entity:has("owner") then
+            local owner = entity:get("owner")
+            if owner.house == self.player_house then
+                local building_data = entity:get("building")
+                local structure_type = building_data.structure_type
+
+                -- Get building cost from data
+                local cost = 0
+                if self.production_system and self.production_system.building_data[structure_type] then
+                    cost = self.production_system.building_data[structure_type].cost or 0
+                end
+
+                -- Calculate refund (50% of original cost)
+                local refund = math.floor(cost * 0.5)
+                total_refund = total_refund + refund
+
+                -- Clear the building's cells from the grid
+                if self.grid then
+                    local transform = entity:get("transform")
+                    local size_x = building_data.size_x or 1
+                    local size_y = building_data.size_y or 1
+                    self.grid:remove_building(transform.cell_x, transform.cell_y, size_x, size_y)
+                end
+
+                -- Remove from selection before destroying
+                self.selection_system:deselect(entity)
+
+                -- Destroy the building
+                self.world:destroy_entity(entity)
+                sold_any = true
+
+                print(string.format("Sold %s for $%d", structure_type, refund))
+            end
+        end
+    end
+
+    -- Add refund to credits
+    if total_refund > 0 and self.harvest_system then
+        self.harvest_system:add_credits(self.player_house, total_refund)
+        self.player_credits = self.player_credits + total_refund
+    end
+
+    if sold_any then
+        -- Recalculate power after selling
+        if self.power_system then
+            self.power_system:recalculate_power()
+        end
+
+        -- Recalculate storage after selling refineries/silos
+        if self.harvest_system then
+            self.harvest_system:recalculate_storage()
+        end
+
+        Events.emit(Events.EVENTS.BUILDING_SOLD, total_refund)
+    end
 end
 
 function Game:wheelmoved(x, y)
