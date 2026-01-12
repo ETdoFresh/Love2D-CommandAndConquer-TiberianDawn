@@ -2944,6 +2944,24 @@ function Game:mousepressed(x, y, button)
             end
         end
 
+        -- Check special weapon targeting mode
+        if button == 1 and self.special_weapons and self.special_weapons.targeting then
+            -- Convert screen coordinates to world coordinates
+            local world_x, world_y = self.render_system:screen_to_world(x, y)
+            -- Fire the special weapon at this location
+            self.special_weapons:fire(
+                self.special_weapons.targeting_house,
+                self.special_weapons.targeting,
+                world_x,
+                world_y
+            )
+            return  -- Handled special weapon targeting
+        elseif button == 2 and self.special_weapons and self.special_weapons.targeting then
+            -- Right click cancels targeting
+            self.special_weapons:cancel_targeting()
+            return
+        end
+
         self.selection_system:on_mouse_pressed(x, y, button, self.render_system)
     end
 end
