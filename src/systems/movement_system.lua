@@ -6,6 +6,7 @@
 local System = require("src.ecs.system")
 local Constants = require("src.core.constants")
 local Direction = require("src.util.direction")
+local Cell = require("src.map.cell")
 
 local MovementSystem = setmetatable({}, {__index = System})
 MovementSystem.__index = MovementSystem
@@ -16,6 +17,9 @@ function MovementSystem.new(grid)
 
     self.grid = grid  -- Reference to map grid
 
+    -- Track which entities occupy which cells (for quick lookup)
+    self.entity_cells = {}  -- entity_id -> {cell_x, cell_y}
+
     return self
 end
 
@@ -25,9 +29,73 @@ function MovementSystem:update(dt, entities)
     end
 end
 
+-- Update cell occupancy for a unit (call when unit enters a new cell)
+function MovementSystem:update_cell_occupancy(entity, old_cell_x, old_cell_y, new_cell_x, new_cell_y)
+    if not self.grid then return end
+
+    -- Determine if this is a vehicle or infantry
+    local is_vehicle = entity:has("vehicle") or (entity:has("mobile") and not entity:has("infantry"))
+
+    -- Clear old cell occupancy
+    if old_cell_x and old_cell_y then
+        local old_cell = self.grid:get_cell(old_cell_x, old_cell_y)
+        if old_cell then
+            if is_vehicle then
+                old_cell:clear_flag(Cell.FLAG.VEHICLE)
+            end
+            if old_cell.occupier == entity.id then
+                old_cell.occupier = nil
+            end
+        end
+    end
+
+    -- Set new cell occupancy
+    if new_cell_x and new_cell_y then
+        local new_cell = self.grid:get_cell(new_cell_x, new_cell_y)
+        if new_cell then
+            if is_vehicle then
+                new_cell:set_flag(Cell.FLAG.VEHICLE)
+            end
+            new_cell.occupier = entity.id
+        end
+    end
+
+    -- Update our tracking table
+    self.entity_cells[entity.id] = {cell_x = new_cell_x, cell_y = new_cell_y}
+end
+
+-- Clear cell occupancy for a unit (call when unit is destroyed/removed)
+function MovementSystem:clear_cell_occupancy(entity)
+    if not self.grid then return end
+
+    local tracked = self.entity_cells[entity.id]
+    if tracked then
+        local cell = self.grid:get_cell(tracked.cell_x, tracked.cell_y)
+        if cell then
+            local is_vehicle = entity:has("vehicle") or (entity:has("mobile") and not entity:has("infantry"))
+            if is_vehicle then
+                cell:clear_flag(Cell.FLAG.VEHICLE)
+            end
+            if cell.occupier == entity.id then
+                cell.occupier = nil
+            end
+        end
+        self.entity_cells[entity.id] = nil
+    end
+end
+
 function MovementSystem:process_entity(dt, entity)
     local transform = entity:get("transform")
     local mobile = entity:get("mobile")
+
+    -- Track current cell for occupancy updates
+    local prev_cell_x = transform.cell_x
+    local prev_cell_y = transform.cell_y
+
+    -- Initialize cell occupancy on first update if not tracked
+    if not self.entity_cells[entity.id] then
+        self:update_cell_occupancy(entity, nil, nil, transform.cell_x, transform.cell_y)
+    end
 
     -- Check for tiberium damage to infantry
     if entity:has("infantry") and entity:has("health") and self.grid then
@@ -38,6 +106,8 @@ function MovementSystem:process_entity(dt, entity)
             health.hp = health.hp - 1
             if health.hp <= 0 then
                 health.hp = 0
+                -- Clear cell occupancy before destroying
+                self:clear_cell_occupancy(entity)
                 -- Unit dies from tiberium
                 local Events = require("src.core.events")
                 Events.emit(Events.EVENTS.ENTITY_KILLED, entity, nil)
@@ -109,6 +179,11 @@ function MovementSystem:process_entity(dt, entity)
 
         -- Update facing
         transform.facing = Direction.from_points(0, 0, dx, dy)
+    end
+
+    -- Update cell occupancy if cell changed
+    if transform.cell_x ~= prev_cell_x or transform.cell_y ~= prev_cell_y then
+        self:update_cell_occupancy(entity, prev_cell_x, prev_cell_y, transform.cell_x, transform.cell_y)
     end
 end
 
