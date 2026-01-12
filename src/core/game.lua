@@ -207,6 +207,11 @@ function Game:init()
         self:start_unit_production(unit_type)
     end)
 
+    -- Set callback for building production from sidebar
+    self.sidebar:set_building_click_callback(function(building_type, item)
+        self:start_building_production(building_type)
+    end)
+
     -- Create radar/minimap UI
     self.radar = Radar.new()
     self.radar:set_house(self.player_house)
@@ -2149,7 +2154,14 @@ function Game:update_production_display()
     local cy = self:find_construction_yard()
     if cy and cy:has("production") then
         local production = cy:get("production")
-        if #production.queue > 0 then
+        if production.ready_to_place and production.placing_type then
+            -- Building is ready to place - set it as selected item for placement preview
+            self.sidebar:set_production_state("building", production.placing_type, 100)
+            -- Set selected item for placement mode
+            if not self.sidebar:get_selected_item() then
+                self.sidebar.selected_item = production.placing_type
+            end
+        elseif #production.queue > 0 then
             local item = production.queue[1]
             self.sidebar:set_production_state("building", item.name, production.progress)
         else
@@ -2225,7 +2237,28 @@ function Game:handle_right_click(screen_x, screen_y)
         return
     end
 
-    -- Check if placing a building from sidebar
+    -- Check if placing a building from production queue
+    local cy = self:find_construction_yard()
+    if cy and cy:has("production") then
+        local production = cy:get("production")
+        if production.ready_to_place and production.placing_type then
+            local item = production.placing_type
+            local cell_x = math.floor(world_x / Constants.CELL_PIXEL_W)
+            local cell_y = math.floor(world_y / Constants.CELL_PIXEL_H)
+
+            -- Use production system's place_building which handles all validation
+            local building, err = self.production_system:place_building(cy, cell_x, cell_y, self.grid)
+            if building then
+                self.sidebar:clear_selection()
+                print(string.format("Placed %s at (%d,%d)", item, cell_x, cell_y))
+            else
+                print(string.format("Cannot place %s: %s", item, err or "invalid location"))
+            end
+            return
+        end
+    end
+
+    -- Check if placing a building from sidebar (sandbox/debug mode - allows direct placement)
     if self.sidebar and self.sidebar:get_selected_item() then
         local item = self.sidebar:get_selected_item()
         local cell_x = math.floor(world_x / Constants.CELL_PIXEL_W)
@@ -2236,7 +2269,7 @@ function Game:handle_right_click(screen_x, screen_y)
         local unit_data = self.production_system.unit_data[item]
 
         if building_data then
-            -- Place building
+            -- Direct building placement (sandbox mode - no production queue)
             local cost = building_data.cost or 0
             if self.player_credits >= cost then
                 -- Check placement validity (with adjacency requirement)
@@ -2269,7 +2302,7 @@ function Game:handle_right_click(screen_x, screen_y)
                 end
             end
         elseif unit_data then
-            -- Create unit at location
+            -- Create unit at location (sandbox mode)
             local cost = unit_data.cost or 0
             if self.player_credits >= cost then
                 local dest_x = cell_x * Constants.LEPTON_PER_CELL + Constants.LEPTON_PER_CELL / 2

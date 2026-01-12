@@ -666,10 +666,14 @@ function Sidebar:mousepressed(mx, my, button)
                 -- Clicked on this item
                 local has_prereqs = item.available ~= false
                 if has_prereqs and self.credits >= item.cost then
-                    -- For buildings, select for placement
+                    -- For buildings, start production via callback, then select for placement when ready
                     -- For units, trigger production callback immediately
                     if self.active_tab == Sidebar.TAB.BUILDINGS then
-                        self.selected_item = item.name
+                        -- Start building production via callback
+                        if self.on_building_click then
+                            self.on_building_click(item.name, item)
+                        end
+                        -- Note: selected_item is set when production completes (ready_to_place)
                     else
                         -- Units start production immediately via callback
                         if self.on_unit_click then
@@ -707,6 +711,11 @@ end
 -- Set callback for unit production
 function Sidebar:set_unit_click_callback(callback)
     self.on_unit_click = callback
+end
+
+-- Set callback for building production
+function Sidebar:set_building_click_callback(callback)
+    self.on_building_click = callback
 end
 
 function Sidebar:wheelmoved(x, y)
