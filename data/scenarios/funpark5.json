@@ -1,0 +1,205 @@
+{
+  "name": "Funpark Mission 5: Extinction Event",
+  "intro": "funpark",
+  "brief": "FUNPARK5",
+  "win_movie": "dinowin",
+  "lose_movie": "dinofail",
+  "player": "JP",
+  "build_level": 15,
+  "theater": "WINTER",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+  "funpark": true,
+
+  "briefing": {
+    "title": "Extinction Event",
+    "text": "This is it. The final containment operation. All dinosaur species have converged in this valley - multiple T-Rexes, raptor packs, and armored herbivores. We must close this dimensional rift permanently by eliminating every prehistoric creature. Deploy all available forces. This ends today. Make them extinct... again.",
+    "objectives": [
+      "Destroy ALL dinosaurs",
+      "Survive the prehistoric onslaught",
+      "Complete the extinction event"
+    ]
+  },
+
+  "houses": {
+    "JP": {
+      "credits": 20000,
+      "edge": "South",
+      "max_unit": 150,
+      "max_building": 75
+    },
+    "Multi4": {
+      "credits": 0,
+      "edge": "North",
+      "max_unit": 100,
+      "max_building": 0
+    }
+  },
+
+  "structures": [
+    {"house": "JP", "type": "FACT", "health": 256, "cell_x": 30, "cell_y": 52},
+    {"house": "JP", "type": "FACT", "health": 256, "cell_x": 38, "cell_y": 52},
+    {"house": "JP", "type": "NUKE", "health": 256, "cell_x": 26, "cell_y": 54},
+    {"house": "JP", "type": "NUKE", "health": 256, "cell_x": 34, "cell_y": 54},
+    {"house": "JP", "type": "NUKE", "health": 256, "cell_x": 42, "cell_y": 54},
+    {"house": "JP", "type": "PYLE", "health": 256, "cell_x": 24, "cell_y": 52},
+    {"house": "JP", "type": "WEAP", "health": 256, "cell_x": 44, "cell_y": 52},
+    {"house": "JP", "type": "WEAP", "health": 256, "cell_x": 48, "cell_y": 52},
+    {"house": "JP", "type": "HQ", "health": 256, "cell_x": 34, "cell_y": 50},
+    {"house": "JP", "type": "EYE", "health": 256, "cell_x": 30, "cell_y": 56},
+    {"house": "JP", "type": "GTWR", "health": 256, "cell_x": 22, "cell_y": 50},
+    {"house": "JP", "type": "GTWR", "health": 256, "cell_x": 50, "cell_y": 50},
+    {"house": "JP", "type": "GTWR", "health": 256, "cell_x": 28, "cell_y": 48},
+    {"house": "JP", "type": "GTWR", "health": 256, "cell_x": 40, "cell_y": 48},
+    {"house": "JP", "type": "ATWR", "health": 256, "cell_x": 34, "cell_y": 46}
+  ],
+
+  "units": [
+    {"house": "JP", "type": "HTNK", "health": 256, "cell_x": 32, "cell_y": 44, "facing": 0, "mission": "Guard"},
+    {"house": "JP", "type": "HTNK", "health": 256, "cell_x": 36, "cell_y": 44, "facing": 0, "mission": "Guard"},
+    {"house": "JP", "type": "MTNK", "health": 256, "cell_x": 28, "cell_y": 46, "facing": 0, "mission": "Guard"},
+    {"house": "JP", "type": "MTNK", "health": 256, "cell_x": 40, "cell_y": 46, "facing": 0, "mission": "Guard"},
+    {"house": "JP", "type": "MTNK", "health": 256, "cell_x": 34, "cell_y": 42, "facing": 0, "mission": "Guard"},
+    {"house": "JP", "type": "MLRS", "health": 256, "cell_x": 30, "cell_y": 48, "facing": 0, "mission": "Guard"},
+    {"house": "JP", "type": "MLRS", "health": 256, "cell_x": 38, "cell_y": 48, "facing": 0, "mission": "Guard"},
+    {"house": "JP", "type": "JEEP", "health": 256, "cell_x": 26, "cell_y": 44, "facing": 0, "mission": "Guard"},
+    {"house": "JP", "type": "JEEP", "health": 256, "cell_x": 42, "cell_y": 44, "facing": 0, "mission": "Guard"},
+    {"house": "Multi4", "type": "TREX", "health": 256, "cell_x": 30, "cell_y": 8, "facing": 128, "mission": "Hunt"},
+    {"house": "Multi4", "type": "TREX", "health": 256, "cell_x": 38, "cell_y": 8, "facing": 128, "mission": "Hunt"},
+    {"house": "Multi4", "type": "TRIC", "health": 256, "cell_x": 26, "cell_y": 10, "facing": 128, "mission": "Hunt"},
+    {"house": "Multi4", "type": "TRIC", "health": 256, "cell_x": 42, "cell_y": 10, "facing": 128, "mission": "Hunt"},
+    {"house": "Multi4", "type": "STEG", "health": 256, "cell_x": 34, "cell_y": 6, "facing": 128, "mission": "Hunt"},
+    {"house": "Multi4", "type": "STEG", "health": 256, "cell_x": 34, "cell_y": 12, "facing": 128, "mission": "Hunt"},
+    {"house": "Multi4", "type": "RAPT", "health": 256, "cell_x": 28, "cell_y": 6, "facing": 128, "mission": "Hunt"},
+    {"house": "Multi4", "type": "RAPT", "health": 256, "cell_x": 32, "cell_y": 6, "facing": 128, "mission": "Hunt"},
+    {"house": "Multi4", "type": "RAPT", "health": 256, "cell_x": 36, "cell_y": 6, "facing": 128, "mission": "Hunt"},
+    {"house": "Multi4", "type": "RAPT", "health": 256, "cell_x": 40, "cell_y": 6, "facing": 128, "mission": "Hunt"}
+  ],
+
+  "infantry": [
+    {"house": "JP", "type": "E1", "health": 256, "cell_x": 31, "cell_y": 45, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "JP", "type": "E1", "health": 256, "cell_x": 33, "cell_y": 45, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "JP", "type": "E1", "health": 256, "cell_x": 35, "cell_y": 45, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "JP", "type": "E1", "health": 256, "cell_x": 37, "cell_y": 45, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "JP", "type": "E3", "health": 256, "cell_x": 29, "cell_y": 47, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "JP", "type": "E3", "health": 256, "cell_x": 31, "cell_y": 47, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "JP", "type": "E3", "health": 256, "cell_x": 37, "cell_y": 47, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "JP", "type": "E3", "health": 256, "cell_x": 39, "cell_y": 47, "subcell": 0, "mission": "Guard", "facing": 0}
+  ],
+
+  "triggers": [
+    {
+      "name": "Win",
+      "house": "Multi4",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "DinoWave1",
+      "house": "Multi4",
+      "event": 13,
+      "event_param": 120,
+      "action": 4,
+      "action_param": 0,
+      "team": "Dino_Wave1",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "DinoWave2",
+      "house": "Multi4",
+      "event": 13,
+      "event_param": 300,
+      "action": 4,
+      "action_param": 0,
+      "team": "Dino_Wave2",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "DinoWave3",
+      "house": "Multi4",
+      "event": 13,
+      "event_param": 480,
+      "action": 4,
+      "action_param": 0,
+      "team": "Dino_Wave3",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "DinoWave4",
+      "house": "Multi4",
+      "event": 13,
+      "event_param": 660,
+      "action": 4,
+      "action_param": 0,
+      "team": "Dino_Wave4",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "Dino_Wave1",
+      "house": "Multi4",
+      "edge": "North",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "RAPT", "count": 6},
+        {"type": "STEG", "count": 2}
+      ]
+    },
+    {
+      "name": "Dino_Wave2",
+      "house": "Multi4",
+      "edge": "North",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "RAPT", "count": 4},
+        {"type": "TRIC", "count": 3},
+        {"type": "TREX", "count": 1}
+      ]
+    },
+    {
+      "name": "Dino_Wave3",
+      "house": "Multi4",
+      "edge": "North",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "RAPT", "count": 8},
+        {"type": "STEG", "count": 2},
+        {"type": "TRIC", "count": 2}
+      ]
+    },
+    {
+      "name": "Dino_Wave4",
+      "house": "Multi4",
+      "edge": "North",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "RAPT", "count": 6},
+        {"type": "TRIC", "count": 3},
+        {"type": "STEG", "count": 3},
+        {"type": "TREX", "count": 2}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 8192, "y": 13312}
+  ],
+
+  "cell_triggers": []
+}

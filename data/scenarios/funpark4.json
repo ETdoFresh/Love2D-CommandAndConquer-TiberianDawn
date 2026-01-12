@@ -1,0 +1,164 @@
+{
+  "name": "Funpark Mission 4: Raptor Rampage",
+  "intro": "funpark",
+  "brief": "FUNPARK4",
+  "win_movie": "dinowin",
+  "lose_movie": "dinofail",
+  "player": "JP",
+  "build_level": 15,
+  "theater": "DESERT",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+  "funpark": true,
+
+  "briefing": {
+    "title": "Raptor Rampage",
+    "text": "Multiple Velociraptor packs have been detected converging on our position. These intelligent predators hunt in coordinated packs and are incredibly fast. They've already overrun three outposts. Establish a defensive perimeter and eliminate every last raptor. Their speed makes them difficult targets - use your fastest units to intercept them.",
+    "objectives": [
+      "Destroy all Velociraptors",
+      "Defend your base against raptor attacks",
+      "Eliminate the raptor threat completely"
+    ]
+  },
+
+  "houses": {
+    "JP": {
+      "credits": 15000,
+      "edge": "Center",
+      "max_unit": 100,
+      "max_building": 50
+    },
+    "Multi4": {
+      "credits": 0,
+      "edge": "East",
+      "max_unit": 60,
+      "max_building": 0
+    }
+  },
+
+  "structures": [
+    {"house": "JP", "type": "FACT", "health": 256, "cell_x": 16, "cell_y": 30},
+    {"house": "JP", "type": "NUKE", "health": 256, "cell_x": 14, "cell_y": 32},
+    {"house": "JP", "type": "NUKE", "health": 256, "cell_x": 18, "cell_y": 32},
+    {"house": "JP", "type": "PYLE", "health": 256, "cell_x": 12, "cell_y": 30},
+    {"house": "JP", "type": "WEAP", "health": 256, "cell_x": 20, "cell_y": 30},
+    {"house": "JP", "type": "HQ", "health": 256, "cell_x": 16, "cell_y": 28},
+    {"house": "JP", "type": "GTWR", "health": 256, "cell_x": 10, "cell_y": 28},
+    {"house": "JP", "type": "GTWR", "health": 256, "cell_x": 22, "cell_y": 28},
+    {"house": "JP", "type": "GTWR", "health": 256, "cell_x": 10, "cell_y": 32},
+    {"house": "JP", "type": "GTWR", "health": 256, "cell_x": 22, "cell_y": 32}
+  ],
+
+  "units": [
+    {"house": "JP", "type": "JEEP", "health": 256, "cell_x": 14, "cell_y": 26, "facing": 64, "mission": "Guard"},
+    {"house": "JP", "type": "JEEP", "health": 256, "cell_x": 18, "cell_y": 26, "facing": 64, "mission": "Guard"},
+    {"house": "JP", "type": "JEEP", "health": 256, "cell_x": 14, "cell_y": 34, "facing": 64, "mission": "Guard"},
+    {"house": "JP", "type": "JEEP", "health": 256, "cell_x": 18, "cell_y": 34, "facing": 64, "mission": "Guard"},
+    {"house": "JP", "type": "MTNK", "health": 256, "cell_x": 16, "cell_y": 24, "facing": 64, "mission": "Guard"},
+    {"house": "JP", "type": "MTNK", "health": 256, "cell_x": 16, "cell_y": 36, "facing": 64, "mission": "Guard"},
+    {"house": "Multi4", "type": "RAPT", "health": 256, "cell_x": 54, "cell_y": 26, "facing": 192, "mission": "Hunt"},
+    {"house": "Multi4", "type": "RAPT", "health": 256, "cell_x": 56, "cell_y": 28, "facing": 192, "mission": "Hunt"},
+    {"house": "Multi4", "type": "RAPT", "health": 256, "cell_x": 54, "cell_y": 30, "facing": 192, "mission": "Hunt"},
+    {"house": "Multi4", "type": "RAPT", "health": 256, "cell_x": 56, "cell_y": 32, "facing": 192, "mission": "Hunt"},
+    {"house": "Multi4", "type": "RAPT", "health": 256, "cell_x": 54, "cell_y": 34, "facing": 192, "mission": "Hunt"},
+    {"house": "Multi4", "type": "RAPT", "health": 256, "cell_x": 58, "cell_y": 30, "facing": 192, "mission": "Hunt"}
+  ],
+
+  "infantry": [
+    {"house": "JP", "type": "E1", "health": 256, "cell_x": 15, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "JP", "type": "E1", "health": 256, "cell_x": 17, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "JP", "type": "E1", "health": 256, "cell_x": 15, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "JP", "type": "E1", "health": 256, "cell_x": 17, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "JP", "type": "E3", "health": 256, "cell_x": 11, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "JP", "type": "E3", "health": 256, "cell_x": 21, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "JP", "type": "E3", "health": 256, "cell_x": 11, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "JP", "type": "E3", "health": 256, "cell_x": 21, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64}
+  ],
+
+  "triggers": [
+    {
+      "name": "Win",
+      "house": "Multi4",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "DinoWave1",
+      "house": "Multi4",
+      "event": 13,
+      "event_param": 90,
+      "action": 4,
+      "action_param": 0,
+      "team": "Dino_Wave1",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "DinoWave2",
+      "house": "Multi4",
+      "event": 13,
+      "event_param": 210,
+      "action": 4,
+      "action_param": 0,
+      "team": "Dino_Wave2",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "DinoWave3",
+      "house": "Multi4",
+      "event": 13,
+      "event_param": 360,
+      "action": 4,
+      "action_param": 0,
+      "team": "Dino_Wave3",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "Dino_Wave1",
+      "house": "Multi4",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "RAPT", "count": 6}
+      ]
+    },
+    {
+      "name": "Dino_Wave2",
+      "house": "Multi4",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "RAPT", "count": 8}
+      ]
+    },
+    {
+      "name": "Dino_Wave3",
+      "house": "Multi4",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "RAPT", "count": 10}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 4096, "y": 7680}
+  ],
+
+  "cell_triggers": []
+}

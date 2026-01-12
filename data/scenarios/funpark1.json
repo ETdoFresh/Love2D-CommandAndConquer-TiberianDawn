@@ -1,0 +1,112 @@
+{
+  "name": "Funpark Mission 1: Containment",
+  "intro": "funpark",
+  "brief": "FUNPARK1",
+  "win_movie": "dinowin",
+  "lose_movie": "dinofail",
+  "player": "JP",
+  "build_level": 15,
+  "theater": "TEMPERATE",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+  "funpark": true,
+
+  "briefing": {
+    "title": "Containment Protocol",
+    "text": "Disaster Containment Team, we have a situation. A dimensional rift has opened and prehistoric creatures are emerging. Your mission is to contain and eliminate the threat before it spreads. Use your military hardware to neutralize all dinosaurs in the area. Good luck, you'll need it.",
+    "objectives": [
+      "Destroy all dinosaurs",
+      "Protect your base",
+      "Secure the perimeter"
+    ]
+  },
+
+  "houses": {
+    "JP": {
+      "credits": 10000,
+      "edge": "West",
+      "max_unit": 80,
+      "max_building": 40
+    },
+    "Multi4": {
+      "credits": 0,
+      "edge": "East",
+      "max_unit": 30,
+      "max_building": 0
+    }
+  },
+
+  "structures": [
+    {"house": "JP", "type": "FACT", "health": 256, "cell_x": 10, "cell_y": 30},
+    {"house": "JP", "type": "NUKE", "health": 256, "cell_x": 8, "cell_y": 32},
+    {"house": "JP", "type": "NUKE", "health": 256, "cell_x": 12, "cell_y": 32},
+    {"house": "JP", "type": "PYLE", "health": 256, "cell_x": 6, "cell_y": 30},
+    {"house": "JP", "type": "WEAP", "health": 256, "cell_x": 14, "cell_y": 30}
+  ],
+
+  "units": [
+    {"house": "JP", "type": "MTNK", "health": 256, "cell_x": 8, "cell_y": 28, "facing": 64, "mission": "Guard"},
+    {"house": "JP", "type": "MTNK", "health": 256, "cell_x": 12, "cell_y": 28, "facing": 64, "mission": "Guard"},
+    {"house": "JP", "type": "JEEP", "health": 256, "cell_x": 10, "cell_y": 26, "facing": 64, "mission": "Guard"},
+    {"house": "JP", "type": "JEEP", "health": 256, "cell_x": 10, "cell_y": 34, "facing": 64, "mission": "Guard"},
+    {"house": "Multi4", "type": "RAPT", "health": 256, "cell_x": 50, "cell_y": 28, "facing": 192, "mission": "Hunt"},
+    {"house": "Multi4", "type": "RAPT", "health": 256, "cell_x": 52, "cell_y": 30, "facing": 192, "mission": "Hunt"},
+    {"house": "Multi4", "type": "RAPT", "health": 256, "cell_x": 50, "cell_y": 32, "facing": 192, "mission": "Hunt"},
+    {"house": "Multi4", "type": "STEG", "health": 256, "cell_x": 54, "cell_y": 30, "facing": 192, "mission": "Hunt"}
+  ],
+
+  "infantry": [
+    {"house": "JP", "type": "E1", "health": 256, "cell_x": 9, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "JP", "type": "E1", "health": 256, "cell_x": 11, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "JP", "type": "E1", "health": 256, "cell_x": 9, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "JP", "type": "E1", "health": 256, "cell_x": 11, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "JP", "type": "E3", "health": 256, "cell_x": 7, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "JP", "type": "E3", "health": 256, "cell_x": 13, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64}
+  ],
+
+  "triggers": [
+    {
+      "name": "Win",
+      "house": "Multi4",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "DinoWave1",
+      "house": "Multi4",
+      "event": 13,
+      "event_param": 180,
+      "action": 4,
+      "action_param": 0,
+      "team": "Dino_Wave1",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "Dino_Wave1",
+      "house": "Multi4",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "RAPT", "count": 4},
+        {"type": "TRIC", "count": 1}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 2560, "y": 7680}
+  ],
+
+  "cell_triggers": []
+}

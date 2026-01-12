@@ -276,5 +276,34 @@
     "super_weapon": true,
     "splash_damage": 500,
     "splash_radius": 5
+  },
+
+  "_comment_dinosaur_weapons": "Funpark/Jurassic Mode dinosaur weapons",
+
+  "Headbutt": {
+    "name": "Headbutt",
+    "damage": 35,
+    "range": 1,
+    "rate_of_fire": 15,
+    "projectile": "none",
+    "warhead": "headbutt",
+    "report": "dinoatk1",
+    "vs_infantry": 100,
+    "vs_vehicles": 80,
+    "vs_buildings": 50,
+    "melee": true
+  },
+  "TrexBite": {
+    "name": "T-Rex Bite",
+    "damage": 100,
+    "range": 1,
+    "rate_of_fire": 20,
+    "projectile": "none",
+    "warhead": "feedme",
+    "report": "dinoatk1",
+    "vs_infantry": 100,
+    "vs_vehicles": 100,
+    "vs_buildings": 60,
+    "melee": true
   }
 }

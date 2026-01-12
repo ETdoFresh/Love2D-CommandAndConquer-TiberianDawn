@@ -68,6 +68,16 @@ CampaignMap.COVERT_OPS_NOD = {
     {id = 8, name = "No Mercy", file = "scb27ea", region = "covert", standalone = true}
 }
 
+-- Funpark/Jurassic Mode bonus missions (special hidden mode)
+-- Original C&C had 5 dinosaur missions accessed via special command line
+CampaignMap.FUNPARK_MISSIONS = {
+    {id = 1, name = "Containment", file = "funpark1", region = "funpark", standalone = true, funpark = true},
+    {id = 2, name = "The Rex Factor", file = "funpark2", region = "funpark", standalone = true, funpark = true},
+    {id = 3, name = "Herbivore Highway", file = "funpark3", region = "funpark", standalone = true, funpark = true},
+    {id = 4, name = "Raptor Rampage", file = "funpark4", region = "funpark", standalone = true, funpark = true},
+    {id = 5, name = "Extinction Event", file = "funpark5", region = "funpark", standalone = true, funpark = true, final = true}
+}
+
 -- Region colors for map rendering
 CampaignMap.REGION_COLORS = {
     baltic = {0.4, 0.5, 0.3},
