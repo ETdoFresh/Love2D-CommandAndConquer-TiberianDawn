@@ -119,6 +119,7 @@ function HarvestSystem:update_tiberium_growth()
     self.growth_timer = 0
 
     -- Process growth - pick random cells from growth list (deterministic for multiplayer)
+    -- Use density multiplier to process more cells in dense tiberium areas
     local max_tries = math.min(3, #self.growth_cells)
     for _ = 1, max_tries do
         if #self.growth_cells == 0 then break end
@@ -130,7 +131,12 @@ function HarvestSystem:update_tiberium_growth()
         if cell and cell:has_tiberium() then
             local level = cell.overlay - HarvestSystem.TIBERIUM_OVERLAY_BASE
 
-            if level < HarvestSystem.TIBERIUM_MAX_LEVEL then
+            -- Apply density-based growth multiplier (original behavior)
+            -- Tiberium surrounded by more tiberium grows faster
+            local density_mult = self:get_density_growth_multiplier(cell)
+            local growth_chance = density_mult / 2.5  -- Normalize to 0.4 - 1.0 range
+
+            if level < HarvestSystem.TIBERIUM_MAX_LEVEL and Random.percent(math.floor(growth_chance * 100)) then
                 -- Grow tiberium (increase overlay level)
                 cell.overlay = cell.overlay + 1
                 level = level + 1
@@ -221,6 +227,43 @@ function HarvestSystem:try_spread_tiberium(source_cell)
     end
 
     return false
+end
+
+-- Count adjacent tiberium cells for density-based growth bonus (original behavior)
+function HarvestSystem:count_adjacent_tiberium(cell)
+    if not self.grid then return 0 end
+
+    local count = 0
+    local neighbors = self.grid:get_neighbors(cell.x, cell.y)
+
+    for _, neighbor in ipairs(neighbors) do
+        if neighbor:has_tiberium() then
+            count = count + 1
+        end
+    end
+
+    return count
+end
+
+-- Get growth rate multiplier based on surrounding tiberium density
+-- Original C&C: Tiberium grows faster when surrounded by more tiberium
+function HarvestSystem:get_density_growth_multiplier(cell)
+    local adjacent_count = self:count_adjacent_tiberium(cell)
+
+    -- More adjacent tiberium = faster growth
+    -- 0 adjacent: 1x (isolated, slow growth)
+    -- 1-2 adjacent: 1.5x
+    -- 3-4 adjacent: 2x
+    -- 5+ adjacent: 2.5x (dense cluster, fast growth)
+    if adjacent_count >= 5 then
+        return 2.5
+    elseif adjacent_count >= 3 then
+        return 2.0
+    elseif adjacent_count >= 1 then
+        return 1.5
+    else
+        return 1.0
+    end
 end
 
 -- Damage infantry standing on Tiberium (from original INFANTRY.CPP Per_Cell_Process)

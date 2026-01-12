@@ -374,7 +374,14 @@ end
 
 -- Apply splash damage at projectile impact point (for artillery, explosives)
 function CombatSystem:apply_splash_damage(proj)
-    local splash_radius = proj.weapon.splash_radius or 1  -- In cells
+    -- Get warhead data for spread factor
+    local warhead_key = CombatSystem.WARHEAD_MAP[proj.warhead] or "SA"
+    local warhead_data = CombatSystem.warheads[warhead_key]
+
+    -- Use warhead spread_factor to determine splash radius (original behavior)
+    -- spread_factor in original ranges from 2 (tight) to 8 (wide)
+    local spread_factor = warhead_data and warhead_data.spread_factor or 4
+    local splash_radius = proj.weapon.splash_radius or math.max(1, spread_factor / 4)  -- In cells
     local splash_damage = proj.weapon.splash_damage or (proj.damage * 0.5)
 
     -- Find units near impact point
@@ -401,6 +408,44 @@ function CombatSystem:apply_splash_damage(proj)
 
     -- Also damage walls in splash radius
     self:apply_wall_splash_damage(proj.target_x, proj.target_y, splash_radius, splash_damage, proj.warhead)
+
+    -- Destroy tiberium in splash radius if warhead supports it (HE, FIRE, PB)
+    if warhead_data and warhead_data.destroys_tiberium then
+        self:destroy_tiberium_in_radius(proj.target_x, proj.target_y, splash_radius)
+    end
+end
+
+-- Destroy tiberium cells in a radius (for explosives, fire weapons)
+function CombatSystem:destroy_tiberium_in_radius(center_x, center_y, radius)
+    local grid = self.world and self.world.grid
+    if not grid then return end
+
+    -- Convert lepton position to cell coordinates
+    local center_cell_x = math.floor(center_x / Constants.LEPTON_PER_CELL)
+    local center_cell_y = math.floor(center_y / Constants.LEPTON_PER_CELL)
+
+    -- Scan cells in radius
+    local cells_radius = math.ceil(radius)
+    for dy = -cells_radius, cells_radius do
+        for dx = -cells_radius, cells_radius do
+            local cell_x = center_cell_x + dx
+            local cell_y = center_cell_y + dy
+
+            -- Check distance
+            local dist = math.sqrt(dx * dx + dy * dy)
+            if dist <= radius then
+                local cell = grid:get_cell(cell_x, cell_y)
+                if cell and cell:has_tiberium() then
+                    -- Reduce or remove tiberium based on distance from impact
+                    local damage_mult = 1 - (dist / radius)
+                    local tiberium_damage = math.floor(50 * damage_mult)
+
+                    -- Damage the tiberium cell
+                    cell:damage_tiberium(tiberium_damage)
+                end
+            end
+        end
+    end
 end
 
 -- Apply damage to walls in an area (for explosives, splash weapons)
@@ -495,6 +540,21 @@ function CombatSystem:apply_damage(target, damage, warhead, attacker)
         target:get("renderable").flash = true
     end
 
+    -- EVA "base under attack" announcement when building is damaged
+    if target:has("building") and target:has("owner") then
+        local owner = target:get("owner")
+        -- Rate-limit this announcement (don't spam every damage tick)
+        local now = love.timer.getTime and love.timer.getTime() or 0
+        if not self.last_base_attack_announce then
+            self.last_base_attack_announce = {}
+        end
+        local last_time = self.last_base_attack_announce[owner.house] or 0
+        if now - last_time > 10 then  -- At most once per 10 seconds per house
+            Events.emit("EVA_SPEECH", "base under attack", owner.house)
+            self.last_base_attack_announce[owner.house] = now
+        end
+    end
+
     -- Check for death
     if health.hp <= 0 then
         health.hp = 0
@@ -510,6 +570,29 @@ end
 function CombatSystem:kill_unit(target, killer, warhead)
     -- Spawn death/explosion effect based on unit type and warhead
     self:spawn_death_effect(target, warhead)
+
+    -- Emit EVA announcements for player units/buildings lost
+    local target_owner = target:has("owner") and target:get("owner")
+    if target_owner then
+        local target_house = target_owner.house
+
+        if target:has("building") then
+            -- Building destroyed - announce structure destroyed
+            Events.emit("EVA_SPEECH", "structure destroyed", target_house)
+
+            -- Check if it was a key building
+            local building = target:get("building")
+            if building and building.building_type then
+                local btype = building.building_type:upper()
+                if btype == "FACT" or btype == "WEAP" or btype == "HAND" or btype == "PYLE" then
+                    Events.emit("EVA_SPEECH", "primary building destroyed", target_house)
+                end
+            end
+        else
+            -- Unit lost
+            Events.emit("EVA_SPEECH", "unit lost", target_house)
+        end
+    end
 
     -- Emit kill event (ENTITY_KILLED is for game logic like scoring)
     self:emit(Events.EVENTS.UNIT_KILLED, target, killer)

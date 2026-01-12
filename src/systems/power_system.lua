@@ -16,10 +16,12 @@ function PowerSystem.new()
     -- Power state per house
     self.power_produced = {}
     self.power_consumed = {}
+    self.previous_ratio = {}  -- Track previous ratio for EVA announcements
 
     for i = 0, Constants.HOUSE.COUNT - 1 do
         self.power_produced[i] = 0
         self.power_consumed[i] = 0
+        self.previous_ratio[i] = 1.0
     end
 
     return self
@@ -57,6 +59,24 @@ function PowerSystem:recalculate_power()
     for i = 0, Constants.HOUSE.COUNT - 1 do
         self:emit(Events.EVENTS.POWER_CHANGED, i,
             self.power_produced[i], self.power_consumed[i])
+
+        -- Check for power status changes and emit EVA announcements
+        local current_ratio = self:get_power_ratio(i)
+        local previous_ratio = self.previous_ratio[i] or 1.0
+
+        -- Emit EVA speech when power state changes
+        if current_ratio < 0.5 and previous_ratio >= 0.5 then
+            -- Power critical - just dropped below 50%
+            Events.emit("EVA_SPEECH", "low power", i)
+        elseif current_ratio >= 0.5 and current_ratio < 1.0 and previous_ratio >= 1.0 then
+            -- Power reduced - just dropped below 100%
+            Events.emit("EVA_SPEECH", "low power", i)
+        elseif current_ratio >= 1.0 and previous_ratio < 1.0 then
+            -- Power restored
+            Events.emit("EVA_SPEECH", "power restored", i)
+        end
+
+        self.previous_ratio[i] = current_ratio
     end
 end
 

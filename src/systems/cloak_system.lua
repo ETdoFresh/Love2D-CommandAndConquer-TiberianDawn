@@ -194,10 +194,51 @@ function CloakSystem:can_detect_cloak(entity)
         end
     end
 
-    -- Some units have detection ability
-    -- (Could add specific unit types here)
+    -- Vehicles with radar can detect (APC, MLRS)
+    local vehicle = entity:get("vehicle")
+    if vehicle then
+        if vehicle.vehicle_type == "APC" or
+           vehicle.vehicle_type == "MLRS" or
+           vehicle.vehicle_type == "MSAM" then
+            return true
+        end
+    end
+
+    -- Infantry cannot detect cloaked units (original behavior)
+    -- Only radar-equipped units can see them
 
     return false
+end
+
+-- Force entity to uncloak (called when taking damage or firing)
+function CloakSystem:force_uncloak(entity)
+    local cloak = entity:get("cloak")
+    if not cloak then return end
+
+    if cloak.state == CloakSystem.STATE.CLOAKED or
+       cloak.state == CloakSystem.STATE.CLOAKING then
+        cloak.state = CloakSystem.STATE.UNCLOAKING
+        cloak.timer = 0
+        cloak.detected = false
+        Events.emit("UNIT_UNCLOAKED", entity)
+    end
+end
+
+-- Register for damage events to break cloak
+function CloakSystem:init()
+    -- Listen for damage events to break cloak
+    Events.on(Events.EVENTS.ENTITY_DAMAGED, function(target, damage, attacker)
+        if target:has("cloak") then
+            self:force_uncloak(target)
+        end
+    end)
+
+    -- Listen for combat firing events to break cloak
+    Events.on("WEAPON_FIRED", function(attacker, target, weapon)
+        if attacker:has("cloak") then
+            self:force_uncloak(attacker)
+        end
+    end)
 end
 
 -- Check if entity is visible (for rendering/targeting)
