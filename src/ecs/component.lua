@@ -194,7 +194,17 @@ function Component.register_all()
         foundation = {},        -- Occupied cells
         bibbed = false,         -- Has ground bib
         repairing = false,      -- Being repaired
-        upgrading = false       -- Being upgraded
+        repair_timer = 0,       -- Repair tick counter
+        upgrading = false,      -- Being upgraded
+        selling = false,        -- Being sold (animation in progress)
+        sell_progress = 0       -- Sell animation progress (0-100)
+    })
+
+    -- Deployable: Can transform into a building (like MCV -> Construction Yard)
+    Component.register("deployable", {
+        deploys_to = nil,       -- Building type this unit deploys into
+        deploying = false,      -- Currently deploying
+        deploy_progress = 0     -- Deploy animation progress (0-100)
     })
 
     -- Infantry: Infantry-specific properties

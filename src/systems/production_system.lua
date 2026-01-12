@@ -270,6 +270,13 @@ function ProductionSystem:create_unit(unit_type, house, x, y)
         if data.cloakable then
             entity:add("cloakable", Component.create("cloakable"))
         end
+
+        -- Deployable (MCV -> Construction Yard)
+        if data.deploys_to then
+            entity:add("deployable", Component.create("deployable", {
+                deploys_to = data.deploys_to
+            }))
+        end
     elseif data.type == "aircraft" then
         entity:add("aircraft", Component.create("aircraft", {
             aircraft_type = unit_type,
@@ -676,6 +683,240 @@ function ProductionSystem:get_available_buildings(construction_yard)
     end
 
     return available
+end
+
+-- Deploy a unit (MCV -> Construction Yard)
+-- Returns the building entity if successful, nil and error message if not
+function ProductionSystem:deploy_unit(unit, grid)
+    if not unit:has("deployable") then
+        return nil, "Unit cannot deploy"
+    end
+
+    local deployable = unit:get("deployable")
+    local transform = unit:get("transform")
+    local owner = unit:get("owner")
+
+    if not deployable.deploys_to then
+        return nil, "No deployment target"
+    end
+
+    local building_type = deployable.deploys_to
+    local data = self.building_data[building_type]
+
+    if not data then
+        return nil, "Unknown building type: " .. building_type
+    end
+
+    -- Calculate building placement position (centered on unit)
+    local cell_x = transform.cell_x - math.floor((data.size[1] - 1) / 2)
+    local cell_y = transform.cell_y - math.floor((data.size[2] - 1) / 2)
+
+    -- Check if we can place the building
+    if grid then
+        local can_place, reason = grid:can_place_building(
+            cell_x, cell_y,
+            data.size[1], data.size[2],
+            owner.house,
+            true  -- Skip adjacency check for deployment
+        )
+        if not can_place then
+            return nil, reason or "Cannot deploy here"
+        end
+    end
+
+    -- Create the building
+    local building = self:create_building(building_type, owner.house, cell_x, cell_y)
+
+    if building then
+        self.world:add_entity(building)
+
+        -- Mark cells as occupied
+        if grid then
+            grid:place_building(cell_x, cell_y, data.size[1], data.size[2], building.id)
+        end
+
+        -- Remove the MCV
+        self.world:destroy_entity(unit)
+
+        -- Emit deployment event
+        self:emit(Events.EVENTS.UNIT_DEPLOYED, unit, building)
+
+        return building
+    end
+
+    return nil, "Failed to create building"
+end
+
+-- Check if a unit can deploy at current location
+function ProductionSystem:can_deploy(unit, grid)
+    if not unit:has("deployable") then
+        return false, "Unit cannot deploy"
+    end
+
+    local deployable = unit:get("deployable")
+    local transform = unit:get("transform")
+    local owner = unit:get("owner")
+
+    if not deployable.deploys_to then
+        return false, "No deployment target"
+    end
+
+    local building_type = deployable.deploys_to
+    local data = self.building_data[building_type]
+
+    if not data then
+        return false, "Unknown building type"
+    end
+
+    local cell_x = transform.cell_x - math.floor((data.size[1] - 1) / 2)
+    local cell_y = transform.cell_y - math.floor((data.size[2] - 1) / 2)
+
+    if grid then
+        return grid:can_place_building(
+            cell_x, cell_y,
+            data.size[1], data.size[2],
+            owner.house,
+            true  -- Skip adjacency for deployment
+        )
+    end
+
+    return true
+end
+
+-- Sell a building - returns credits refunded
+function ProductionSystem:sell_building(building, grid)
+    if not building:has("building") then
+        return 0, "Not a building"
+    end
+
+    local building_data = building:get("building")
+    local owner = building:get("owner")
+    local transform = building:get("transform")
+
+    local data = self.building_data[building_data.structure_type]
+    if not data then
+        return 0, "Unknown building type"
+    end
+
+    -- Calculate refund (50% of cost, like original)
+    local refund = math.floor((data.cost or 0) * 0.5)
+
+    -- Add credits to owner
+    local harvest_system = self.world:get_system("harvest")
+    if harvest_system then
+        harvest_system:add_credits(owner.house, refund)
+    end
+
+    -- Clear cells
+    if grid then
+        grid:remove_building(
+            transform.cell_x,
+            transform.cell_y,
+            data.size[1],
+            data.size[2]
+        )
+    end
+
+    -- Emit sell event
+    self:emit(Events.EVENTS.BUILDING_SOLD, building, refund)
+
+    -- Destroy the building
+    self.world:destroy_entity(building)
+
+    return refund
+end
+
+-- Start repairing a building
+function ProductionSystem:start_repair(building)
+    if not building:has("building") or not building:has("health") then
+        return false, "Cannot repair"
+    end
+
+    local building_comp = building:get("building")
+    local health = building:get("health")
+
+    -- Already at full health
+    if health.hp >= health.max_hp then
+        return false, "Already at full health"
+    end
+
+    -- Start repairing
+    building_comp.repairing = true
+    building_comp.repair_timer = 0
+
+    return true
+end
+
+-- Stop repairing a building
+function ProductionSystem:stop_repair(building)
+    if not building:has("building") then
+        return false
+    end
+
+    local building_comp = building:get("building")
+    building_comp.repairing = false
+    building_comp.repair_timer = 0
+
+    return true
+end
+
+-- Process repair for a building (called each tick)
+-- Repair costs credits and heals over time
+function ProductionSystem:process_repair(building, dt)
+    if not building:has("building") or not building:has("health") or not building:has("owner") then
+        return
+    end
+
+    local building_comp = building:get("building")
+    local health = building:get("health")
+    local owner = building:get("owner")
+
+    if not building_comp.repairing then
+        return
+    end
+
+    -- Check if fully healed
+    if health.hp >= health.max_hp then
+        building_comp.repairing = false
+        return
+    end
+
+    -- Repair every few ticks (like original)
+    building_comp.repair_timer = building_comp.repair_timer + 1
+    if building_comp.repair_timer < 8 then  -- Repair every 8 ticks
+        return
+    end
+    building_comp.repair_timer = 0
+
+    -- Calculate repair cost and amount
+    local data = self.building_data[building_comp.structure_type]
+    if not data then return end
+
+    -- Repair 1% of max health per cycle, costs proportional credits
+    local repair_amount = math.ceil(health.max_hp * 0.01)
+    local repair_cost = math.ceil((data.cost or 0) * 0.01 * 0.5)  -- Half price for repairs
+
+    -- Check if we can afford it
+    local harvest_system = self.world:get_system("harvest")
+    if harvest_system then
+        local credits = harvest_system:get_credits(owner.house)
+        if credits < repair_cost then
+            -- Can't afford repair, stop
+            building_comp.repairing = false
+            return
+        end
+
+        -- Deduct credits
+        harvest_system:spend_credits(owner.house, repair_cost)
+    end
+
+    -- Apply repair
+    health.hp = math.min(health.hp + repair_amount, health.max_hp)
+
+    -- Check if done
+    if health.hp >= health.max_hp then
+        building_comp.repairing = false
+    end
 end
 
 return ProductionSystem

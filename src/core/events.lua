@@ -169,7 +169,10 @@ M.EVENTS = {
 
     -- Unit/Building lifecycle
     UNIT_BUILT = "unit:built",
+    UNIT_DEPLOYED = "unit:deployed",
     BUILDING_BUILT = "building:built",
+    BUILDING_REPAIR_START = "building:repair_start",
+    BUILDING_REPAIR_STOP = "building:repair_stop",
 
     -- Economy
     CREDITS_CHANGED = "economy:credits",
