@@ -133,6 +133,8 @@ M.EVENTS = {
     GAME_RESUME = "game:resume",
     GAME_TICK = "game:tick",
     GAME_END = "game:end",
+    GAME_WIN = "game:win",
+    GAME_LOSE = "game:lose",
 
     -- Entity lifecycle
     ENTITY_CREATED = "entity:created",

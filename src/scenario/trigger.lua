@@ -204,6 +204,12 @@ function TriggerSystem:load_cell_triggers(cell_trigger_data)
     end
 end
 
+-- Add a single cell trigger
+function TriggerSystem:add_cell_trigger(cell_x, cell_y, trigger_name)
+    local key = cell_x .. "," .. cell_y
+    self.cell_triggers[key] = trigger_name
+end
+
 -- Attach trigger to entity
 function TriggerSystem:attach_to_entity(entity_id, trigger_name)
     self.object_triggers[entity_id] = trigger_name
@@ -375,13 +381,13 @@ function TriggerSystem:execute_action(trigger, action, param)
         if self.win_allowed then
             self.game_over = true
             self.victory = true
-            Events.emit("GAME_WIN", trigger.house)
+            Events.emit(Events.EVENTS.GAME_WIN, trigger.house)
         end
 
     elseif action == TriggerSystem.ACTION.LOSE then
         self.game_over = true
         self.victory = false
-        Events.emit("GAME_LOSE", trigger.house)
+        Events.emit(Events.EVENTS.GAME_LOSE, trigger.house)
 
     elseif action == TriggerSystem.ACTION.CREATE_TEAM then
         Events.emit("CREATE_TEAM", param)

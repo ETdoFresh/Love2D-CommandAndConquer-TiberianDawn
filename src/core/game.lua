@@ -118,6 +118,14 @@ function Game.new()
     -- Team system (for AI teams)
     self.team_system = nil
 
+    -- Mission result state
+    self.mission_result = nil  -- "victory" or "defeat"
+    self.mission_result_message = nil
+
+    -- In-game message display
+    self.current_message = nil
+    self.message_timer = 0
+
     return self
 end
 
@@ -223,7 +231,98 @@ function Game:init()
     -- Initialize systems that need world reference
     self:init_systems()
 
+    -- Register game event handlers
+    self:register_events()
+
     self.state = Game.STATE.MENU
+end
+
+-- Register for game events
+function Game:register_events()
+    -- Handle mission win
+    Events.on(Events.EVENTS.GAME_WIN, function(house)
+        self:on_game_win(house)
+    end)
+
+    -- Handle mission lose
+    Events.on(Events.EVENTS.GAME_LOSE, function(house)
+        self:on_game_lose(house)
+    end)
+
+    -- Handle reinforcement requests from triggers
+    Events.on("REINFORCEMENT", function(team_name, waypoint)
+        self:spawn_reinforcement(team_name, waypoint)
+    end)
+
+    -- Handle in-game text messages from triggers
+    Events.on("SHOW_TEXT", function(text_id)
+        self:show_message(text_id)
+    end)
+end
+
+-- Called when player wins a mission
+function Game:on_game_win(house)
+    if self.mode == Game.MODE.CAMPAIGN then
+        self.state = Game.STATE.PAUSED
+        self.mission_result = "victory"
+        self.mission_result_message = "Mission Accomplished"
+    end
+end
+
+-- Called when player loses a mission
+function Game:on_game_lose(house)
+    if self.mode == Game.MODE.CAMPAIGN then
+        self.state = Game.STATE.PAUSED
+        self.mission_result = "defeat"
+        self.mission_result_message = "Mission Failed"
+    end
+end
+
+-- Spawn reinforcement team at map edge
+function Game:spawn_reinforcement(team_name, waypoint)
+    if not self.team_system then return end
+
+    -- Get the team type definition
+    local team_type = self.team_system.team_types[team_name]
+    if not team_type then return end
+
+    -- Determine spawn position (map edge based on waypoint or default)
+    local spawn_x, spawn_y = 0, 0
+    if waypoint and self.scenario_loader and self.scenario_loader.scenario then
+        local wp = self.scenario_loader.scenario.waypoints and
+                   self.scenario_loader.scenario.waypoints[waypoint]
+        if wp then
+            spawn_x = wp.x
+            spawn_y = wp.y
+        end
+    end
+
+    -- Create units for the team
+    if self.production_system then
+        for _, member in ipairs(team_type.members or {}) do
+            for i = 1, (member.count or 1) do
+                local entity = self.production_system:create_unit(
+                    member.type,
+                    Constants.HOUSE[team_type.house] or Constants.HOUSE.BAD,
+                    spawn_x + (i * 128),  -- Offset each unit slightly
+                    spawn_y
+                )
+                if entity then
+                    self.world:add_entity(entity)
+                end
+            end
+        end
+    end
+
+    -- Create the team to coordinate these units
+    self.team_system:create_team(team_name)
+end
+
+-- Show in-game message
+function Game:show_message(text_id)
+    -- Store message for display
+    self.current_message = text_id
+    self.message_timer = 5.0  -- Show for 5 seconds
 end
 
 -- Initialize systems after world is set up
