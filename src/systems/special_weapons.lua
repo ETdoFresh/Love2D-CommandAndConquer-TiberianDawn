@@ -273,10 +273,26 @@ end
 -- Update special weapons
 function SpecialWeapons:update(dt)
     -- Update cooldowns
-    for _, house_weapons in pairs(self.weapons) do
-        for _, weapon in pairs(house_weapons) do
+    for house, house_weapons in pairs(self.weapons) do
+        for weapon_type, weapon in pairs(house_weapons) do
             if weapon.cooldown > 0 then
+                local was_charging = weapon.cooldown > 0
                 weapon.cooldown = weapon.cooldown - dt * 60  -- Convert to frames
+
+                -- Check if weapon just became ready
+                if was_charging and weapon.cooldown <= 0 and weapon.available then
+                    weapon.cooldown = 0  -- Clamp
+                    -- Emit ready event for EVA announcement
+                    local type_name = "ion_cannon"
+                    if weapon_type == SpecialWeapons.TYPE.NUCLEAR_STRIKE then
+                        type_name = "nuclear"
+                    elseif weapon_type == SpecialWeapons.TYPE.AIRSTRIKE then
+                        type_name = "airstrike"
+                    elseif weapon_type == SpecialWeapons.TYPE.NAPALM_STRIKE then
+                        type_name = "napalm"
+                    end
+                    Events.emit("SPECIAL_WEAPON_READY", house, type_name)
+                end
             end
         end
     end

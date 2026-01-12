@@ -179,6 +179,65 @@ function AudioSystem:register_events()
         self:queue_speech("Building captured")
     end)
 
+    -- Special weapons EVA announcements
+    Events.on("SPECIAL_WEAPON_READY", function(house, weapon_type)
+        if weapon_type == "ion_cannon" then
+            self:queue_speech("Ion cannon ready")
+        elseif weapon_type == "nuclear" or weapon_type == "nuke" then
+            self:queue_speech("Nuclear missile ready")
+        elseif weapon_type == "airstrike" or weapon_type == "a10" then
+            self:queue_speech("A-10 ready")
+        end
+    end)
+
+    Events.on("SPECIAL_WEAPON_TARGETING", function(house, weapon_type)
+        self:queue_speech("Select target")
+    end)
+
+    Events.on("SPECIAL_WEAPON_FIRED", function(house, weapon_type)
+        if weapon_type == "ion_cannon" then
+            self:play_sound("ion1")
+        elseif weapon_type == "nuclear" or weapon_type == "nuke" then
+            self:play_sound("nukexplo")
+        elseif weapon_type == "airstrike" or weapon_type == "a10" then
+            self:play_sound("airborne")
+        end
+    end)
+
+    -- Harvester events
+    Events.on("HARVESTER_DOCKING", function(entity, refinery)
+        -- Could play docking sound
+    end)
+
+    Events.on("HARVESTER_UNDER_ATTACK", function(entity)
+        self:queue_speech("Harvester under attack")
+    end)
+
+    Events.on("SILOS_NEEDED", function()
+        self:queue_speech("Silos needed")
+    end)
+
+    -- Mission/game events
+    Events.on(Events.EVENTS.GAME_WIN, function()
+        self:queue_speech("Mission accomplished")
+    end)
+
+    Events.on(Events.EVENTS.GAME_LOSE, function()
+        self:queue_speech("Mission failed")
+    end)
+
+    Events.on("REINFORCEMENTS_ARRIVED", function()
+        self:queue_speech("Reinforcements have arrived")
+    end)
+
+    Events.on("BUILDING_PLACEMENT_CANCELLED", function()
+        self:queue_speech("Cancelled")
+    end)
+
+    Events.on("CANNOT_DEPLOY", function()
+        self:queue_speech("Cannot deploy here")
+    end)
+
     -- Selection response - play unit acknowledgment when units are selected
     Events.on(Events.EVENTS.SELECTION_CHANGED, function(units)
         if units and #units > 0 then

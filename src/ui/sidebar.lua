@@ -263,8 +263,12 @@ function Sidebar:draw()
     local prod_y = power_y + 16
     self:draw_production_status(x + 4, prod_y, self.width - 8)
 
+    -- Harvester status display (if any harvester is docking/unloading)
+    local harvester_y = prod_y + 28
+    local harvester_height = self:draw_harvester_status(x + 4, harvester_y, self.width - 8)
+
     -- Tabs
-    local tabs_y = prod_y + 28
+    local tabs_y = harvester_y + harvester_height + 4
     self:draw_tabs(x, tabs_y)
 
     -- Items
@@ -311,6 +315,103 @@ function Sidebar:draw_production_status(x, y, width)
         love.graphics.setColor(0.4, 0.4, 0.4, 1)
         love.graphics.printf("Ready", x, y + 4, width, "center")
     end
+end
+
+-- Draw harvester dock/unload status
+function Sidebar:draw_harvester_status(x, y, width)
+    if not self.world then return 0 end
+
+    -- Find any harvester that is docking or unloading for this house
+    local harvesters = self.world:get_entities_with("harvester", "owner")
+    local active_harvester = nil
+    local dock_state = nil
+    local tiberium_load = 0
+    local max_load = 700  -- Standard harvester capacity
+
+    for _, entity in ipairs(harvesters) do
+        local owner = entity:get("owner")
+        local harvester = entity:get("harvester")
+
+        if owner and owner.house == self.house and harvester then
+            -- Check if this harvester is at refinery
+            if harvester.dock_state then
+                active_harvester = entity
+                dock_state = harvester.dock_state
+                tiberium_load = harvester.tiberium_load or 0
+                break  -- Show first active harvester
+            end
+        end
+    end
+
+    if not active_harvester then
+        return 0  -- No height used
+    end
+
+    local height = 24
+
+    -- Background
+    love.graphics.setColor(0.15, 0.2, 0.15, 1)
+    love.graphics.rectangle("fill", x, y, width, height)
+
+    -- Border
+    love.graphics.setColor(0.3, 0.5, 0.3, 1)
+    love.graphics.rectangle("line", x, y, width, height)
+
+    -- Status text based on dock state
+    local status_text = "HARVESTER"
+    local progress = 0
+    local show_progress = false
+
+    -- Dock states: APPROACHING=1, DOCKING=2, UNLOADING=3, UNDOCKING=4, COMPLETE=5
+    if dock_state == 1 then
+        status_text = "Approaching..."
+    elseif dock_state == 2 then
+        status_text = "Docking..."
+        show_progress = true
+        local harvester = active_harvester:get("harvester")
+        progress = 1 - ((harvester.dock_timer or 0) / 15)  -- 15 ticks to dock
+    elseif dock_state == 3 then
+        status_text = "Unloading"
+        show_progress = true
+        progress = 1 - (tiberium_load / max_load)
+    elseif dock_state == 4 then
+        status_text = "Undocking..."
+        show_progress = true
+        local harvester = active_harvester:get("harvester")
+        progress = 1 - ((harvester.dock_timer or 0) / 10)  -- 10 ticks to undock
+    elseif dock_state == 5 then
+        status_text = "Complete"
+        progress = 1
+    end
+
+    -- Draw progress bar
+    if show_progress or dock_state == 3 then
+        local bar_y = y + 14
+        local bar_height = 6
+
+        -- Bar background
+        love.graphics.setColor(0.1, 0.1, 0.1, 1)
+        love.graphics.rectangle("fill", x + 2, bar_y, width - 4, bar_height)
+
+        -- Progress fill
+        local fill_color = {0.2, 0.7, 0.2, 1}  -- Green
+        if dock_state == 3 then
+            -- Unloading - show credits color (yellow/gold)
+            fill_color = {0.9, 0.8, 0.1, 1}
+        end
+        love.graphics.setColor(unpack(fill_color))
+        love.graphics.rectangle("fill", x + 2, bar_y, (width - 4) * progress, bar_height)
+
+        -- Bar border
+        love.graphics.setColor(0.4, 0.6, 0.4, 1)
+        love.graphics.rectangle("line", x + 2, bar_y, width - 4, bar_height)
+    end
+
+    -- Status text
+    love.graphics.setColor(0.8, 1, 0.8, 1)
+    love.graphics.printf(status_text, x, y + 2, width, "center")
+
+    return height
 end
 
 function Sidebar:draw_power_bar(x, y, width)

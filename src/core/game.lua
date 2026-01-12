@@ -841,10 +841,43 @@ function Game:draw_terrain()
                 love.graphics.setColor(0.2, 0.35, 0.15, 1)
                 love.graphics.rectangle("line", px, py, Constants.CELL_PIXEL_W, Constants.CELL_PIXEL_H)
 
-                -- Draw tiberium overlay
-                if cell.overlay and cell.overlay >= 0 then
-                    love.graphics.setColor(0.2, 0.9, 0.3, 0.8)
-                    love.graphics.rectangle("fill", px + 4, py + 4, 16, 16)
+                -- Draw tiberium overlay with level-based visuals
+                if cell.overlay and cell.overlay >= 6 and cell.overlay <= 17 then
+                    local tib_level = cell.overlay - 6  -- 0-11 levels
+                    local max_level = 11
+
+                    -- Base green color, brighter with higher levels
+                    local intensity = 0.4 + (tib_level / max_level) * 0.6
+                    local green = 0.7 + (tib_level / max_level) * 0.3
+                    love.graphics.setColor(0.1 * intensity, green * intensity, 0.2 * intensity, 0.9)
+
+                    -- Size based on level (small crystals grow larger)
+                    local base_size = 8 + (tib_level / max_level) * 10
+                    local cx, cy = px + Constants.CELL_PIXEL_W / 2, py + Constants.CELL_PIXEL_H / 2
+
+                    -- Draw crystal cluster
+                    local num_crystals = math.min(3 + math.floor(tib_level / 3), 6)
+                    for i = 1, num_crystals do
+                        local angle = (i / num_crystals) * math.pi * 2 + (cell.x * 0.7 + cell.y * 1.3)
+                        local dist = base_size * 0.3
+                        local crystal_x = cx + math.cos(angle) * dist
+                        local crystal_y = cy + math.sin(angle) * dist
+                        local crystal_size = base_size * (0.3 + (i % 3) * 0.2)
+
+                        -- Crystal polygon (diamond shape)
+                        love.graphics.polygon("fill",
+                            crystal_x, crystal_y - crystal_size * 0.7,
+                            crystal_x + crystal_size * 0.4, crystal_y,
+                            crystal_x, crystal_y + crystal_size * 0.3,
+                            crystal_x - crystal_size * 0.4, crystal_y
+                        )
+                    end
+
+                    -- Highlight for high-level tiberium
+                    if tib_level >= 8 then
+                        love.graphics.setColor(0.5, 1, 0.6, 0.3)
+                        love.graphics.circle("fill", cx, cy, base_size * 0.5)
+                    end
                 end
             end
         end
@@ -1573,13 +1606,129 @@ function Game:draw_building_placement_preview()
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.print(selected_item, screen_x, screen_y - 16)
 
+    -- Draw adjacency requirement help when placement fails due to adjacency
     if not can_place and reason then
         love.graphics.setColor(1, 0.5, 0.5, 1)
         love.graphics.print(reason, screen_x, screen_y + screen_h + 4)
+
+        -- If failed due to adjacency, highlight nearby friendly buildings
+        if reason:find("adjacent") then
+            self:draw_adjacent_building_hints(cell_x, cell_y, size_x, size_y)
+        end
+    elseif can_place then
+        -- Show helpful placement tip
+        love.graphics.setColor(0.5, 1, 0.5, 0.8)
+        love.graphics.print("Click to place", screen_x, screen_y + screen_h + 4)
     end
 
     -- Reset color
     love.graphics.setColor(1, 1, 1, 1)
+end
+
+-- Draw hints showing where adjacent buildings are that could satisfy placement
+function Game:draw_adjacent_building_hints(cell_x, cell_y, size_x, size_y)
+    if not self.world then return end
+
+    -- Find nearest friendly buildings
+    local buildings = self.world:get_entities_with("building", "transform", "owner")
+    local nearest_buildings = {}
+
+    for _, building in ipairs(buildings) do
+        local owner = building:get("owner")
+        if owner and owner.house == self.player_house then
+            local transform = building:get("transform")
+            local bld = building:get("building")
+
+            local bx = math.floor(transform.x / Constants.LEPTON_PER_CELL)
+            local by = math.floor(transform.y / Constants.LEPTON_PER_CELL)
+            local bw = bld.width or 1
+            local bh = bld.height or 1
+
+            -- Calculate distance from placement area to this building
+            local dist_x = 0
+            local dist_y = 0
+
+            if cell_x + size_x <= bx then
+                dist_x = bx - (cell_x + size_x)
+            elseif bx + bw <= cell_x then
+                dist_x = cell_x - (bx + bw)
+            end
+
+            if cell_y + size_y <= by then
+                dist_y = by - (cell_y + size_y)
+            elseif by + bh <= cell_y then
+                dist_y = cell_y - (by + bh)
+            end
+
+            local dist = math.max(dist_x, dist_y)
+
+            -- Only show nearby buildings (within 5 cells)
+            if dist <= 5 then
+                table.insert(nearest_buildings, {
+                    x = bx, y = by, w = bw, h = bh,
+                    dist = dist,
+                    type = bld.building_type or "Building"
+                })
+            end
+        end
+    end
+
+    -- Sort by distance
+    table.sort(nearest_buildings, function(a, b) return a.dist < b.dist end)
+
+    -- Draw highlights on nearest buildings
+    for i, bld in ipairs(nearest_buildings) do
+        if i > 3 then break end  -- Only show 3 nearest
+
+        local sx = (bld.x * Constants.CELL_PIXEL_W - self.render_system.camera_x) * self.render_system.scale
+        local sy = (bld.y * Constants.CELL_PIXEL_H - self.render_system.camera_y) * self.render_system.scale
+        local sw = bld.w * Constants.CELL_PIXEL_W * self.render_system.scale
+        local sh = bld.h * Constants.CELL_PIXEL_H * self.render_system.scale
+
+        -- Pulsing yellow border for valid adjacency buildings
+        local pulse = math.sin(love.timer.getTime() * 4) * 0.3 + 0.7
+        love.graphics.setColor(1, 0.9, 0.2, pulse)
+        love.graphics.setLineWidth(3)
+        love.graphics.rectangle("line", sx - 2, sy - 2, sw + 4, sh + 4)
+
+        -- Arrow pointing from building to placement area
+        local center_x = sx + sw / 2
+        local center_y = sy + sh / 2
+        local target_x = (cell_x * Constants.CELL_PIXEL_W + size_x * Constants.CELL_PIXEL_W / 2 - self.render_system.camera_x) * self.render_system.scale
+        local target_y = (cell_y * Constants.CELL_PIXEL_H + size_y * Constants.CELL_PIXEL_H / 2 - self.render_system.camera_y) * self.render_system.scale
+
+        love.graphics.setColor(1, 0.9, 0.2, 0.6)
+        love.graphics.setLineWidth(2)
+
+        -- Calculate direction and draw dotted line
+        local dx = target_x - center_x
+        local dy = target_y - center_y
+        local dist = math.sqrt(dx * dx + dy * dy)
+        if dist > 0 then
+            local segments = math.floor(dist / 10)
+            for s = 0, segments do
+                if s % 2 == 0 then
+                    local t1 = s / segments
+                    local t2 = math.min((s + 1) / segments, 1)
+                    local x1 = center_x + dx * t1
+                    local y1 = center_y + dy * t1
+                    local x2 = center_x + dx * t2
+                    local y2 = center_y + dy * t2
+                    love.graphics.line(x1, y1, x2, y2)
+                end
+            end
+        end
+    end
+
+    love.graphics.setLineWidth(1)
+
+    -- Show tooltip about adjacency requirement
+    if #nearest_buildings > 0 then
+        love.graphics.setColor(1, 0.9, 0.3, 0.9)
+        local nearest = nearest_buildings[1]
+        local tip_text = string.format("Place next to %s (yellow)", nearest.type)
+        love.graphics.print(tip_text, 10, love.graphics.getHeight() - 30)
+    end
 end
 
 -- Draw debug info
