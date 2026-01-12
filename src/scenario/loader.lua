@@ -422,10 +422,48 @@ function ScenarioLoader:load_scenario_data(data)
     -- Apply initial missions to all spawned entities
     self:apply_initial_missions()
 
+    -- Initialize trigger system house stats from spawned entities
+    if self.trigger_system then
+        self:init_trigger_house_stats()
+    end
+
     -- Store scenario info
     Events.emit("SCENARIO_LOADED", data)
 
     return data
+end
+
+-- Initialize house statistics for trigger system based on spawned entities
+function ScenarioLoader:init_trigger_house_stats()
+    if not self.trigger_system or not self.world then return end
+
+    -- Count buildings and units per house
+    local house_counts = {}
+
+    local entities = self.world:get_all_entities()
+    for _, entity in ipairs(entities) do
+        if entity:has("owner") then
+            local owner = entity:get("owner")
+            local house = owner.house
+
+            if not house_counts[house] then
+                house_counts[house] = { buildings = 0, units = 0 }
+            end
+
+            if entity:has("building") then
+                house_counts[house].buildings = house_counts[house].buildings + 1
+            elseif entity:has("mobile") or entity:has("infantry") then
+                house_counts[house].units = house_counts[house].units + 1
+            end
+        end
+    end
+
+    -- Update trigger system with initial counts
+    for house, counts in pairs(house_counts) do
+        self.trigger_system:ensure_house_stats(house)
+        self.trigger_system.house_stats[house].buildings = counts.buildings
+        self.trigger_system.house_stats[house].units = counts.units
+    end
 end
 
 -- Apply initial missions to entities after they're all spawned

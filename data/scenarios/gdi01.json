@@ -61,7 +61,7 @@
   "triggers": [
     {
       "name": "Win1",
-      "house": "GoodGuy",
+      "house": "BadGuy",
       "event": 11,
       "event_param": 0,
       "action": 1,

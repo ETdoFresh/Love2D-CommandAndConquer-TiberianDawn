@@ -4,9 +4,24 @@
 ]]
 
 local Events = require("src.core.events")
+local Constants = require("src.core.constants")
 
 local TriggerSystem = {}
 TriggerSystem.__index = TriggerSystem
+
+-- House string to constant mapping
+TriggerSystem.HOUSE_MAP = {
+    GoodGuy = Constants.HOUSE.GOOD,
+    BadGuy = Constants.HOUSE.BAD,
+    Neutral = Constants.HOUSE.NEUTRAL,
+    Special = Constants.HOUSE.JP,
+    Multi1 = Constants.HOUSE.MULTI1,
+    Multi2 = Constants.HOUSE.MULTI2,
+    Multi3 = Constants.HOUSE.MULTI3,
+    Multi4 = Constants.HOUSE.MULTI4,
+    GOOD = Constants.HOUSE.GOOD,
+    BAD = Constants.HOUSE.BAD
+}
 
 -- Event types (matching original)
 TriggerSystem.EVENT = {
@@ -171,6 +186,14 @@ function TriggerSystem:ensure_house_stats(house)
     end
 end
 
+-- Convert house string to constant
+function TriggerSystem:house_to_constant(house_str)
+    if type(house_str) == "number" then
+        return house_str
+    end
+    return TriggerSystem.HOUSE_MAP[house_str] or Constants.HOUSE.NEUTRAL
+end
+
 -- Load triggers from scenario data
 function TriggerSystem:load_triggers(trigger_data)
     self.triggers = {}
@@ -178,7 +201,7 @@ function TriggerSystem:load_triggers(trigger_data)
     for _, t in ipairs(trigger_data) do
         local trigger = {
             name = t.name,
-            house = t.house or "GOOD",
+            house = self:house_to_constant(t.house or "GOOD"),  -- Convert to numeric constant
             event = t.event or TriggerSystem.EVENT.NONE,
             event_param = t.event_param or 0,
             action = t.action or TriggerSystem.ACTION.NONE,
