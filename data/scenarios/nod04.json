@@ -1,0 +1,147 @@
+{
+  "name": "NOD Mission 4: Destroy the Convoy",
+  "intro": "nod4",
+  "brief": "NOD4",
+  "win_movie": "nod4win",
+  "lose_movie": "nod4lose",
+  "player": "BadGuy",
+  "build_level": 4,
+  "theater": "TEMPERATE",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+
+  "briefing": {
+    "title": "NOD Mission 4: Destroy the Convoy",
+    "text": "GDI is transporting sensitive equipment through this region. Intelligence reports a convoy will pass through the valley within minutes. Your forces must intercept and destroy the convoy before it reaches the GDI base. Strike fast and hard - do not let any vehicles escape. Our flame tanks will prove effective against their light vehicles.",
+    "objectives": [
+      "Destroy all GDI convoy vehicles",
+      "Do not let any convoy vehicles escape",
+      "Eliminate GDI escort forces"
+    ]
+  },
+
+  "houses": {
+    "BadGuy": {
+      "credits": 4000,
+      "edge": "West",
+      "max_unit": 60,
+      "max_building": 20
+    },
+    "GoodGuy": {
+      "credits": 2000,
+      "edge": "East",
+      "max_unit": 50,
+      "max_building": 15
+    }
+  },
+
+  "structures": [
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 55, "cell_y": 28},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 55, "cell_y": 35}
+  ],
+
+  "units": [
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 5, "cell_y": 28, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 5, "cell_y": 32, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 3, "cell_y": 30, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 7, "cell_y": 30, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BIKE", "health": 256, "cell_x": 4, "cell_y": 26, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BIKE", "health": 256, "cell_x": 4, "cell_y": 34, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BGGY", "health": 256, "cell_x": 6, "cell_y": 26, "facing": 64, "mission": "Guard"},
+    {"house": "BadGuy", "type": "BGGY", "health": 256, "cell_x": 6, "cell_y": 34, "facing": 64, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 58, "cell_y": 26, "facing": 192, "mission": "Guard", "tag": "escort1"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 58, "cell_y": 34, "facing": 192, "mission": "Guard", "tag": "escort2"},
+    {"house": "GoodGuy", "type": "APC", "health": 256, "cell_x": 60, "cell_y": 28, "facing": 192, "mission": "Guard", "tag": "convoy1"},
+    {"house": "GoodGuy", "type": "APC", "health": 256, "cell_x": 60, "cell_y": 30, "facing": 192, "mission": "Guard", "tag": "convoy2"},
+    {"house": "GoodGuy", "type": "APC", "health": 256, "cell_x": 60, "cell_y": 32, "facing": 192, "mission": "Guard", "tag": "convoy3"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 62, "cell_y": 30, "facing": 192, "mission": "Guard", "tag": "escort3"}
+  ],
+
+  "infantry": [
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 4, "cell_y": 28, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 4, "cell_y": 32, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 5, "cell_y": 29, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 5, "cell_y": 31, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 6, "cell_y": 28, "subcell": 0, "mission": "Guard", "facing": 64},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 6, "cell_y": 32, "subcell": 0, "mission": "Guard", "facing": 64}
+  ],
+
+  "triggers": [
+    {
+      "name": "Win1",
+      "house": "GoodGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Intro",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 3,
+      "action": 11,
+      "action_param": "The convoy is approaching from the east. Intercept and destroy it!",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "ConvoyMove",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 60,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Convoy",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Reinforce",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 300,
+      "action": 7,
+      "action_param": 0,
+      "team": "GDI_Reinforce",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "GDI_Convoy",
+      "house": "GoodGuy",
+      "edge": "East",
+      "mission": 2,
+      "waypoints": [0, 1],
+      "members": [
+        {"type": "APC", "count": 3},
+        {"type": "JEEP", "count": 2}
+      ]
+    },
+    {
+      "name": "GDI_Reinforce",
+      "house": "GoodGuy",
+      "edge": "East",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "MTNK", "count": 2},
+        {"type": "E1", "count": 4}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 15360, "y": 7680},
+    {"x": 1280, "y": 7680}
+  ],
+
+  "cell_triggers": []
+}

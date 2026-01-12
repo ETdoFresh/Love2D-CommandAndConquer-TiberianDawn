@@ -512,11 +512,25 @@ function ProductionSystem:create_building(building_type, house, cell_x, cell_y)
         local attack_range = self:get_weapon_range(data.primary_weapon)
         entity:add("combat", Component.create("combat", {
             primary_weapon = data.primary_weapon,
-            attack_range = attack_range
+            attack_range = attack_range,
+            ammo = -1  -- Buildings have unlimited ammo
         }))
 
         if data.turret then
             entity:add("turret", Component.create("turret"))
+        end
+
+        -- Add mission component for AI targeting (defensive buildings use GUARD)
+        entity:add("mission", Component.create("mission", {
+            mission_type = Constants.MISSION.GUARD
+        }))
+    end
+
+    -- Anti-air buildings can only target aircraft
+    if data.antiair then
+        local combat = entity:get("combat")
+        if combat then
+            combat.antiair_only = true
         end
     end
 

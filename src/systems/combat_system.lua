@@ -836,6 +836,9 @@ function CombatSystem:find_target(entity, threat_mask)
     local best_target = nil
     local best_score = -math.huge
 
+    -- Check if this is an anti-air only weapon (SAM sites)
+    local antiair_only = combat.antiair_only or false
+
     -- Get all potential targets
     local targets = self.world:get_entities_with("transform", "health", "owner")
 
@@ -845,16 +848,21 @@ function CombatSystem:find_target(entity, threat_mask)
 
             -- Check if enemy
             if target_owner.house ~= owner.house then
-                local target_transform = target:get("transform")
-                local dist = self:calculate_distance(transform, target_transform)
+                -- Anti-air weapons can only target aircraft
+                if antiair_only and not target:has("aircraft") then
+                    -- Skip non-aircraft targets for AA weapons
+                else
+                    local target_transform = target:get("transform")
+                    local dist = self:calculate_distance(transform, target_transform)
 
-                -- Check range
-                if dist <= combat.attack_range then
-                    local score = self:calculate_threat_score(entity, target, dist)
+                    -- Check range
+                    if dist <= combat.attack_range then
+                        local score = self:calculate_threat_score(entity, target, dist)
 
-                    if score > best_score then
-                        best_score = score
-                        best_target = target
+                        if score > best_score then
+                            best_score = score
+                            best_target = target
+                        end
                     end
                 end
             end

@@ -1,0 +1,198 @@
+{
+  "name": "NOD Mission 7: Tiberium Dominance",
+  "intro": "nod7",
+  "brief": "NOD7",
+  "win_movie": "nod7win",
+  "lose_movie": "nod7lose",
+  "player": "BadGuy",
+  "build_level": 7,
+  "theater": "DESERT",
+  "map_x": 0,
+  "map_y": 0,
+  "map_width": 64,
+  "map_height": 64,
+
+  "briefing": {
+    "title": "NOD Mission 7: Tiberium Dominance",
+    "text": "This region contains the richest Tiberium fields in the sector. GDI has established multiple harvesting operations here. Kane demands we take control of this vital resource. Establish your base and build Obelisks of Light to secure the perimeter. Then eliminate all GDI presence. The Tiberium fields must be ours - harvest as much as possible while destroying the enemy.",
+    "objectives": [
+      "Deploy and establish your base",
+      "Build at least one Obelisk of Light",
+      "Destroy all GDI structures",
+      "Control the Tiberium fields"
+    ]
+  },
+
+  "houses": {
+    "BadGuy": {
+      "credits": 8000,
+      "edge": "South",
+      "max_unit": 100,
+      "max_building": 60
+    },
+    "GoodGuy": {
+      "credits": 6000,
+      "edge": "North",
+      "max_unit": 80,
+      "max_building": 50
+    }
+  },
+
+  "structures": [
+    {"house": "GoodGuy", "type": "FACT", "health": 256, "cell_x": 30, "cell_y": 6},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 26, "cell_y": 8},
+    {"house": "GoodGuy", "type": "NUKE", "health": 256, "cell_x": 34, "cell_y": 8},
+    {"house": "GoodGuy", "type": "NUK2", "health": 256, "cell_x": 38, "cell_y": 8},
+    {"house": "GoodGuy", "type": "PROC", "health": 256, "cell_x": 22, "cell_y": 6},
+    {"house": "GoodGuy", "type": "PROC", "health": 256, "cell_x": 40, "cell_y": 6},
+    {"house": "GoodGuy", "type": "PYLE", "health": 256, "cell_x": 28, "cell_y": 10},
+    {"house": "GoodGuy", "type": "WEAP", "health": 256, "cell_x": 32, "cell_y": 10},
+    {"house": "GoodGuy", "type": "HQ", "health": 256, "cell_x": 36, "cell_y": 12},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 20, "cell_y": 10},
+    {"house": "GoodGuy", "type": "GTWR", "health": 256, "cell_x": 42, "cell_y": 10},
+    {"house": "GoodGuy", "type": "ATWR", "health": 256, "cell_x": 24, "cell_y": 14},
+    {"house": "GoodGuy", "type": "ATWR", "health": 256, "cell_x": 38, "cell_y": 14}
+  ],
+
+  "units": [
+    {"house": "BadGuy", "type": "MCV", "health": 256, "cell_x": 30, "cell_y": 55, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 26, "cell_y": 54, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "LTNK", "health": 256, "cell_x": 34, "cell_y": 54, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 28, "cell_y": 54, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "FTNK", "health": 256, "cell_x": 32, "cell_y": 54, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 24, "cell_y": 53, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "STNK", "health": 256, "cell_x": 36, "cell_y": 53, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 28, "cell_y": 56, "facing": 0, "mission": "Guard"},
+    {"house": "BadGuy", "type": "ARTY", "health": 256, "cell_x": 32, "cell_y": 56, "facing": 0, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 28, "cell_y": 14, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MTNK", "health": 256, "cell_x": 34, "cell_y": 14, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HTNK", "health": 256, "cell_x": 31, "cell_y": 16, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 22, "cell_y": 12, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "JEEP", "health": 256, "cell_x": 40, "cell_y": 12, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "MLRS", "health": 256, "cell_x": 30, "cell_y": 18, "facing": 128, "mission": "Guard"},
+    {"house": "GoodGuy", "type": "HARV", "health": 256, "cell_x": 20, "cell_y": 8, "facing": 128, "mission": "Harvest"},
+    {"house": "GoodGuy", "type": "HARV", "health": 256, "cell_x": 42, "cell_y": 8, "facing": 128, "mission": "Harvest"}
+  ],
+
+  "infantry": [
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 29, "cell_y": 55, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E1", "health": 256, "cell_x": 31, "cell_y": 55, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 27, "cell_y": 55, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E3", "health": 256, "cell_x": 33, "cell_y": 55, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 25, "cell_y": 54, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E4", "health": 256, "cell_x": 35, "cell_y": 54, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E5", "health": 256, "cell_x": 29, "cell_y": 54, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "BadGuy", "type": "E5", "health": 256, "cell_x": 31, "cell_y": 54, "subcell": 0, "mission": "Guard", "facing": 0},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 27, "cell_y": 9, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 35, "cell_y": 9, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 29, "cell_y": 11, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E1", "health": 256, "cell_x": 33, "cell_y": 11, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 21, "cell_y": 11, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 41, "cell_y": 11, "subcell": 0, "mission": "Guard", "facing": 128},
+    {"house": "GoodGuy", "type": "E3", "health": 256, "cell_x": 31, "cell_y": 13, "subcell": 0, "mission": "Guard", "facing": 128}
+  ],
+
+  "triggers": [
+    {
+      "name": "Win1",
+      "house": "GoodGuy",
+      "event": 11,
+      "event_param": 0,
+      "action": 1,
+      "action_param": 0,
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Intro",
+      "house": "BadGuy",
+      "event": 13,
+      "event_param": 3,
+      "action": 11,
+      "action_param": "Secure this region. Build Obelisks and destroy all GDI forces.",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Counter1",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 360,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Counter1",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Counter2",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 600,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Counter2",
+      "persistent": false,
+      "repeatable": false
+    },
+    {
+      "name": "Counter3",
+      "house": "GoodGuy",
+      "event": 13,
+      "event_param": 900,
+      "action": 4,
+      "action_param": 0,
+      "team": "GDI_Counter3",
+      "persistent": false,
+      "repeatable": false
+    }
+  ],
+
+  "teams": [
+    {
+      "name": "GDI_Counter1",
+      "house": "GoodGuy",
+      "edge": "North",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 8},
+        {"type": "MTNK", "count": 2}
+      ]
+    },
+    {
+      "name": "GDI_Counter2",
+      "house": "GoodGuy",
+      "edge": "North",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 6},
+        {"type": "E3", "count": 4},
+        {"type": "MTNK", "count": 3},
+        {"type": "HTNK", "count": 1}
+      ]
+    },
+    {
+      "name": "GDI_Counter3",
+      "house": "GoodGuy",
+      "edge": "North",
+      "mission": 0,
+      "waypoints": [],
+      "members": [
+        {"type": "E1", "count": 4},
+        {"type": "E3", "count": 4},
+        {"type": "MTNK", "count": 2},
+        {"type": "HTNK", "count": 2},
+        {"type": "MLRS", "count": 2}
+      ]
+    }
+  ],
+
+  "waypoints": [
+    {"x": 7680, "y": 14080},
+    {"x": 7680, "y": 2048}
+  ],
+
+  "cell_triggers": []
+}
