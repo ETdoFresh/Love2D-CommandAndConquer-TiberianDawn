@@ -147,9 +147,14 @@ function ProductionSystem:spawn_unit(factory, item)
         return nil
     end
 
-    -- Find spawn location (next to factory)
-    local spawn_x = factory_transform.x + Constants.LEPTON_PER_CELL
-    local spawn_y = factory_transform.y + Constants.LEPTON_PER_CELL
+    -- Find valid spawn location around factory
+    local spawn_x, spawn_y = self:find_spawn_location(factory, item)
+
+    if not spawn_x then
+        -- No valid spawn location, queue for later
+        print("WARNING: No valid spawn location for " .. tostring(item.name))
+        return nil
+    end
 
     -- Create the unit
     local unit = self:create_unit(item.name, factory_owner.house, spawn_x, spawn_y)
@@ -160,6 +165,92 @@ function ProductionSystem:spawn_unit(factory, item)
     end
 
     return nil
+end
+
+-- Find a valid spawn location around a factory
+function ProductionSystem:find_spawn_location(factory, item)
+    local transform = factory:get("transform")
+    local building = factory:get("building")
+
+    if not transform then return nil, nil end
+
+    -- Get factory size in cells (default 2x2 for weapons factory)
+    local factory_w = building and building.width or 2
+    local factory_h = building and building.height or 2
+
+    local factory_cell_x = transform.cell_x
+    local factory_cell_y = transform.cell_y
+
+    -- Check spawn locations in priority order:
+    -- 1. Right side (east exit)
+    -- 2. Bottom side (south exit)
+    -- 3. Left side (west)
+    -- 4. Top side (north)
+    local spawn_offsets = {
+        -- Right side (east exit - primary for vehicles)
+        {x = factory_w, y = 0},
+        {x = factory_w, y = 1},
+        {x = factory_w, y = factory_h - 1},
+        -- Bottom side (south exit)
+        {x = 0, y = factory_h},
+        {x = 1, y = factory_h},
+        {x = factory_w - 1, y = factory_h},
+        -- Left side
+        {x = -1, y = 0},
+        {x = -1, y = 1},
+        -- Top side
+        {x = 0, y = -1},
+        {x = 1, y = -1},
+    }
+
+    local grid = self.world and self.world.grid
+
+    for _, offset in ipairs(spawn_offsets) do
+        local cell_x = factory_cell_x + offset.x
+        local cell_y = factory_cell_y + offset.y
+
+        -- Check if cell is valid for spawning
+        if self:is_spawn_cell_valid(cell_x, cell_y, item, grid) then
+            -- Convert to leptons (center of cell)
+            local spawn_x = (cell_x * Constants.LEPTON_PER_CELL) + (Constants.LEPTON_PER_CELL / 2)
+            local spawn_y = (cell_y * Constants.LEPTON_PER_CELL) + (Constants.LEPTON_PER_CELL / 2)
+            return spawn_x, spawn_y
+        end
+    end
+
+    -- No valid location found
+    return nil, nil
+end
+
+-- Check if a cell is valid for spawning a unit
+function ProductionSystem:is_spawn_cell_valid(cell_x, cell_y, item, grid)
+    if not grid then
+        -- No grid, assume valid
+        return true
+    end
+
+    local cell = grid:get_cell(cell_x, cell_y)
+    if not cell then
+        return false
+    end
+
+    -- Check if cell is passable
+    if not cell:is_passable() then
+        return false
+    end
+
+    -- Check if cell is occupied by a building
+    local Cell = require("src.map.cell")
+    if cell:has_flag_set(Cell.FLAG.BUILDING) then
+        return false
+    end
+
+    -- Check if cell already has a unit
+    if cell:has_flag_set(Cell.FLAG.UNIT) then
+        return false
+    end
+
+    return true
 end
 
 -- Get color for a house/faction

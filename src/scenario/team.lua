@@ -288,11 +288,204 @@ function TeamSystem:update_team(team, dt)
         return
     end
 
-    -- Update waypoint following
+    -- Update based on mission type
     if team.mission == TeamSystem.MISSION.MOVE or
        team.mission == TeamSystem.MISSION.LOOP then
         self:update_waypoint_movement(team)
+
+    elseif team.mission == TeamSystem.MISSION.ATTACK_BASE or
+           team.mission == TeamSystem.MISSION.ATTACK_UNITS then
+        self:update_coordinated_attack(team)
     end
+end
+
+-- Update coordinated attack - wait for team to gather before attacking
+function TeamSystem:update_coordinated_attack(team)
+    if #team.members == 0 then return end
+
+    -- Calculate team center
+    local center_x, center_y = 0, 0
+    local count = 0
+
+    for _, entity in ipairs(team.members) do
+        local transform = entity:get("transform")
+        if transform then
+            center_x = center_x + transform.x
+            center_y = center_y + transform.y
+            count = count + 1
+        end
+    end
+
+    if count == 0 then return end
+
+    center_x = center_x / count
+    center_y = center_y / count
+
+    -- Check if team is gathered (all members within gather radius)
+    local GATHER_RADIUS = 512  -- 2 cells
+    local all_gathered = true
+    local max_dist = 0
+
+    for _, entity in ipairs(team.members) do
+        local transform = entity:get("transform")
+        if transform then
+            local dx = transform.x - center_x
+            local dy = transform.y - center_y
+            local dist = math.sqrt(dx * dx + dy * dy)
+            max_dist = math.max(max_dist, dist)
+            if dist > GATHER_RADIUS then
+                all_gathered = false
+            end
+        end
+    end
+
+    -- Team behavior based on gather state
+    if not team.gathering_started then
+        -- First update - start gathering phase
+        team.gathering_started = true
+        team.gathered = false
+        team.gather_time = 0
+
+        -- Move all units toward center
+        for _, entity in ipairs(team.members) do
+            self:move_entity_to(entity, center_x, center_y)
+        end
+
+    elseif not team.gathered then
+        -- Gathering phase - wait for units to group up
+        team.gather_time = (team.gather_time or 0) + 1
+
+        if all_gathered or team.gather_time > 150 then  -- Max 10 seconds at 15 FPS
+            -- Team is gathered, start attack
+            team.gathered = true
+
+            -- Find target and attack as a group
+            local target = self:find_team_target(team)
+            if target then
+                team.target = target
+                for _, entity in ipairs(team.members) do
+                    if self.ai_system then
+                        -- Set shared target for focused fire
+                        local mission = entity:get("mission")
+                        if mission then
+                            mission.target = target
+                        end
+                        self.ai_system:set_mission(entity, Constants.MISSION.ATTACK)
+                    end
+                end
+            else
+                -- No target found, hunt
+                for _, entity in ipairs(team.members) do
+                    if self.ai_system then
+                        self.ai_system:set_mission(entity, Constants.MISSION.HUNT)
+                    end
+                end
+            end
+        else
+            -- Still gathering - move stragglers toward center
+            for _, entity in ipairs(team.members) do
+                local transform = entity:get("transform")
+                local mobile = entity:get("mobile")
+                if transform and mobile and not mobile.is_moving then
+                    local dx = transform.x - center_x
+                    local dy = transform.y - center_y
+                    local dist = math.sqrt(dx * dx + dy * dy)
+                    if dist > GATHER_RADIUS then
+                        self:move_entity_to(entity, center_x, center_y)
+                    end
+                end
+            end
+        end
+
+    else
+        -- Already gathered and attacking - check for shared target
+        if team.target and team.target.destroyed then
+            -- Target destroyed, find new one
+            local new_target = self:find_team_target(team)
+            if new_target then
+                team.target = new_target
+                for _, entity in ipairs(team.members) do
+                    local mission = entity:get("mission")
+                    if mission then
+                        mission.target = new_target
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Find a target for the team to attack
+function TeamSystem:find_team_target(team)
+    if #team.members == 0 then return nil end
+
+    -- Get team center for distance calculations
+    local center_x, center_y = 0, 0
+    local count = 0
+
+    for _, entity in ipairs(team.members) do
+        local transform = entity:get("transform")
+        if transform then
+            center_x = center_x + transform.x
+            center_y = center_y + transform.y
+            count = count + 1
+        end
+    end
+
+    if count == 0 then return nil end
+    center_x = center_x / count
+    center_y = center_y / count
+
+    -- Convert team house to constant
+    local team_house = team.house
+    if type(team_house) == "string" then
+        if team_house == "BadGuy" or team_house == "BAD" then
+            team_house = Constants.HOUSE.BAD
+        elseif team_house == "GoodGuy" or team_house == "GOOD" then
+            team_house = Constants.HOUSE.GOOD
+        end
+    end
+
+    -- Find closest enemy target
+    local best_target = nil
+    local best_dist = math.huge
+
+    -- Priority: buildings first for ATTACK_BASE, units for ATTACK_UNITS
+    local search_order
+    if team.mission == TeamSystem.MISSION.ATTACK_BASE then
+        search_order = {"building", "vehicle", "infantry"}
+    else
+        search_order = {"vehicle", "infantry", "building"}
+    end
+
+    for _, tag in ipairs(search_order) do
+        local entities = self.world:get_entities_tagged(tag)
+
+        for _, entity in ipairs(entities) do
+            if not entity.destroyed then
+                local owner = entity:get("owner")
+                local transform = entity:get("transform")
+
+                if owner and transform and owner.house ~= team_house then
+                    local dx = transform.x - center_x
+                    local dy = transform.y - center_y
+                    local dist = math.sqrt(dx * dx + dy * dy)
+
+                    if dist < best_dist then
+                        best_dist = dist
+                        best_target = entity
+                    end
+                end
+            end
+        end
+
+        -- If we found a target in preferred category, use it
+        if best_target then
+            break
+        end
+    end
+
+    return best_target
 end
 
 -- Update waypoint-based movement

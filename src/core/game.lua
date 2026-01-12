@@ -1064,11 +1064,22 @@ function Game:advance_campaign()
     if self.current_mission then
         local faction = self.current_mission:match("^(%a+)")
         local num = tonumber(self.current_mission:match("(%d+)$")) or 1
-        self.current_mission = faction .. string.format("%02d", num + 1)
-    end
+        local next_num = num + 1
 
-    -- Return to campaign select for now (could auto-load next mission)
-    self.state = Game.STATE.CAMPAIGN_SELECT
+        -- Check if next mission exists (GDI has 15, Nod has 13)
+        local max_missions = (faction == "gdi") and 15 or 13
+        if next_num <= max_missions then
+            -- Show briefing for next mission
+            local faction_upper = faction:upper()
+            self:reset_game_state()
+            self:show_briefing(faction_upper, next_num)
+        else
+            -- Campaign complete - return to menu
+            self.state = Game.STATE.MENU
+        end
+    else
+        self.state = Game.STATE.CAMPAIGN_SELECT
+    end
 end
 
 -- Replay current mission
