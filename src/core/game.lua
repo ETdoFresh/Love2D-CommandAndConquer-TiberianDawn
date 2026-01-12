@@ -455,6 +455,10 @@ function Game:init_systems()
 
     if self.fog_system then
         self.fog_system.world = self.world
+        -- Link fog system to render system for visibility filtering
+        if self.render_system then
+            self.render_system:set_fog_system(self.fog_system)
+        end
     end
 
     if self.audio_system then

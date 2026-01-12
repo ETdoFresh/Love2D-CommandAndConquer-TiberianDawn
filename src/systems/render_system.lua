@@ -33,7 +33,15 @@ function RenderSystem.new()
         [Constants.LAYER.TOP] = {}
     }
 
+    -- Reference to fog system for visibility checks
+    self.fog_system = nil
+
     return self
+end
+
+-- Set fog system reference for visibility filtering
+function RenderSystem:set_fog_system(fog_system)
+    self.fog_system = fog_system
 end
 
 function RenderSystem:init()
@@ -83,12 +91,24 @@ function RenderSystem:update(dt, entities)
         self.layers[layer_id] = {}
     end
 
-    -- Sort entities into layers
+    -- Sort entities into layers (filter by fog visibility if enabled)
     for _, entity in ipairs(entities) do
         local renderable = entity:get("renderable")
         if renderable.visible then
-            local layer = renderable.layer or Constants.LAYER.GROUND
-            table.insert(self.layers[layer], entity)
+            -- Check fog of war visibility for enemy units
+            local should_render = true
+            if self.fog_system and self.fog_system.fog_enabled then
+                local owner = entity:get("owner")
+                -- Only apply fog to enemy units (not your own units or effects)
+                if owner and owner.house ~= self.fog_system.player_house then
+                    should_render = self.fog_system:is_entity_visible(entity)
+                end
+            end
+
+            if should_render then
+                local layer = renderable.layer or Constants.LAYER.GROUND
+                table.insert(self.layers[layer], entity)
+            end
         end
     end
 

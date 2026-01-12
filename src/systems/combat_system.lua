@@ -8,6 +8,7 @@ local Constants = require("src.core.constants")
 local Events = require("src.core.events")
 local Direction = require("src.util.direction")
 local Component = require("src.ecs.component")
+local Random = require("src.util.random")
 
 local CombatSystem = setmetatable({}, {__index = System})
 CombatSystem.__index = CombatSystem
@@ -283,11 +284,11 @@ function CombatSystem:fire_weapon(attacker, target, weapon)
         alive = true
     }
 
-    -- Add inaccuracy for artillery-type weapons
+    -- Add inaccuracy for artillery-type weapons (use deterministic RNG for multiplayer sync)
     if projectile.inaccurate then
         local scatter = Constants.LEPTON_PER_CELL * 2  -- 2 cell scatter
-        projectile.target_x = projectile.target_x + (math.random() - 0.5) * scatter
-        projectile.target_y = projectile.target_y + (math.random() - 0.5) * scatter
+        projectile.target_x = projectile.target_x + (Random.random() - 0.5) * scatter
+        projectile.target_y = projectile.target_y + (Random.random() - 0.5) * scatter
     end
 
     self.next_projectile_id = self.next_projectile_id + 1
@@ -497,7 +498,7 @@ function CombatSystem:apply_damage(target, damage, warhead, attacker)
     -- Check for death
     if health.hp <= 0 then
         health.hp = 0
-        self:kill_unit(target, attacker)
+        self:kill_unit(target, attacker, warhead)
     end
 
     -- Emit damage event
@@ -506,9 +507,9 @@ function CombatSystem:apply_damage(target, damage, warhead, attacker)
     return final_damage
 end
 
-function CombatSystem:kill_unit(target, killer)
-    -- Spawn death/explosion effect based on unit type
-    self:spawn_death_effect(target)
+function CombatSystem:kill_unit(target, killer, warhead)
+    -- Spawn death/explosion effect based on unit type and warhead
+    self:spawn_death_effect(target, warhead)
 
     -- Emit kill event (ENTITY_KILLED is for game logic like scoring)
     self:emit(Events.EVENTS.UNIT_KILLED, target, killer)
@@ -522,18 +523,56 @@ function CombatSystem:kill_unit(target, killer)
     self.world:destroy_entity(target)
 end
 
+-- Map warhead types to infantry death animation types
+-- Based on original C&C behavior from INFANTRY.CPP
+CombatSystem.WARHEAD_TO_DEATH = {
+    SA = "gun",           -- Small arms -> gun death
+    HE = "explosion",     -- High explosive -> explosion death
+    AP = "explosion",     -- Armor piercing -> explosion death
+    FIRE = "fire",        -- Incendiary -> fire death
+    LASER = "explosion",  -- Laser -> explosion death
+    PB = "explosion",     -- Particle beam -> explosion death
+    FIST = "punch",       -- Fist -> punch death (hand-to-hand)
+    FOOT = "kick",        -- Foot -> kick death (hand-to-hand)
+    HOLLOW_POINT = "gun", -- Sniper -> gun death
+    SPORE = "fire",       -- Spore -> chemical/fire death
+    HEADBUTT = "explosion", -- Dinosaur headbutt -> explosion
+    FEEDME = "explosion",   -- T-Rex eat -> explosion
+    -- Lowercase mappings for weapon.json format
+    small_arms = "gun",
+    he = "explosion",
+    ap = "explosion",
+    fire = "fire",
+    laser = "explosion",
+    super = "explosion"
+}
+
 -- Spawn death/explosion animation at target's position
-function CombatSystem:spawn_death_effect(target)
+function CombatSystem:spawn_death_effect(target, warhead)
     if not target:has("transform") then
         return
     end
 
     local transform = target:get("transform")
     local effect_type = "explosion_small"  -- Default
+    local death_anim = nil  -- Infantry-specific death animation type
 
     -- Determine effect type based on what died
     if target:has("infantry") then
+        -- Infantry get specific death animations based on warhead
         effect_type = "infantry_death"
+
+        -- Map warhead to death type
+        local death_type = "gun"  -- Default
+        if warhead then
+            local warhead_key = CombatSystem.WARHEAD_MAP[warhead] or warhead
+            death_type = CombatSystem.WARHEAD_TO_DEATH[warhead_key] or
+                        CombatSystem.WARHEAD_TO_DEATH[warhead] or "gun"
+        end
+
+        -- Store death type for animation system
+        death_anim = death_type
+
     elseif target:has("vehicle") then
         effect_type = "explosion_medium"
     elseif target:has("aircraft") then
@@ -553,32 +592,46 @@ function CombatSystem:spawn_death_effect(target)
         x = transform.x,
         y = transform.y,
         cell_x = transform.cell_x,
-        cell_y = transform.cell_y
+        cell_y = transform.cell_y,
+        facing = transform.facing or 0  -- Preserve facing for death animation
     }))
 
-    -- Renderable
+    -- Renderable - for infantry, use their sprite for death animation
+    local sprite_name = effect_type .. ".shp"
+    if target:has("infantry") and target:has("renderable") then
+        local renderable = target:get("renderable")
+        sprite_name = renderable.sprite or sprite_name
+    end
+
     effect:add("renderable", Component.create("renderable", {
         visible = true,
         layer = Constants.LAYER.TOP or 3,  -- Render on top
-        sprite = effect_type .. ".shp",
+        sprite = sprite_name,
         color = {1, 1, 1, 1}
     }))
 
     -- Animation component for death animation
     effect:add("animation", Component.create("animation", {
-        current = "play",
+        current = "death",
         frame = 0,
         timer = 0,
         looping = false,
-        playing = true
+        playing = true,
+        death_type = death_anim  -- Store the specific death type
     }))
+
+    -- Copy infantry type for animation lookup
+    if target:has("infantry") then
+        local infantry = target:get("infantry")
+        effect.infantry_type = infantry.infantry_type
+    end
 
     -- Tag for cleanup
     effect:add_tag("effect")
     effect:add_tag("death_effect")
 
     -- Set effect lifetime (will be cleaned up by animation system when done)
-    effect.effect_lifetime = self:get_effect_duration(effect_type)
+    effect.effect_lifetime = self:get_effect_duration(effect_type, death_anim)
     effect.effect_timer = 0
 
     self.world:add_entity(effect)
@@ -586,10 +639,24 @@ function CombatSystem:spawn_death_effect(target)
     return effect
 end
 
--- Get effect duration in ticks based on effect type
-function CombatSystem:get_effect_duration(effect_type)
+-- Get effect duration in ticks based on effect type and death animation
+function CombatSystem:get_effect_duration(effect_type, death_type)
+    -- Infantry death durations based on animation frame counts from animation_data.lua
+    local infantry_durations = {
+        gun = 16,        -- 8 frames * 2 ticks
+        explosion = 16,  -- 8 frames * 2 ticks
+        grenade = 24,    -- 12 frames * 2 ticks
+        fire = 36,       -- 18 frames * 2 ticks (longest)
+        punch = 16,      -- 8 frames * 2 ticks
+        kick = 16        -- 8 frames * 2 ticks
+    }
+
+    if effect_type == "infantry_death" and death_type then
+        return infantry_durations[death_type] or 16
+    end
+
     local durations = {
-        infantry_death = 15,    -- 1 second at 15 FPS
+        infantry_death = 16,    -- Default infantry death
         explosion_small = 10,
         explosion_medium = 15,
         explosion_large = 20

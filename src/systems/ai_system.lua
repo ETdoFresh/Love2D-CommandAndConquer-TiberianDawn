@@ -6,6 +6,7 @@
 local System = require("src.ecs.system")
 local Constants = require("src.core.constants")
 local Events = require("src.core.events")
+local Random = require("src.util.random")
 
 local AISystem = setmetatable({}, {__index = System})
 AISystem.__index = AISystem
@@ -466,9 +467,9 @@ AISystem.mission_handlers[Constants.MISSION.UNLOAD] = function(self, entity, mis
             if passenger and passenger:is_alive() then
                 local passenger_transform = passenger:get("transform")
 
-                -- Place passenger next to transport
-                local offset_x = (math.random() - 0.5) * Constants.LEPTON_PER_CELL
-                local offset_y = (math.random() - 0.5) * Constants.LEPTON_PER_CELL
+                -- Place passenger next to transport (use deterministic RNG for multiplayer sync)
+                local offset_x = (Random.random() - 0.5) * Constants.LEPTON_PER_CELL
+                local offset_y = (Random.random() - 0.5) * Constants.LEPTON_PER_CELL
                 passenger_transform.x = transform.x + offset_x
                 passenger_transform.y = transform.y + offset_y
                 passenger_transform.cell_x = math.floor(passenger_transform.x / Constants.LEPTON_PER_CELL)

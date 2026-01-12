@@ -145,6 +145,7 @@ M.EVENTS = {
     -- Selection
     SELECTION_CHANGED = "selection:changed",
     SELECTION_CLEARED = "selection:cleared",
+    UNIT_SELECTED = "selection:unit_selected",
 
     -- Commands
     COMMAND_MOVE = "command:move",

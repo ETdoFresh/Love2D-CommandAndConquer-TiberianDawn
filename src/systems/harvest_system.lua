@@ -8,6 +8,7 @@ local Constants = require("src.core.constants")
 local Events = require("src.core.events")
 local Cell = require("src.map.cell")
 local Theater = require("src.map.theater")
+local Random = require("src.util.random")
 
 local HarvestSystem = setmetatable({}, {__index = System})
 HarvestSystem.__index = HarvestSystem
@@ -117,12 +118,12 @@ function HarvestSystem:update_tiberium_growth()
     end
     self.growth_timer = 0
 
-    -- Process growth - pick random cells from growth list
+    -- Process growth - pick random cells from growth list (deterministic for multiplayer)
     local max_tries = math.min(3, #self.growth_cells)
     for _ = 1, max_tries do
         if #self.growth_cells == 0 then break end
 
-        local pick = math.random(1, #self.growth_cells)
+        local pick = Random.range(1, #self.growth_cells)
         local pos = self.growth_cells[pick]
         local cell = self.grid:get_cell(pos.x, pos.y)
 
@@ -163,12 +164,12 @@ function HarvestSystem:update_tiberium_spread()
     end
     self.spread_timer = 0
 
-    -- Process spread - pick random cells from spread list
+    -- Process spread - pick random cells from spread list (deterministic for multiplayer)
     local max_tries = math.min(2, #self.spread_cells)
     for _ = 1, max_tries do
         if #self.spread_cells == 0 then break end
 
-        local pick = math.random(1, #self.spread_cells)
+        local pick = Random.range(1, #self.spread_cells)
         local pos = self.spread_cells[pick]
         local cell = self.grid:get_cell(pos.x, pos.y)
 
@@ -198,11 +199,8 @@ function HarvestSystem:try_spread_tiberium(source_cell)
     local neighbors = self.grid:get_neighbors(source_cell.x, source_cell.y)
     if #neighbors == 0 then return false end
 
-    -- Shuffle neighbors for random spread direction
-    for i = #neighbors, 2, -1 do
-        local j = math.random(i)
-        neighbors[i], neighbors[j] = neighbors[j], neighbors[i]
-    end
+    -- Shuffle neighbors for random spread direction (deterministic for multiplayer)
+    Random.shuffle(neighbors)
 
     for _, neighbor in ipairs(neighbors) do
         -- Check if cell is valid for tiberium spread

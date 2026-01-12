@@ -24,8 +24,93 @@ function AnimationSystem:update(dt, entities)
         self:update_entity(entity)
     end
 
+    -- Update death effect animations
+    self:update_death_effects()
+
     -- Clean up expired effects
     self:cleanup_effects()
+end
+
+-- Update death effect animations (infantry death sequences, explosions)
+function AnimationSystem:update_death_effects()
+    local effects = self.world:get_entities_with_tag("death_effect")
+
+    for _, effect in ipairs(effects) do
+        if effect:has("animation") and effect:has("renderable") then
+            local animation = effect:get("animation")
+            local renderable = effect:get("renderable")
+            local transform = effect:has("transform") and effect:get("transform") or nil
+
+            -- Determine which death animation to play
+            local death_state = self:get_death_state_from_type(animation.death_type)
+
+            -- Get infantry type for frame lookup
+            local infantry_type = effect.infantry_type or "E1"
+
+            -- Get animation data
+            local sprite_name = infantry_type:upper()
+            local anim_data = AnimationData[sprite_name]
+            if anim_data and anim_data[death_state] then
+                local data = anim_data[death_state]
+                local frame_offset = data[1] or 0
+                local frame_count = data[2] or 1
+                local frame_rate = data[3] or 2
+
+                -- Initialize animation frame tracking
+                if not renderable.anim_frame then
+                    renderable.anim_frame = 0
+                end
+                if not renderable.anim_timer then
+                    renderable.anim_timer = 0
+                end
+
+                -- Advance animation
+                if frame_rate > 0 then
+                    renderable.anim_timer = renderable.anim_timer + 1
+                    if renderable.anim_timer >= frame_rate then
+                        renderable.anim_timer = 0
+                        if renderable.anim_frame < frame_count - 1 then
+                            renderable.anim_frame = renderable.anim_frame + 1
+                        end
+                        -- Hold on last frame (non-looping)
+                    end
+                end
+
+                -- Calculate final frame
+                renderable.frame = frame_offset + renderable.anim_frame
+            else
+                -- Fallback for non-infantry explosions - just use a simple frame counter
+                if not renderable.anim_frame then
+                    renderable.anim_frame = 0
+                end
+                if not renderable.anim_timer then
+                    renderable.anim_timer = 0
+                end
+
+                renderable.anim_timer = renderable.anim_timer + 1
+                if renderable.anim_timer >= 2 then
+                    renderable.anim_timer = 0
+                    renderable.anim_frame = renderable.anim_frame + 1
+                end
+
+                renderable.frame = renderable.anim_frame
+            end
+        end
+    end
+end
+
+-- Map death type string to AnimationData.DO constant
+function AnimationSystem:get_death_state_from_type(death_type)
+    local mapping = {
+        gun = AnimationData.DO.GUN_DEATH,
+        explosion = AnimationData.DO.EXPLOSION_DEATH,
+        explosion2 = AnimationData.DO.EXPLOSION2_DEATH,
+        grenade = AnimationData.DO.GRENADE_DEATH,
+        fire = AnimationData.DO.FIRE_DEATH,
+        punch = AnimationData.DO.PUNCH_DEATH,
+        kick = AnimationData.DO.KICK_DEATH
+    }
+    return mapping[death_type] or AnimationData.DO.GUN_DEATH
 end
 
 -- Clean up death effects and other temporary animations

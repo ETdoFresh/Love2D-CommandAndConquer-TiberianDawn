@@ -124,13 +124,21 @@ function AudioSystem:register_events()
         self:stop_music()
     end)
 
-    -- Game events that trigger sounds
-    Events.on(Events.EVENTS.COMMAND_MOVE, function()
-        self:play_sound("ackno")
+    -- Game events that trigger sounds with unit response variety
+    Events.on(Events.EVENTS.COMMAND_MOVE, function(units, dest_x, dest_y)
+        self:play_unit_response("move", units)
     end)
 
-    Events.on(Events.EVENTS.COMMAND_ATTACK, function()
-        self:play_sound("affirm1")
+    Events.on(Events.EVENTS.COMMAND_ATTACK, function(units, target)
+        self:play_unit_response("attack", units)
+    end)
+
+    Events.on(Events.EVENTS.COMMAND_ATTACK_MOVE, function(units, dest_x, dest_y)
+        self:play_unit_response("attack", units)
+    end)
+
+    Events.on(Events.EVENTS.COMMAND_ATTACK_GROUND, function(units, dest_x, dest_y)
+        self:play_unit_response("attack", units)
     end)
 
     Events.on(Events.EVENTS.ENTITY_DESTROYED, function(entity)
@@ -170,6 +178,118 @@ function AudioSystem:register_events()
     Events.on("BUILDING_CAPTURED", function()
         self:queue_speech("Building captured")
     end)
+
+    -- Selection response - play unit acknowledgment when units are selected
+    Events.on(Events.EVENTS.SELECTION_CHANGED, function(units)
+        if units and #units > 0 then
+            self:play_unit_response("select", units)
+        end
+    end)
+end
+
+-- Unit response sound mappings by unit type
+-- Based on original C&C unit voice responses
+AudioSystem.UNIT_RESPONSES = {
+    -- Infantry responses
+    infantry = {
+        select = {"yessir1", "ready", "awaiting"},
+        move = {"ackno", "affirm1", "roger"},
+        attack = {"affirm1", "yessir1", "ugotit"}
+    },
+    -- Vehicle responses
+    vehicle = {
+        select = {"vehic1", "report1", "await1"},
+        move = {"ackno", "moveout", "onmove"},
+        attack = {"affirm1", "ugotit", "yessir1"}
+    },
+    -- Aircraft responses
+    aircraft = {
+        select = {"await1", "ready", "report1"},
+        move = {"ackno", "affirm1", "roger"},
+        attack = {"affirm1", "ugotit", "yessir1"}
+    },
+    -- Commando responses (unique)
+    commando = {
+        select = {"iamgod", "keepem", "laugh1"},
+        move = {"noprblm", "yessir1", "roger"},
+        attack = {"gotit", "noprblm", "yessir1"}
+    },
+    -- Engineer responses
+    engineer = {
+        select = {"ready", "yessir1", "await1"},
+        move = {"ackno", "affirm1", "roger"},
+        attack = {"affirm1", "ugotit", "yessir1"}
+    },
+    -- Default fallback
+    default = {
+        select = {"yessir1", "ready", "report1"},
+        move = {"ackno", "affirm1", "roger"},
+        attack = {"affirm1", "ugotit", "yessir1"}
+    }
+}
+
+-- Response rotation index to cycle through variety
+AudioSystem.response_index = 1
+
+-- Play unit response audio with variety
+function AudioSystem:play_unit_response(response_type, units)
+    if not units or #units == 0 then
+        -- Fallback to default sounds
+        if response_type == "move" then
+            self:play_sound("ackno")
+        elseif response_type == "attack" then
+            self:play_sound("affirm1")
+        end
+        return
+    end
+
+    -- Get the first selected unit to determine response type
+    local unit = units[1]
+    if type(units) ~= "table" then
+        unit = units  -- Single unit passed
+    end
+
+    -- Determine unit category for responses
+    local category = "default"
+    if unit and type(unit.has) == "function" then
+        if unit:has("infantry") then
+            local infantry = unit:get("infantry")
+            local infantry_type = infantry and infantry.infantry_type or "E1"
+            -- Check for special unit types
+            if infantry_type == "RMBO" then
+                category = "commando"
+            elseif infantry_type == "E6" then
+                category = "engineer"
+            else
+                category = "infantry"
+            end
+        elseif unit:has("aircraft") then
+            category = "aircraft"
+        elseif unit:has("vehicle") then
+            category = "vehicle"
+        end
+    end
+
+    -- Get response sounds for this category and type
+    local responses = self.UNIT_RESPONSES[category]
+    if not responses then
+        responses = self.UNIT_RESPONSES.default
+    end
+
+    local sounds = responses[response_type]
+    if not sounds then
+        sounds = responses.select or {"yessir1"}
+    end
+
+    -- Rotate through sound variety
+    local sound_name = sounds[((self.response_index - 1) % #sounds) + 1]
+    self.response_index = self.response_index + 1
+    if self.response_index > 100 then
+        self.response_index = 1  -- Prevent overflow
+    end
+
+    -- Play the response
+    self:play_sound(sound_name)
 end
 
 -- Register a sound file
