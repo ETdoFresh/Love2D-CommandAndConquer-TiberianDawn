@@ -284,6 +284,13 @@ function IPC:process_command(command)
         response.tests = test_result.tests
         response.message = test_result.message
 
+    elseif cmd == "test_phase5" then
+        -- Test Phase 5 integration (teams, triggers, scenarios)
+        local test_result = self:test_phase5_integration()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
     elseif cmd == "help" then
         response.commands = {
             "input <key> - Simulate key press",
@@ -307,6 +314,7 @@ function IPC:process_command(command)
             "test_combat - Test BulletClass, AnimClass, WeaponTypeClass, WarheadTypeClass",
             "test_phase3 - Test Phase 3 integration (pathfinding, combat)",
             "test_phase4 - Test Phase 4 integration (economy, production, overlays)",
+            "test_phase5 - Test Phase 5 integration (teams, triggers, scenarios)",
             "help - Show this help"
         }
 
@@ -3803,6 +3811,428 @@ function IPC:test_phase4_integration()
 
     if not ok16 then
         add_test("FactoryClass Cost_Per_Tick", false, tostring(err16))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test Phase 5 integration (teams, triggers, scenarios)
+function IPC:test_phase5_integration()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: TeamTypeClass loading
+    local ok1, err1 = pcall(function()
+        local TeamTypeClass = require("src.scenario.team_type")
+
+        -- Test constants
+        assert(TeamTypeClass.TMISSION.ATTACKBASE == 0, "ATTACKBASE should be 0")
+        assert(TeamTypeClass.TMISSION.MOVE == 5, "MOVE should be 5")
+        assert(TeamTypeClass.TMISSION.UNLOAD == 11, "UNLOAD should be 11")
+        assert(TeamTypeClass.MAX_TEAM_CLASSCOUNT == 5, "MAX_TEAM_CLASSCOUNT should be 5")
+        assert(TeamTypeClass.MAX_TEAM_MISSIONS == 20, "MAX_TEAM_MISSIONS should be 20")
+
+        add_test("TeamTypeClass constants", true, "Constants loaded correctly")
+    end)
+
+    if not ok1 then
+        add_test("TeamTypeClass constants", false, tostring(err1))
+    end
+
+    -- Test 2: TeamTypeClass creation
+    local ok2, err2 = pcall(function()
+        local TeamTypeClass = require("src.scenario.team_type")
+
+        -- Clear registry for clean test
+        TeamTypeClass.Init()
+
+        local team_type = TeamTypeClass.Create("TestTeam1")
+        assert(team_type ~= nil, "Team type should be created")
+        assert(team_type.IniName == "TestTeam1", "IniName should match")
+        assert(team_type.IsActive == true, "Should be active")
+        assert(team_type.IsAutocreate == false, "Should not be autocreate by default")
+        assert(team_type.IsSuicide == false, "Should not be suicide by default")
+        assert(team_type.ClassCount == 0, "Should have no units yet")
+        assert(team_type.MissionCount == 0, "Should have no missions yet")
+
+        add_test("TeamTypeClass creation", true, "TeamTypeClass creates correctly")
+    end)
+
+    if not ok2 then
+        add_test("TeamTypeClass creation", false, tostring(err2))
+    end
+
+    -- Test 3: TeamTypeClass Fill_In
+    local ok3, err3 = pcall(function()
+        local TeamTypeClass = require("src.scenario.team_type")
+
+        TeamTypeClass.Init()
+
+        local team_type = TeamTypeClass.Create("AttackTeam")
+        team_type:Fill_In({
+            house = 1,  -- NOD
+            roundabout = true,
+            suicide = true,
+            autocreate = true,
+            priority = 10,
+            max_allowed = 2,
+            fear = 50,
+            members = {
+                { type = "E1", count = 3 },
+                { type = "E3", count = 2 },
+            },
+            missions = {
+                { mission = TeamTypeClass.TMISSION.MOVE, argument = 5 },
+                { mission = TeamTypeClass.TMISSION.ATTACKBASE, argument = 0 },
+            }
+        })
+
+        assert(team_type.House == 1, "House should be 1")
+        assert(team_type.IsRoundAbout == true, "Should be roundabout")
+        assert(team_type.IsSuicide == true, "Should be suicide")
+        assert(team_type.IsAutocreate == true, "Should be autocreate")
+        assert(team_type.RecruitPriority == 10, "Priority should be 10")
+        assert(team_type.MaxAllowed == 2, "MaxAllowed should be 2")
+        assert(team_type.Fear == 50, "Fear should be 50")
+        assert(team_type.ClassCount == 2, "Should have 2 unit types")
+        assert(team_type.DesiredNum[1] == 3, "First type should have 3 units")
+        assert(team_type.MissionCount == 2, "Should have 2 missions")
+        assert(team_type.MissionList[1].Mission == TeamTypeClass.TMISSION.MOVE, "First mission should be MOVE")
+
+        add_test("TeamTypeClass Fill_In", true, "Fill_In populates data correctly")
+    end)
+
+    if not ok3 then
+        add_test("TeamTypeClass Fill_In", false, tostring(err3))
+    end
+
+    -- Test 4: TeamTypeClass As_Pointer
+    local ok4, err4 = pcall(function()
+        local TeamTypeClass = require("src.scenario.team_type")
+
+        TeamTypeClass.Init()
+
+        local team1 = TeamTypeClass.Create("Team1")
+        local team2 = TeamTypeClass.Create("Team2")
+
+        -- Retrieve by name
+        local found1 = TeamTypeClass.As_Pointer("Team1")
+        local found2 = TeamTypeClass.As_Pointer("Team2")
+        local not_found = TeamTypeClass.As_Pointer("NonExistent")
+
+        assert(found1 == team1, "Should find Team1")
+        assert(found2 == team2, "Should find Team2")
+        assert(not_found == nil, "Should not find NonExistent")
+
+        add_test("TeamTypeClass As_Pointer", true, "Registry lookup works")
+    end)
+
+    if not ok4 then
+        add_test("TeamTypeClass As_Pointer", false, tostring(err4))
+    end
+
+    -- Test 5: TeamTypeClass Create_One_Of
+    local ok5, err5 = pcall(function()
+        local TeamTypeClass = require("src.scenario.team_type")
+
+        TeamTypeClass.Init()
+
+        local team_type = TeamTypeClass.Create("SpawnTeam")
+        team_type.MaxAllowed = 2
+        team_type.House = 0
+
+        -- Create first team
+        local data1 = team_type:Create_One_Of()
+        assert(data1 ~= nil, "Should create first team")
+        assert(team_type.ActiveCount == 1, "ActiveCount should be 1")
+
+        -- Create second team
+        local data2 = team_type:Create_One_Of()
+        assert(data2 ~= nil, "Should create second team")
+        assert(team_type.ActiveCount == 2, "ActiveCount should be 2")
+
+        -- Should fail to create third (max reached)
+        local data3 = team_type:Create_One_Of()
+        assert(data3 == nil, "Should not create third team")
+        assert(team_type.ActiveCount == 2, "ActiveCount should still be 2")
+
+        add_test("TeamTypeClass Create_One_Of", true, "Team creation with limits works")
+    end)
+
+    if not ok5 then
+        add_test("TeamTypeClass Create_One_Of", false, tostring(err5))
+    end
+
+    -- Test 6: TeamTypeClass mission names
+    local ok6, err6 = pcall(function()
+        local TeamTypeClass = require("src.scenario.team_type")
+
+        -- Test Name_From_Mission
+        local name = TeamTypeClass.Name_From_Mission(TeamTypeClass.TMISSION.ATTACKBASE)
+        assert(name == "Attack Base", "ATTACKBASE should be 'Attack Base'")
+
+        local name2 = TeamTypeClass.Name_From_Mission(TeamTypeClass.TMISSION.GUARD)
+        assert(name2 == "Guard", "GUARD should be 'Guard'")
+
+        -- Test Mission_From_Name
+        local mission = TeamTypeClass.Mission_From_Name("Move")
+        assert(mission == TeamTypeClass.TMISSION.MOVE, "Move should be TMISSION.MOVE")
+
+        local mission2 = TeamTypeClass.Mission_From_Name("Attack Units")
+        assert(mission2 == TeamTypeClass.TMISSION.ATTACKUNITS, "'Attack Units' should be TMISSION.ATTACKUNITS")
+
+        add_test("TeamTypeClass mission names", true, "Mission name conversion works")
+    end)
+
+    if not ok6 then
+        add_test("TeamTypeClass mission names", false, tostring(err6))
+    end
+
+    -- Test 7: ScenarioClass loading
+    local ok7, err7 = pcall(function()
+        local ScenarioClass = require("src.scenario.scenario")
+
+        -- Test constants
+        assert(ScenarioClass.PLAYER.GDI == 0, "GDI should be 0")
+        assert(ScenarioClass.PLAYER.NOD == 1, "NOD should be 1")
+        assert(ScenarioClass.THEATER.TEMPERATE == 1, "TEMPERATE should be 1")
+        assert(ScenarioClass.DIR.EAST == 0, "EAST should be 0")
+        assert(ScenarioClass.VAR.A == 0, "VAR A should be 0")
+
+        add_test("ScenarioClass constants", true, "Constants loaded correctly")
+    end)
+
+    if not ok7 then
+        add_test("ScenarioClass constants", false, tostring(err7))
+    end
+
+    -- Test 8: ScenarioClass creation
+    local ok8, err8 = pcall(function()
+        local ScenarioClass = require("src.scenario.scenario")
+
+        local scenario = ScenarioClass.Reset()
+        assert(scenario ~= nil, "Scenario should be created")
+        assert(scenario.Number == 0, "Number should be 0")
+        assert(scenario.IsEnded == false, "Should not be ended")
+        assert(scenario.IsPlayerWinner == false, "Should not have winner")
+        assert(scenario.Timer == 0, "Timer should be 0")
+        assert(scenario.TechLevel == 10, "TechLevel should be 10")
+
+        add_test("ScenarioClass creation", true, "ScenarioClass creates correctly")
+    end)
+
+    if not ok8 then
+        add_test("ScenarioClass creation", false, tostring(err8))
+    end
+
+    -- Test 9: ScenarioClass Initialize
+    local ok9, err9 = pcall(function()
+        local ScenarioClass = require("src.scenario.scenario")
+
+        local scenario = ScenarioClass.Reset()
+        scenario:Initialize({
+            name = "SCG01EA",
+            description = "GDI Mission 1",
+            number = 1,
+            player = "GDI",
+            theater = "TEMPERATE",
+            map_width = 64,
+            map_height = 64,
+            briefing = "Test briefing",
+            tech_level = 5,
+            starting_credits = 5000,
+            difficulty = 1,
+        })
+
+        assert(scenario.Name == "SCG01EA", "Name should be SCG01EA")
+        assert(scenario.Description == "GDI Mission 1", "Description should match")
+        assert(scenario.Number == 1, "Number should be 1")
+        assert(scenario.Player == ScenarioClass.PLAYER.GDI, "Player should be GDI")
+        assert(scenario.Theater == ScenarioClass.THEATER.TEMPERATE, "Theater should be TEMPERATE")
+        assert(scenario.TechLevel == 5, "TechLevel should be 5")
+        assert(scenario.StartingCredits == 5000, "Credits should be 5000")
+
+        add_test("ScenarioClass Initialize", true, "Initialize sets data correctly")
+    end)
+
+    if not ok9 then
+        add_test("ScenarioClass Initialize", false, tostring(err9))
+    end
+
+    -- Test 10: ScenarioClass global flags
+    local ok10, err10 = pcall(function()
+        local ScenarioClass = require("src.scenario.scenario")
+
+        local scenario = ScenarioClass.Reset()
+
+        -- Test Set_Global and Get_Global
+        assert(scenario:Get_Global(0) == false, "Flag 0 should be false initially")
+        scenario:Set_Global(0, true)
+        assert(scenario:Get_Global(0) == true, "Flag 0 should be true after set")
+
+        scenario:Set_Global(15, true)
+        assert(scenario:Get_Global(15) == true, "Flag 15 should be true")
+
+        scenario:Clear_Global(0)
+        assert(scenario:Get_Global(0) == false, "Flag 0 should be false after clear")
+
+        -- Test out of range
+        assert(scenario:Get_Global(50) == false, "Out of range should return false")
+
+        add_test("ScenarioClass global flags", true, "Global flags work correctly")
+    end)
+
+    if not ok10 then
+        add_test("ScenarioClass global flags", false, tostring(err10))
+    end
+
+    -- Test 11: ScenarioClass victory/defeat
+    local ok11, err11 = pcall(function()
+        local ScenarioClass = require("src.scenario.scenario")
+
+        -- Test win
+        local scenario1 = ScenarioClass.Reset()
+        assert(scenario1:Has_Ended() == false, "Should not be ended")
+        scenario1:Player_Wins()
+        assert(scenario1:Has_Ended() == true, "Should be ended after win")
+        assert(scenario1:Did_Win() == true, "Should have won")
+
+        -- Test lose
+        local scenario2 = ScenarioClass.Reset()
+        scenario2:Player_Loses()
+        assert(scenario2:Has_Ended() == true, "Should be ended after lose")
+        assert(scenario2:Did_Win() == false, "Should not have won")
+
+        add_test("ScenarioClass victory/defeat", true, "Victory/defeat works correctly")
+    end)
+
+    if not ok11 then
+        add_test("ScenarioClass victory/defeat", false, tostring(err11))
+    end
+
+    -- Test 12: ScenarioClass timer
+    local ok12, err12 = pcall(function()
+        local ScenarioClass = require("src.scenario.scenario")
+
+        local scenario = ScenarioClass.Reset()
+        scenario.Timer = 900  -- 60 seconds * 15 ticks
+        local timer_str = scenario:Get_Timer_String()
+        assert(timer_str == "01:00", string.format("Timer should be 01:00, got %s", timer_str))
+
+        scenario.Timer = 1350  -- 90 seconds
+        timer_str = scenario:Get_Timer_String()
+        assert(timer_str == "01:30", string.format("Timer should be 01:30, got %s", timer_str))
+
+        add_test("ScenarioClass timer", true, "Timer formatting works")
+    end)
+
+    if not ok12 then
+        add_test("ScenarioClass timer", false, tostring(err12))
+    end
+
+    -- Test 13: ScenarioClass singleton
+    local ok13, err13 = pcall(function()
+        local ScenarioClass = require("src.scenario.scenario")
+
+        local scenario1 = ScenarioClass.Get()
+        local scenario2 = ScenarioClass.Get()
+        assert(scenario1 == scenario2, "Get should return same instance")
+
+        ScenarioClass.Reset()
+        local scenario3 = ScenarioClass.Get()
+        assert(scenario1 ~= scenario3, "Reset should create new instance")
+
+        add_test("ScenarioClass singleton", true, "Singleton pattern works")
+    end)
+
+    if not ok13 then
+        add_test("ScenarioClass singleton", false, tostring(err13))
+    end
+
+    -- Test 14: ScenarioClass theater name
+    local ok14, err14 = pcall(function()
+        local ScenarioClass = require("src.scenario.scenario")
+
+        local scenario = ScenarioClass.Reset()
+
+        scenario.Theater = ScenarioClass.THEATER.DESERT
+        assert(scenario:Get_Theater_Name() == "DESERT", "Should be DESERT")
+
+        scenario.Theater = ScenarioClass.THEATER.TEMPERATE
+        assert(scenario:Get_Theater_Name() == "TEMPERATE", "Should be TEMPERATE")
+
+        scenario.Theater = ScenarioClass.THEATER.WINTER
+        assert(scenario:Get_Theater_Name() == "WINTER", "Should be WINTER")
+
+        add_test("ScenarioClass theater name", true, "Theater names work")
+    end)
+
+    if not ok14 then
+        add_test("ScenarioClass theater name", false, tostring(err14))
+    end
+
+    -- Test 15: ScenarioClass trigger tracking
+    local ok15, err15 = pcall(function()
+        local ScenarioClass = require("src.scenario.scenario")
+
+        local scenario = ScenarioClass.Reset()
+
+        assert(scenario:Has_Trigger_Fired("Test1") == false, "Trigger should not be fired")
+        scenario:Record_Trigger_Fired("Test1")
+        assert(scenario:Has_Trigger_Fired("Test1") == true, "Trigger should be fired")
+        assert(scenario:Has_Trigger_Fired("Test2") == false, "Other trigger should not be fired")
+
+        add_test("ScenarioClass trigger tracking", true, "Trigger tracking works")
+    end)
+
+    if not ok15 then
+        add_test("ScenarioClass trigger tracking", false, tostring(err15))
+    end
+
+    -- Test 16: TeamTypeClass validation
+    local ok16, err16 = pcall(function()
+        local TeamTypeClass = require("src.scenario.team_type")
+
+        TeamTypeClass.Init()
+
+        local valid_team = TeamTypeClass.Create("ValidTeam")
+        assert(valid_team:Validate() == true, "Valid team should validate")
+
+        local invalid_team = TeamTypeClass.Create("")
+        invalid_team.IniName = ""  -- Force invalid name
+        assert(invalid_team:Validate() == false, "Invalid team should not validate")
+
+        add_test("TeamTypeClass validation", true, "Validation works correctly")
+    end)
+
+    if not ok16 then
+        add_test("TeamTypeClass validation", false, tostring(err16))
     end
 
     -- Summary
