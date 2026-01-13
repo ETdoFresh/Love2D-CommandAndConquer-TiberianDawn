@@ -64,6 +64,9 @@ function Sidebar.new()
     self.special_weapons = {}
     self.special_weapons_available = false
 
+    -- Mission timer reference
+    self.trigger_system = nil
+
     return self
 end
 
@@ -73,6 +76,7 @@ function Sidebar:init(world)
     self.harvest_system = world:get_system("harvest")
     self.power_system = world:get_system("power")
     self.special_weapons_system = world:get_system("special_weapons")
+    self.trigger_system = world:get_system("trigger")
 
     -- Subscribe to events
     Events.on(Events.EVENTS.CREDITS_CHANGED, function(house, credits)
@@ -255,8 +259,12 @@ function Sidebar:draw()
     love.graphics.printf("$" .. tostring(self.credits),
         x + 4, y + 4, self.width - 8, "center")
 
+    -- Mission timer (if active)
+    local timer_y = y + 20
+    local timer_height = self:draw_mission_timer(x + 4, timer_y, self.width - 8)
+
     -- Power bar
-    local power_y = y + 24
+    local power_y = timer_y + timer_height + 4
     self:draw_power_bar(x + 4, power_y, self.width - 8)
 
     -- Production progress display
@@ -274,6 +282,45 @@ function Sidebar:draw()
     -- Items
     local items_y = tabs_y + Sidebar.TABS_HEIGHT + 4
     self:draw_items(x, items_y)
+end
+
+-- Draw mission timer if active
+-- Reference: Original C&C displayed countdown timer in sidebar area
+function Sidebar:draw_mission_timer(x, y, width)
+    if not self.trigger_system then
+        return 0
+    end
+
+    local timer_display = self.trigger_system:get_timer_display()
+    if not timer_display then
+        return 0
+    end
+
+    -- Draw timer background
+    love.graphics.setColor(0.1, 0.1, 0.1, 0.9)
+    love.graphics.rectangle("fill", x, y, width, 16)
+
+    -- Flash red when time is running low (under 60 seconds)
+    local timer = self.trigger_system.mission_timer or 0
+    local flash = false
+    if timer < 60 and timer > 0 then
+        flash = (math.floor(love.timer.getTime() * 4) % 2 == 0)
+    end
+
+    -- Timer text
+    if flash then
+        love.graphics.setColor(1, 0.2, 0.2, 1)
+    else
+        love.graphics.setColor(1, 1, 1, 1)
+    end
+
+    love.graphics.printf(timer_display, x, y + 2, width, "center")
+
+    -- Border
+    love.graphics.setColor(0.5, 0.5, 0.5, 1)
+    love.graphics.rectangle("line", x, y, width, 16)
+
+    return 16
 end
 
 function Sidebar:draw_production_status(x, y, width)

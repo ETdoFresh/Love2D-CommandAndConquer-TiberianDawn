@@ -190,6 +190,14 @@ function Speech:register_events()
         self:speak("STRUCTURE_LOST")
     end)
 
+    Events.on("HARVESTER_LOST", function()
+        self:speak("HARVESTER_LOST", Speech.PRIORITY.HIGH)
+    end)
+
+    Events.on("PRIMARY_BUILDING_DESTROYED", function()
+        self:speak("STRUCTURE_LOST", Speech.PRIORITY.HIGH)
+    end)
+
     Events.on("BUILDING_SOLD", function()
         self:speak("STRUCTURE_SOLD")
     end)

@@ -40,6 +40,55 @@ end
 
 function ProductionSystem:init()
     self:load_data()
+    self:register_events()
+end
+
+-- Register event listeners
+function ProductionSystem:register_events()
+    -- Fire Sale: Sell all buildings for a house (trigger action)
+    -- Reference: Original C&C TRIGGER.CPP - TACTION_FIRE_SALE
+    Events.on("FIRE_SALE", function(house)
+        self:fire_sale(house)
+    end)
+end
+
+-- Fire Sale: Sell all buildings belonging to a house
+-- Reference: Original C&C - all buildings sell for 50% credits when fire sale triggers
+function ProductionSystem:fire_sale(house)
+    if not self.world then return end
+
+    -- Get the grid for clearing cells
+    local grid = nil
+    local grid_module = self.world:get_system("map")
+    if grid_module and grid_module.grid then
+        grid = grid_module.grid
+    end
+
+    -- Find all buildings belonging to this house
+    local buildings_to_sell = {}
+    local all_buildings = self.world:get_entities_with("building")
+
+    for _, building in ipairs(all_buildings) do
+        local owner = building:get("owner")
+        if owner and owner.house == house then
+            table.insert(buildings_to_sell, building)
+        end
+    end
+
+    -- Sell all buildings
+    local total_refund = 0
+    for _, building in ipairs(buildings_to_sell) do
+        local refund = self:sell_building(building, grid)
+        total_refund = total_refund + refund
+    end
+
+    -- Emit fire sale completed event
+    Events.emit("FIRE_SALE_COMPLETE", house, total_refund, #buildings_to_sell)
+
+    -- EVA announcement
+    Events.emit("EVA_SPEECH", "fire sale", house)
+
+    return total_refund, #buildings_to_sell
 end
 
 function ProductionSystem:load_data()

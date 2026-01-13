@@ -698,25 +698,29 @@ function CombatSystem:kill_unit(target, killer, warhead)
     self:spawn_death_effect(target, warhead)
 
     -- Emit EVA announcements for player units/buildings lost
+    -- These events trigger speech.lua to play EVA voice lines
     local target_owner = target:has("owner") and target:get("owner")
     if target_owner then
         local target_house = target_owner.house
 
         if target:has("building") then
-            -- Building destroyed - announce structure destroyed
-            Events.emit("EVA_SPEECH", "structure destroyed", target_house)
+            -- Building destroyed - emit STRUCTURE_LOST for EVA announcement
+            Events.emit("STRUCTURE_LOST", target, target_house)
 
-            -- Check if it was a key building
+            -- Check if it was a key building (factory types)
             local building = target:get("building")
             if building and building.building_type then
                 local btype = building.building_type:upper()
                 if btype == "FACT" or btype == "WEAP" or btype == "HAND" or btype == "PYLE" then
-                    Events.emit("EVA_SPEECH", "primary building destroyed", target_house)
+                    Events.emit("PRIMARY_BUILDING_DESTROYED", target, target_house)
                 end
             end
+        elseif target:has("harvester") then
+            -- Harvester lost - special announcement
+            Events.emit("HARVESTER_LOST", target, target_house)
         else
-            -- Unit lost
-            Events.emit("EVA_SPEECH", "unit lost", target_house)
+            -- Regular unit lost - emit UNIT_LOST for EVA announcement
+            Events.emit("UNIT_LOST", target, target_house)
         end
     end
 

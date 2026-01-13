@@ -504,7 +504,12 @@ function TriggerSystem:update(dt)
         if self.mission_timer <= 0 and self.mission_timer_direction == -1 then
             self.mission_timer = 0
             self.mission_timer_running = false
+
+            -- Emit timer expired event for triggers
             self:check_event(TriggerSystem.EVENT.MISSION_TIMER_EXPIRED, nil, 0)
+
+            -- EVA announcement - time's up
+            Events.emit("MISSION_TIMER_EXPIRED")
         end
     end
 
