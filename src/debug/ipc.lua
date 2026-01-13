@@ -277,6 +277,13 @@ function IPC:process_command(command)
         response.tests = test_result.tests
         response.message = test_result.message
 
+    elseif cmd == "test_phase4" then
+        -- Test Phase 4 integration (economy, production, overlays)
+        local test_result = self:test_phase4_integration()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
     elseif cmd == "help" then
         response.commands = {
             "input <key> - Simulate key press",
@@ -299,6 +306,7 @@ function IPC:process_command(command)
             "test_specific_types - Test InfantryTypeClass, UnitTypeClass, AircraftTypeClass, BuildingTypeClass",
             "test_combat - Test BulletClass, AnimClass, WeaponTypeClass, WarheadTypeClass",
             "test_phase3 - Test Phase 3 integration (pathfinding, combat)",
+            "test_phase4 - Test Phase 4 integration (economy, production, overlays)",
             "help - Show this help"
         }
 
@@ -3311,6 +3319,490 @@ function IPC:test_phase3_integration()
 
     if not ok12 then
         add_test("FootClass pathfinding", false, tostring(err12))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test Phase 4 integration (economy, production, overlays)
+function IPC:test_phase4_integration()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: FactoryClass loading and basic operations
+    local ok1, err1 = pcall(function()
+        local FactoryClass = require("src.production.factory")
+
+        local factory = FactoryClass:new()
+        assert(factory ~= nil, "Factory should be created")
+        assert(factory.IsActive == true, "Factory should be active")
+        assert(factory.IsSuspended == true, "Factory should start suspended")
+        assert(factory:Fetch_Stage() == 0, "Stage should be 0")
+        assert(factory:Fetch_Rate() == 0, "Rate should be 0")
+        assert(factory:Is_Building() == false, "Should not be building")
+        assert(factory:Has_Completed() == false, "Should not be completed")
+
+        add_test("FactoryClass creation", true, "FactoryClass creates and initializes correctly")
+    end)
+
+    if not ok1 then
+        add_test("FactoryClass creation", false, tostring(err1))
+    end
+
+    -- Test 2: FactoryClass Set and Start
+    local ok2, err2 = pcall(function()
+        local FactoryClass = require("src.production.factory")
+        local UnitTypeClass = require("src.objects.types.unittype")
+
+        local factory = FactoryClass:new()
+
+        -- Create a mock house
+        local mock_house = {
+            is_human = true,
+            cost_bias = 1.0,
+            build_time_bias = 1.0,
+            can_afford = function() return true end,
+            available_money = function() return 10000 end,
+            spend_credits = function() end,
+            add_credits = function() end,
+        }
+
+        -- Set up production using a unit type
+        local unit_type = UnitTypeClass.Create(UnitTypeClass.UNIT.MTANK)
+        local success = factory:Set(unit_type, mock_house)
+        assert(success == true, "Set should succeed")
+        assert(factory.ObjectType == unit_type, "ObjectType should be set")
+        assert(factory.Balance > 0, "Balance should be set from cost")
+        assert(factory.IsSuspended == true, "Should still be suspended")
+
+        -- Start production
+        local started = factory:Start()
+        assert(started == true, "Start should succeed")
+        assert(factory.IsSuspended == false, "Should not be suspended after start")
+        assert(factory:Fetch_Rate() > 0, "Rate should be set")
+        assert(factory:Is_Building() == true, "Should be building")
+
+        add_test("FactoryClass Set/Start", true, "Set and Start work correctly")
+    end)
+
+    if not ok2 then
+        add_test("FactoryClass Set/Start", false, tostring(err2))
+    end
+
+    -- Test 3: FactoryClass Suspend and Abandon
+    local ok3, err3 = pcall(function()
+        local FactoryClass = require("src.production.factory")
+        local UnitTypeClass = require("src.objects.types.unittype")
+
+        local factory = FactoryClass:new()
+
+        local mock_house = {
+            is_human = true,
+            cost_bias = 1.0,
+            build_time_bias = 1.0,
+            can_afford = function() return true end,
+            available_money = function() return 10000 end,
+            spend_credits = function() end,
+            add_credits = function() end,
+        }
+
+        local unit_type = UnitTypeClass.Create(UnitTypeClass.UNIT.MTANK)
+        factory:Set(unit_type, mock_house)
+        factory:Start()
+
+        -- Suspend
+        local suspended = factory:Suspend()
+        assert(suspended == true, "Suspend should succeed")
+        assert(factory.IsSuspended == true, "Should be suspended")
+        assert(factory:Is_Building() == false, "Should not be building")
+
+        -- Resume
+        factory:Start()
+        assert(factory.IsSuspended == false, "Should resume")
+
+        -- Abandon
+        local abandoned = factory:Abandon()
+        assert(abandoned == true, "Abandon should succeed")
+        assert(factory.Object == nil, "Object should be nil")
+        assert(factory.ObjectType == nil, "ObjectType should be nil")
+        assert(factory:Fetch_Stage() == 0, "Stage should be reset")
+
+        add_test("FactoryClass Suspend/Abandon", true, "Suspend and Abandon work correctly")
+    end)
+
+    if not ok3 then
+        add_test("FactoryClass Suspend/Abandon", false, tostring(err3))
+    end
+
+    -- Test 4: FactoryClass AI and completion
+    local ok4, err4 = pcall(function()
+        local FactoryClass = require("src.production.factory")
+        local UnitTypeClass = require("src.objects.types.unittype")
+
+        local factory = FactoryClass:new()
+        local credits_spent = 0
+
+        local mock_house = {
+            is_human = true,
+            cost_bias = 1.0,
+            build_time_bias = 1.0,
+            can_afford = function() return true end,
+            available_money = function() return 10000 end,
+            spend_credits = function(self, amount) credits_spent = credits_spent + amount end,
+            add_credits = function() end,
+        }
+
+        local unit_type = UnitTypeClass.Create(UnitTypeClass.UNIT.MTANK)
+        factory:Set(unit_type, mock_house)
+        factory:Start()
+
+        local initial_balance = factory.Balance
+
+        -- Simulate faster by reducing rate for testing
+        factory:Set_Rate(1)  -- Fastest rate
+
+        -- Run AI until completed (with faster rate)
+        local ticks = 0
+        while not factory:Has_Completed() and ticks < 500 do
+            factory:AI()
+            ticks = ticks + 1
+        end
+
+        assert(factory:Has_Completed() == true, "Should complete")
+        assert(factory:Fetch_Stage() == FactoryClass.STEP_COUNT, "Should be at max stage")
+        assert(factory.Balance == 0, "Balance should be 0")
+        assert(credits_spent > 0, "Should have spent credits")
+
+        add_test("FactoryClass AI/completion", true, string.format("Completed in %d ticks, spent %d credits", ticks, credits_spent))
+    end)
+
+    if not ok4 then
+        add_test("FactoryClass AI/completion", false, tostring(err4))
+    end
+
+    -- Test 5: OverlayTypeClass loading
+    local ok5, err5 = pcall(function()
+        local OverlayTypeClass = require("src.objects.types.overlaytype")
+
+        -- Test overlay type constants
+        assert(OverlayTypeClass.OVERLAY.NONE == -1, "NONE should be -1")
+        assert(OverlayTypeClass.OVERLAY.SANDBAG_WALL == 1, "SANDBAG_WALL should be 1")
+        assert(OverlayTypeClass.OVERLAY.TIBERIUM1 == 6, "TIBERIUM1 should be 6")
+        assert(OverlayTypeClass.OVERLAY.WOOD_CRATE == 28, "WOOD_CRATE should be 28")
+
+        -- Test creating overlay type
+        local wall_type = OverlayTypeClass.Create(OverlayTypeClass.OVERLAY.SANDBAG_WALL)
+        assert(wall_type ~= nil, "Wall type should be created")
+        assert(wall_type.Name == "SBAG", "Name should be SBAG")
+        assert(wall_type.IsWall == true, "Should be a wall")
+        assert(wall_type.IsTiberium == false, "Should not be tiberium")
+
+        local tib_type = OverlayTypeClass.Create(OverlayTypeClass.OVERLAY.TIBERIUM1)
+        assert(tib_type ~= nil, "Tiberium type should be created")
+        assert(tib_type.IsTiberium == true, "Should be tiberium")
+        assert(tib_type.IsWall == false, "Should not be a wall")
+
+        add_test("OverlayTypeClass creation", true, "OverlayTypeClass creates types correctly")
+    end)
+
+    if not ok5 then
+        add_test("OverlayTypeClass creation", false, tostring(err5))
+    end
+
+    -- Test 6: OverlayTypeClass Tiberium_Value
+    local ok6, err6 = pcall(function()
+        local OverlayTypeClass = require("src.objects.types.overlaytype")
+
+        -- Test tiberium values (should increase with stage)
+        local val1 = OverlayTypeClass.Tiberium_Value(OverlayTypeClass.OVERLAY.TIBERIUM1)
+        local val6 = OverlayTypeClass.Tiberium_Value(OverlayTypeClass.OVERLAY.TIBERIUM6)
+        local val12 = OverlayTypeClass.Tiberium_Value(OverlayTypeClass.OVERLAY.TIBERIUM12)
+
+        assert(val1 > 0, "TIBERIUM1 should have value")
+        assert(val6 > val1, "TIBERIUM6 should be more valuable than TIBERIUM1")
+        assert(val12 > val6, "TIBERIUM12 should be more valuable than TIBERIUM6")
+
+        -- Non-tiberium should be 0
+        local wall_val = OverlayTypeClass.Tiberium_Value(OverlayTypeClass.OVERLAY.SANDBAG_WALL)
+        assert(wall_val == 0, "Walls should have 0 tiberium value")
+
+        add_test("OverlayTypeClass Tiberium_Value", true, string.format("Values: T1=%d, T6=%d, T12=%d", val1, val6, val12))
+    end)
+
+    if not ok6 then
+        add_test("OverlayTypeClass Tiberium_Value", false, tostring(err6))
+    end
+
+    -- Test 7: OverlayClass creation and type helpers
+    local ok7, err7 = pcall(function()
+        local OverlayClass = require("src.objects.overlay")
+        local OverlayTypeClass = require("src.objects.types.overlaytype")
+
+        -- Create a tiberium overlay
+        local tib = OverlayClass:new(OverlayTypeClass.OVERLAY.TIBERIUM5)
+        assert(tib ~= nil, "Tiberium overlay should be created")
+        assert(tib:Is_Tiberium() == true, "Should be tiberium")
+        assert(tib:Is_Wall() == false, "Should not be a wall")
+        assert(tib:Is_Crate() == false, "Should not be a crate")
+        assert(tib:Tiberium_Value() > 0, "Should have tiberium value")
+
+        -- Create a wall overlay
+        local wall = OverlayClass:new(OverlayTypeClass.OVERLAY.BRICK_WALL)
+        assert(wall ~= nil, "Wall overlay should be created")
+        assert(wall:Is_Wall() == true, "Should be a wall")
+        assert(wall:Is_Tiberium() == false, "Should not be tiberium")
+
+        -- Create a crate overlay
+        local crate = OverlayClass:new(OverlayTypeClass.OVERLAY.WOOD_CRATE)
+        assert(crate ~= nil, "Crate overlay should be created")
+        assert(crate:Is_Crate() == true, "Should be a crate")
+        assert(crate:Is_Wall() == false, "Should not be a wall")
+
+        add_test("OverlayClass type helpers", true, "Is_Tiberium, Is_Wall, Is_Crate work")
+    end)
+
+    if not ok7 then
+        add_test("OverlayClass type helpers", false, tostring(err7))
+    end
+
+    -- Test 8: OverlayClass tiberium growth
+    local ok8, err8 = pcall(function()
+        local OverlayClass = require("src.objects.overlay")
+        local OverlayTypeClass = require("src.objects.types.overlaytype")
+
+        local tib = OverlayClass:new(OverlayTypeClass.OVERLAY.TIBERIUM1)
+        local initial_type = tib.Type
+        local initial_value = tib:Tiberium_Value()
+
+        -- Grow tiberium
+        local new_type = tib:Grow_Tiberium()
+        assert(new_type ~= nil, "Should grow")
+        assert(new_type > initial_type, "Type should increase")
+        assert(tib:Tiberium_Value() > initial_value, "Value should increase")
+
+        -- Grow to max
+        while tib:Grow_Tiberium() ~= nil do end
+        assert(tib.Type == OverlayTypeClass.OVERLAY.TIBERIUM12, "Should reach TIBERIUM12")
+
+        -- Can't grow past max
+        local past_max = tib:Grow_Tiberium()
+        assert(past_max == nil, "Should not grow past max")
+
+        add_test("OverlayClass tiberium growth", true, "Grow_Tiberium works correctly")
+    end)
+
+    if not ok8 then
+        add_test("OverlayClass tiberium growth", false, tostring(err8))
+    end
+
+    -- Test 9: OverlayClass harvesting
+    local ok9, err9 = pcall(function()
+        local OverlayClass = require("src.objects.overlay")
+        local OverlayTypeClass = require("src.objects.types.overlaytype")
+
+        local tib = OverlayClass:new(OverlayTypeClass.OVERLAY.TIBERIUM6)
+        local expected_value = tib:Tiberium_Value()
+
+        local harvested = tib:Harvest_Tiberium()
+        assert(harvested == expected_value, "Should return correct value")
+        assert(tib.IsInLimbo == true, "Should be in limbo after harvest")
+
+        add_test("OverlayClass harvesting", true, string.format("Harvested %d credits", harvested))
+    end)
+
+    if not ok9 then
+        add_test("OverlayClass harvesting", false, tostring(err9))
+    end
+
+    -- Test 10: OverlayClass wall damage
+    local ok10, err10 = pcall(function()
+        local OverlayClass = require("src.objects.overlay")
+        local OverlayTypeClass = require("src.objects.types.overlaytype")
+
+        local wall = OverlayClass:new(OverlayTypeClass.OVERLAY.SANDBAG_WALL)
+        wall.Strength = 3  -- Give it 3 HP
+
+        -- Low damage (< 20 damage_points) should not reduce strength
+        local destroyed = wall:Take_Wall_Damage(10)
+        assert(destroyed == false, "Should not destroy with low damage")
+        assert(wall.Strength == 3, "Strength unchanged with insufficient damage")
+
+        -- Sufficient damage (>= 20) should reduce strength
+        destroyed = wall:Take_Wall_Damage(25)
+        assert(destroyed == false, "Should not destroy yet")
+        assert(wall.Strength == 2, "Strength should be reduced")
+
+        -- Keep damaging until destroyed
+        wall:Take_Wall_Damage(25)
+        destroyed = wall:Take_Wall_Damage(25)
+        assert(destroyed == true, "Should be destroyed")
+        assert(wall.IsInLimbo == true, "Should be in limbo")
+
+        add_test("OverlayClass wall damage", true, "Take_Wall_Damage works correctly")
+    end)
+
+    if not ok10 then
+        add_test("OverlayClass wall damage", false, tostring(err10))
+    end
+
+    -- Test 11: OverlayClass crate opening
+    local ok11, err11 = pcall(function()
+        local OverlayClass = require("src.objects.overlay")
+        local OverlayTypeClass = require("src.objects.types.overlaytype")
+
+        local wood_crate = OverlayClass:new(OverlayTypeClass.OVERLAY.WOOD_CRATE)
+        local content_type, value = wood_crate:Open_Crate(nil)
+        assert(content_type == "MONEY", "Wood crate should give money")
+        assert(value == 500, "Wood crate should give 500")
+        assert(wood_crate.IsInLimbo == true, "Crate should be in limbo")
+
+        local steel_crate = OverlayClass:new(OverlayTypeClass.OVERLAY.STEEL_CRATE)
+        content_type, value = steel_crate:Open_Crate(nil)
+        assert(content_type == "MONEY", "Steel crate should give money")
+        assert(value == 2000, "Steel crate should give 2000")
+
+        add_test("OverlayClass crate opening", true, "Open_Crate works correctly")
+    end)
+
+    if not ok11 then
+        add_test("OverlayClass crate opening", false, tostring(err11))
+    end
+
+    -- Test 12: HouseClass factory tracking
+    local ok12, err12 = pcall(function()
+        local House = require("src.house.house")
+
+        local house = House:new("GDI", 1, true)
+        assert(house ~= nil, "House should be created")
+        assert(house.infantry_factories == 0, "Should start with 0 infantry factories")
+        assert(house.unit_factories == 0, "Should start with 0 unit factories")
+        assert(house.aircraft_factories == 0, "Should start with 0 aircraft factories")
+        assert(house.building_factories == 0, "Should start with 0 building factories")
+
+        add_test("HouseClass factory tracking", true, "Factory count tracking initialized")
+    end)
+
+    if not ok12 then
+        add_test("HouseClass factory tracking", false, tostring(err12))
+    end
+
+    -- Test 13: HouseClass Build_Unit
+    local ok13, err13 = pcall(function()
+        local House = require("src.house.house")
+        local UnitTypeClass = require("src.objects.types.unittype")
+
+        local house = House:new("GDI", 1, true)
+        house:add_credits(10000)  -- Give some money
+        house.factories.vehicle = true  -- Simulate having a war factory
+
+        local unit_type = UnitTypeClass.Create(UnitTypeClass.UNIT.MTANK)
+        local success = house:Build_Unit(unit_type)
+        assert(success == true, "Build_Unit should succeed")
+        assert(house.unit_factory ~= nil, "Should have unit factory")
+        assert(house.unit_factory:Is_Building() == true, "Factory should be building")
+
+        add_test("HouseClass Build_Unit", true, "Build_Unit starts production correctly")
+    end)
+
+    if not ok13 then
+        add_test("HouseClass Build_Unit", false, tostring(err13))
+    end
+
+    -- Test 14: HouseClass Build_Infantry
+    local ok14, err14 = pcall(function()
+        local House = require("src.house.house")
+        local InfantryTypeClass = require("src.objects.types.infantrytype")
+
+        local house = House:new("GDI", 1, true)
+        house:add_credits(1000)
+        house.factories.infantry = true  -- Simulate having a barracks
+
+        local infantry_type = InfantryTypeClass.Create(InfantryTypeClass.INFANTRY.E1)
+        local success = house:Build_Infantry(infantry_type)
+        assert(success == true, "Build_Infantry should succeed")
+        assert(house.infantry_factory ~= nil, "Should have infantry factory")
+
+        add_test("HouseClass Build_Infantry", true, "Build_Infantry starts production correctly")
+    end)
+
+    if not ok14 then
+        add_test("HouseClass Build_Infantry", false, tostring(err14))
+    end
+
+    -- Test 15: BuildingClass placement validation
+    local ok15, err15 = pcall(function()
+        local BuildingClass = require("src.objects.building")
+
+        -- Test basic placement check (no map, just function existence)
+        assert(BuildingClass.Can_Place_Building ~= nil, "Can_Place_Building should exist")
+        assert(BuildingClass.Is_Adjacent_To_Building ~= nil, "Is_Adjacent_To_Building should exist")
+        assert(BuildingClass.Get_Valid_Placement_Cells ~= nil, "Get_Valid_Placement_Cells should exist")
+
+        add_test("BuildingClass placement", true, "Placement validation functions exist")
+    end)
+
+    if not ok15 then
+        add_test("BuildingClass placement", false, tostring(err15))
+    end
+
+    -- Test 16: FactoryClass Cost_Per_Tick
+    local ok16, err16 = pcall(function()
+        local FactoryClass = require("src.production.factory")
+        local UnitTypeClass = require("src.objects.types.unittype")
+
+        local factory = FactoryClass:new()
+
+        local mock_house = {
+            is_human = true,
+            cost_bias = 1.0,
+            build_time_bias = 1.0,
+            can_afford = function() return true end,
+            available_money = function() return 10000 end,
+            spend_credits = function() end,
+            add_credits = function() end,
+        }
+
+        local unit_type = UnitTypeClass.Create(UnitTypeClass.UNIT.MTANK)
+        factory:Set(unit_type, mock_house)
+
+        local initial_balance = factory.Balance
+        local cost_per_tick = factory:Cost_Per_Tick()
+
+        -- Cost per tick should be balance / steps_remaining
+        local expected = math.floor(initial_balance / FactoryClass.STEP_COUNT)
+        assert(cost_per_tick == expected, string.format("Cost per tick should be %d, got %d", expected, cost_per_tick))
+
+        add_test("FactoryClass Cost_Per_Tick", true, string.format("Cost per tick: %d", cost_per_tick))
+    end)
+
+    if not ok16 then
+        add_test("FactoryClass Cost_Per_Tick", false, tostring(err16))
     end
 
     -- Summary

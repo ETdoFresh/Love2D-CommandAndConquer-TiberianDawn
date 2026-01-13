@@ -5,6 +5,9 @@
 
 local Events = require("src.core.events")
 
+-- Lazy load FactoryClass to avoid circular dependency
+local FactoryClass = nil
+
 local House = {}
 House.__index = House
 
@@ -76,6 +79,22 @@ function House.new(house_type, name)
         building = nil        -- Primary construction yard
     }
     self.build_queue = {}
+
+    -- Factory objects (FactoryClass instances for active production)
+    self.infantry_factory = nil   -- Current infantry production
+    self.unit_factory = nil       -- Current vehicle production
+    self.aircraft_factory = nil   -- Current aircraft production
+    self.building_factory = nil   -- Current building production
+
+    -- Factory counts (for production acceleration)
+    self.infantry_factories = 0
+    self.unit_factories = 0
+    self.aircraft_factories = 0
+    self.building_factories = 0
+
+    -- Cost/speed modifiers
+    self.cost_bias = 1.0          -- Cost multiplier (difficulty)
+    self.build_time_bias = 1.0    -- Build speed multiplier
 
     -- Tech level and prerequisites
     self.tech_level = 1
@@ -208,6 +227,10 @@ function House:get_credits()
     return self.credits
 end
 
+function House:available_money()
+    return self.credits
+end
+
 -- Capacity management
 function House:update_capacity()
     local capacity = 0
@@ -293,6 +316,9 @@ function House:add_building(entity)
     -- Check for special buildings
     self:check_special_buildings(entity, true)
 
+    -- Update factory counts
+    self:update_factory_counts()
+
     Events.emit("BUILDING_ADDED", self, entity)
 end
 
@@ -319,6 +345,9 @@ function House:remove_building(entity)
 
             -- Check special buildings
             self:check_special_buildings(entity, false)
+
+            -- Update factory counts
+            self:update_factory_counts()
 
             Events.emit("BUILDING_REMOVED", self, entity)
             return true
@@ -437,16 +466,27 @@ end
 
 -- Check prerequisites for building/unit
 function House:meets_prerequisites(prerequisites)
-    if not prerequisites or #prerequisites == 0 then
+    -- Handle nil or 0 (PREREQ.NONE)
+    if not prerequisites or prerequisites == 0 then
         return true
     end
 
-    for _, prereq in ipairs(prerequisites) do
-        if not self:has_building_type(prereq) then
-            return false
+    -- Handle table of building type names (legacy)
+    if type(prerequisites) == "table" then
+        if #prerequisites == 0 then
+            return true
         end
+        for _, prereq in ipairs(prerequisites) do
+            if not self:has_building_type(prereq) then
+                return false
+            end
+        end
+        return true
     end
 
+    -- Handle bitfield prerequisites (from TechnoTypeClass)
+    -- For now, allow production if we have the factory - full prerequisite
+    -- checking will be done when tech tree is properly integrated
     return true
 end
 
@@ -546,6 +586,329 @@ function House:defeat()
     end
 end
 
+--============================================================================
+-- Production Methods
+--============================================================================
+
+--[[
+    Begin building a unit.
+
+    @param unit_type - UnitTypeClass to build
+    @return true if production started
+]]
+function House:Build_Unit(unit_type)
+    -- Lazy load FactoryClass
+    if not FactoryClass then
+        FactoryClass = require("src.production.factory")
+    end
+
+    -- Check if we have a war factory
+    if not self.factories.vehicle then
+        return false
+    end
+
+    -- Check if already building a unit
+    if self.unit_factory and self.unit_factory:Is_Building() then
+        return false  -- Already building
+    end
+
+    -- Check prerequisites
+    if unit_type.Prerequisites and not self:meets_prerequisites(unit_type.Prerequisites) then
+        return false
+    end
+
+    -- Check cost
+    local cost = unit_type.Cost or 0
+    if not self:can_afford(cost) then
+        return false
+    end
+
+    -- Create factory and start production
+    self.unit_factory = FactoryClass:new()
+    if self.unit_factory:Set(unit_type, self) then
+        self.unit_factory:Start()
+        Events.emit("PRODUCTION_STARTED", self, "UNIT", unit_type)
+        return true
+    end
+
+    self.unit_factory = nil
+    return false
+end
+
+--[[
+    Begin building infantry.
+
+    @param infantry_type - InfantryTypeClass to build
+    @return true if production started
+]]
+function House:Build_Infantry(infantry_type)
+    if not FactoryClass then
+        FactoryClass = require("src.production.factory")
+    end
+
+    -- Check if we have a barracks
+    if not self.factories.infantry then
+        return false
+    end
+
+    -- Check if already building
+    if self.infantry_factory and self.infantry_factory:Is_Building() then
+        return false
+    end
+
+    -- Check prerequisites
+    if infantry_type.Prerequisites and not self:meets_prerequisites(infantry_type.Prerequisites) then
+        return false
+    end
+
+    -- Check cost
+    local cost = infantry_type.Cost or 0
+    if not self:can_afford(cost) then
+        return false
+    end
+
+    -- Create factory and start production
+    self.infantry_factory = FactoryClass:new()
+    if self.infantry_factory:Set(infantry_type, self) then
+        self.infantry_factory:Start()
+        Events.emit("PRODUCTION_STARTED", self, "INFANTRY", infantry_type)
+        return true
+    end
+
+    self.infantry_factory = nil
+    return false
+end
+
+--[[
+    Begin building aircraft.
+
+    @param aircraft_type - AircraftTypeClass to build
+    @return true if production started
+]]
+function House:Build_Aircraft(aircraft_type)
+    if not FactoryClass then
+        FactoryClass = require("src.production.factory")
+    end
+
+    -- Check if we have an airfield
+    if not self.factories.aircraft then
+        return false
+    end
+
+    -- Check if already building
+    if self.aircraft_factory and self.aircraft_factory:Is_Building() then
+        return false
+    end
+
+    -- Check prerequisites
+    if aircraft_type.Prerequisites and not self:meets_prerequisites(aircraft_type.Prerequisites) then
+        return false
+    end
+
+    -- Check cost
+    local cost = aircraft_type.Cost or 0
+    if not self:can_afford(cost) then
+        return false
+    end
+
+    -- Create factory and start production
+    self.aircraft_factory = FactoryClass:new()
+    if self.aircraft_factory:Set(aircraft_type, self) then
+        self.aircraft_factory:Start()
+        Events.emit("PRODUCTION_STARTED", self, "AIRCRAFT", aircraft_type)
+        return true
+    end
+
+    self.aircraft_factory = nil
+    return false
+end
+
+--[[
+    Begin building a structure.
+
+    @param building_type - BuildingTypeClass to build
+    @return true if production started
+]]
+function House:Build_Structure(building_type)
+    if not FactoryClass then
+        FactoryClass = require("src.production.factory")
+    end
+
+    -- Check if we have a construction yard
+    if not self.factories.building then
+        return false
+    end
+
+    -- Check if already building
+    if self.building_factory and self.building_factory:Is_Building() then
+        return false
+    end
+
+    -- Check prerequisites
+    if building_type.Prerequisites and not self:meets_prerequisites(building_type.Prerequisites) then
+        return false
+    end
+
+    -- Check cost
+    local cost = building_type.Cost or 0
+    if not self:can_afford(cost) then
+        return false
+    end
+
+    -- Create factory and start production
+    self.building_factory = FactoryClass:new()
+    if self.building_factory:Set(building_type, self) then
+        self.building_factory:Start()
+        Events.emit("PRODUCTION_STARTED", self, "BUILDING", building_type)
+        return true
+    end
+
+    self.building_factory = nil
+    return false
+end
+
+--[[
+    Cancel production of a specific type.
+
+    @param factory_type - "UNIT", "INFANTRY", "AIRCRAFT", "BUILDING"
+    @return true if cancelled
+]]
+function House:Cancel_Production(factory_type)
+    local factory = nil
+
+    if factory_type == "UNIT" then
+        factory = self.unit_factory
+        self.unit_factory = nil
+    elseif factory_type == "INFANTRY" then
+        factory = self.infantry_factory
+        self.infantry_factory = nil
+    elseif factory_type == "AIRCRAFT" then
+        factory = self.aircraft_factory
+        self.aircraft_factory = nil
+    elseif factory_type == "BUILDING" then
+        factory = self.building_factory
+        self.building_factory = nil
+    end
+
+    if factory then
+        factory:Abandon()
+        Events.emit("PRODUCTION_CANCELLED", self, factory_type)
+        return true
+    end
+
+    return false
+end
+
+--[[
+    Suspend/resume production.
+
+    @param factory_type - "UNIT", "INFANTRY", "AIRCRAFT", "BUILDING"
+    @return true if toggled
+]]
+function House:Toggle_Production(factory_type)
+    local factory = nil
+
+    if factory_type == "UNIT" then
+        factory = self.unit_factory
+    elseif factory_type == "INFANTRY" then
+        factory = self.infantry_factory
+    elseif factory_type == "AIRCRAFT" then
+        factory = self.aircraft_factory
+    elseif factory_type == "BUILDING" then
+        factory = self.building_factory
+    end
+
+    if factory then
+        if factory:Is_Building() then
+            factory:Suspend()
+            Events.emit("PRODUCTION_SUSPENDED", self, factory_type)
+        else
+            factory:Start()
+            Events.emit("PRODUCTION_RESUMED", self, factory_type)
+        end
+        return true
+    end
+
+    return false
+end
+
+--[[
+    Get production completion percentage.
+
+    @param factory_type - "UNIT", "INFANTRY", "AIRCRAFT", "BUILDING"
+    @return Completion percentage 0-100
+]]
+function House:Production_Completion(factory_type)
+    local factory = nil
+
+    if factory_type == "UNIT" then
+        factory = self.unit_factory
+    elseif factory_type == "INFANTRY" then
+        factory = self.infantry_factory
+    elseif factory_type == "AIRCRAFT" then
+        factory = self.aircraft_factory
+    elseif factory_type == "BUILDING" then
+        factory = self.building_factory
+    end
+
+    if factory then
+        return factory:Completion_Percent()
+    end
+
+    return 0
+end
+
+--[[
+    Check if production of a type has completed.
+
+    @param factory_type - "UNIT", "INFANTRY", "AIRCRAFT", "BUILDING"
+    @return true if ready for placement/deployment
+]]
+function House:Production_Ready(factory_type)
+    local factory = nil
+
+    if factory_type == "UNIT" then
+        factory = self.unit_factory
+    elseif factory_type == "INFANTRY" then
+        factory = self.infantry_factory
+    elseif factory_type == "AIRCRAFT" then
+        factory = self.aircraft_factory
+    elseif factory_type == "BUILDING" then
+        factory = self.building_factory
+    end
+
+    if factory then
+        return factory:Has_Completed()
+    end
+
+    return false
+end
+
+--[[
+    Update factory counts based on owned buildings.
+    Called when buildings are added/removed.
+]]
+function House:update_factory_counts()
+    self.infantry_factories = 0
+    self.unit_factories = 0
+    self.aircraft_factories = 0
+    self.building_factories = 0
+
+    for _, building in ipairs(self.buildings) do
+        local bt = building.building_type
+
+        if bt == "PYLE" or bt == "HAND" then
+            self.infantry_factories = self.infantry_factories + 1
+        elseif bt == "WEAP" then
+            self.unit_factories = self.unit_factories + 1
+        elseif bt == "AFLD" or bt == "HPAD" then
+            self.aircraft_factories = self.aircraft_factories + 1
+        elseif bt == "FACT" then
+            self.building_factories = self.building_factories + 1
+        end
+    end
+end
+
 -- Update (call each game tick)
 function House:update(dt)
     -- Update special weapon charges
@@ -557,6 +920,32 @@ function House:update(dt)
         Events.emit("RADAR_CHANGED", self, false)
     elseif not self.radar_active and self.has_power then
         self:update_radar()
+    end
+
+    -- Update production factories
+    if self.infantry_factory then
+        self.infantry_factory:AI()
+        if self.infantry_factory:Has_Completed() then
+            Events.emit("PRODUCTION_COMPLETE", self, "INFANTRY", self.infantry_factory:Get_Object())
+        end
+    end
+    if self.unit_factory then
+        self.unit_factory:AI()
+        if self.unit_factory:Has_Completed() then
+            Events.emit("PRODUCTION_COMPLETE", self, "UNIT", self.unit_factory:Get_Object())
+        end
+    end
+    if self.aircraft_factory then
+        self.aircraft_factory:AI()
+        if self.aircraft_factory:Has_Completed() then
+            Events.emit("PRODUCTION_COMPLETE", self, "AIRCRAFT", self.aircraft_factory:Get_Object())
+        end
+    end
+    if self.building_factory then
+        self.building_factory:AI()
+        if self.building_factory:Has_Completed() then
+            Events.emit("PRODUCTION_COMPLETE", self, "BUILDING", self.building_factory:Get_Object())
+        end
     end
 end
 

@@ -882,6 +882,206 @@ function BuildingClass:Decode_Pointers(data, heap_lookup)
 end
 
 --============================================================================
+-- Placement Validation
+--============================================================================
+
+-- Adjacent cell offsets (8 directions)
+local ADJACENT_OFFSETS = {
+    {dx = 0, dy = -1},   -- N
+    {dx = 1, dy = -1},   -- NE
+    {dx = 1, dy = 0},    -- E
+    {dx = 1, dy = 1},    -- SE
+    {dx = 0, dy = 1},    -- S
+    {dx = -1, dy = 1},   -- SW
+    {dx = -1, dy = 0},   -- W
+    {dx = -1, dy = -1},  -- NW
+}
+
+--[[
+    Check if a cell is adjacent to any owned building.
+
+    @param cell_x - Cell X coordinate
+    @param cell_y - Cell Y coordinate
+    @param house - HouseClass to check buildings for
+    @return true if adjacent to owned building
+]]
+function BuildingClass.Is_Adjacent_To_Building(cell_x, cell_y, house)
+    if not house or not house.buildings then
+        return false
+    end
+
+    for _, building in ipairs(house.buildings) do
+        -- Get building cells
+        local bld_coord = building.Coord
+        if bld_coord then
+            local bld_cell_x = Coord.Cell_X(Coord.Coord_Cell(bld_coord))
+            local bld_cell_y = Coord.Cell_Y(Coord.Coord_Cell(bld_coord))
+
+            -- Get building size (default 1x1)
+            local width = 1
+            local height = 1
+            if building.Class then
+                width = building.Class.Width or 1
+                height = building.Class.Height or 1
+            end
+
+            -- Check if placement cell is adjacent to any building cell
+            for by = 0, height - 1 do
+                for bx = 0, width - 1 do
+                    local check_x = bld_cell_x + bx
+                    local check_y = bld_cell_y + by
+
+                    -- Check all 8 adjacent positions
+                    for _, offset in ipairs(ADJACENT_OFFSETS) do
+                        if cell_x == check_x + offset.dx and
+                           cell_y == check_y + offset.dy then
+                            return true
+                        end
+                    end
+
+                    -- Also allow placement ON the building edge (for adjacency)
+                    if cell_x == check_x and cell_y == check_y then
+                        return false  -- Can't place ON building
+                    end
+                end
+            end
+        end
+    end
+
+    return false
+end
+
+--[[
+    Check if placement at a cell is legal for a building.
+
+    @param cell_x - Cell X coordinate
+    @param cell_y - Cell Y coordinate
+    @param building_type - BuildingTypeClass
+    @param house - HouseClass placing the building
+    @param map - Map object for cell checks
+    @return true if placement is legal, false with reason otherwise
+]]
+function BuildingClass.Can_Place_Building(cell_x, cell_y, building_type, house, map)
+    if not building_type then
+        return false, "No building type"
+    end
+
+    -- Get building size
+    local width = building_type.Width or 1
+    local height = building_type.Height or 1
+
+    -- Check adjacency requirement
+    local needs_adjacency = not building_type.IsBridgeHead  -- Most buildings need adjacency
+    local is_adjacent = false
+
+    -- Check each cell the building will occupy
+    for dy = 0, height - 1 do
+        for dx = 0, width - 1 do
+            local check_x = cell_x + dx
+            local check_y = cell_y + dy
+
+            -- Check map bounds
+            if map then
+                local map_width = map.width or 64
+                local map_height = map.height or 64
+                if check_x < 0 or check_x >= map_width or
+                   check_y < 0 or check_y >= map_height then
+                    return false, "Out of bounds"
+                end
+
+                -- Check cell passability
+                local cell = map:get_cell(check_x, check_y)
+                if cell then
+                    -- Can't build on water, cliffs, or occupied cells
+                    if cell.terrain == "water" or cell.terrain == "cliff" then
+                        return false, "Invalid terrain"
+                    end
+                    if cell.building then
+                        return false, "Cell occupied"
+                    end
+                end
+            end
+
+            -- Check adjacency for each cell
+            if needs_adjacency and not is_adjacent then
+                is_adjacent = BuildingClass.Is_Adjacent_To_Building(check_x, check_y, house)
+            end
+        end
+    end
+
+    -- Check adjacency requirement (except for first building/Construction Yard)
+    if needs_adjacency then
+        -- Allow if house has no buildings (first building)
+        if house and #house.buildings > 0 and not is_adjacent then
+            return false, "Must be adjacent to existing building"
+        end
+    end
+
+    return true, nil
+end
+
+--[[
+    Get list of valid placement cells around owned buildings.
+
+    @param house - HouseClass
+    @param building_type - BuildingTypeClass to place
+    @param map - Map object
+    @return Table of {x, y} valid cells
+]]
+function BuildingClass.Get_Valid_Placement_Cells(house, building_type, map)
+    local valid_cells = {}
+    local checked = {}
+
+    if not house or not house.buildings then
+        return valid_cells
+    end
+
+    local width = building_type and building_type.Width or 1
+    local height = building_type and building_type.Height or 1
+
+    -- For each owned building
+    for _, building in ipairs(house.buildings) do
+        local bld_coord = building.Coord
+        if bld_coord then
+            local bld_cell_x = Coord.Cell_X(Coord.Coord_Cell(bld_coord))
+            local bld_cell_y = Coord.Cell_Y(Coord.Coord_Cell(bld_coord))
+
+            local bld_width = 1
+            local bld_height = 1
+            if building.Class then
+                bld_width = building.Class.Width or 1
+                bld_height = building.Class.Height or 1
+            end
+
+            -- Check all adjacent cells
+            for by = -1, bld_height do
+                for bx = -1, bld_width do
+                    -- Skip interior cells
+                    if bx < 0 or bx >= bld_width or by < 0 or by >= bld_height then
+                        local check_x = bld_cell_x + bx
+                        local check_y = bld_cell_y + by
+                        local key = check_x .. "," .. check_y
+
+                        if not checked[key] then
+                            checked[key] = true
+
+                            local can_place, _ = BuildingClass.Can_Place_Building(
+                                check_x, check_y, building_type, house, map)
+
+                            if can_place then
+                                table.insert(valid_cells, {x = check_x, y = check_y})
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return valid_cells
+end
+
+--============================================================================
 -- Debug Support
 --============================================================================
 
