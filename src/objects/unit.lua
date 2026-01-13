@@ -252,28 +252,194 @@ function UnitClass:Offload_Tiberium_Bail()
 end
 
 --[[
-    Find and return to nearest refinery.
+    Find and head to nearest refinery.
+
+    Reference: UnitClass::Find_Best_Refinery from UNIT.CPP
+
+    Searches for the nearest available refinery owned by this unit's house.
+    Establishes radio contact with the refinery and assigns ENTER mission.
+
+    @return true if refinery found and destination assigned
 ]]
 function UnitClass:Find_Refinery()
     if not self.House then
         return false
     end
 
-    -- Would search for nearest refinery
-    -- self.ArchiveTarget = refinery:As_Target()
-    -- self:Assign_Destination(self.ArchiveTarget)
-    -- self:Assign_Mission(self.MISSION.ENTER)
+    -- Get the global game reference to search for buildings
+    local Game = require("src.core.game")
+    if not Game or not Game.buildings then
+        return false
+    end
+
+    local my_coord = self:Center_Coord()
+    local my_x, my_y = Coord.From_Lepton(my_coord)
+
+    local best_refinery = nil
+    local best_distance = math.huge
+
+    -- Search all buildings for refineries owned by our house
+    for _, building in pairs(Game.buildings) do
+        if building and building.IsActive and building.House == self.House then
+            local type_class = building.Class
+            if type_class and type_class.IsRefinery then
+                -- Calculate distance
+                local bx, by = Coord.From_Lepton(building:Center_Coord())
+                local dx = bx - my_x
+                local dy = by - my_y
+                local dist = math.sqrt(dx * dx + dy * dy)
+
+                if dist < best_distance then
+                    best_distance = dist
+                    best_refinery = building
+                end
+            end
+        end
+    end
+
+    if best_refinery then
+        -- Establish radio contact with refinery
+        local response = self:Transmit_Message(self.RADIO.HELLO, best_refinery)
+        if response == self.RADIO.ROGER then
+            -- Refinery acknowledged, head there
+            self.ArchiveTarget = Target.As_Target(best_refinery)
+            self:Assign_Destination(self.ArchiveTarget)
+            self:Assign_Mission(self.MISSION.ENTER)
+            return true
+        else
+            -- Refinery busy, just move toward it
+            local near_coord = best_refinery:Center_Coord()
+            self:Assign_Destination(Target.As_Target_Coord(near_coord))
+            return true
+        end
+    end
 
     return false
 end
 
 --[[
     Find and harvest from nearest tiberium.
+
+    Reference: UnitClass::Goto_Tiberium from UNIT.CPP
+
+    Searches for the nearest tiberium cell within scanning range.
+    Uses spiral search pattern outward from current position.
+
+    @return true if tiberium found and destination assigned
 ]]
 function UnitClass:Find_Tiberium()
-    -- Would search for nearest tiberium field
-    -- self:Assign_Destination(tiberium_coord)
-    -- self:Assign_Mission(self.MISSION.HARVEST)
+    local Game = require("src.core.game")
+    if not Game or not Game.grid then
+        return false
+    end
+
+    local grid = Game.grid
+    local my_coord = self:Center_Coord()
+    local cell_x = Coord.Cell_X(Coord.Coord_Cell(my_coord))
+    local cell_y = Coord.Cell_Y(Coord.Coord_Cell(my_coord))
+
+    -- Search radius (in cells) - start small and expand
+    local max_radius = 32  -- Maximum search distance
+
+    -- Spiral search outward from current position
+    for radius = 1, max_radius do
+        -- Check cells at this radius
+        for dx = -radius, radius do
+            for dy = -radius, radius do
+                -- Only check cells on the perimeter of this radius
+                if math.abs(dx) == radius or math.abs(dy) == radius then
+                    local cx = cell_x + dx
+                    local cy = cell_y + dy
+
+                    local cell = grid:get_cell(cx, cy)
+                    if cell and cell:has_tiberium() then
+                        -- Found tiberium! Calculate destination coordinate
+                        local dest_coord = Coord.XY_Coord(
+                            cx * 256 + 128,  -- Cell center in leptons
+                            cy * 256 + 128
+                        )
+
+                        -- Remember where we found tiberium for future reference
+                        self.ArchiveTarget = Target.As_Target_Coord(dest_coord)
+
+                        -- Assign destination and stay in harvest mission
+                        self:Assign_Destination(self.ArchiveTarget)
+                        return true
+                    end
+                end
+            end
+        end
+    end
+
+    -- No tiberium found - check archive target (last known location)
+    if Target.Is_Valid(self.ArchiveTarget) then
+        self:Assign_Destination(self.ArchiveTarget)
+        return true
+    end
+
+    return false
+end
+
+--[[
+    Check if harvester is currently on a tiberium cell.
+
+    @return true if current cell has tiberium
+]]
+function UnitClass:On_Tiberium()
+    local Game = require("src.core.game")
+    if not Game or not Game.grid then
+        return false
+    end
+
+    local my_coord = self:Center_Coord()
+    local cell_x = Coord.Cell_X(Coord.Coord_Cell(my_coord))
+    local cell_y = Coord.Cell_Y(Coord.Coord_Cell(my_coord))
+    local cell = Game.grid:get_cell(cell_x, cell_y)
+
+    return cell and cell:has_tiberium()
+end
+
+--[[
+    Perform actual harvest operation from current cell.
+
+    Called from Mission_Harvest when on tiberium. Extracts tiberium
+    from the cell and adds it to the harvester's cargo.
+
+    @return true if successfully harvested
+]]
+function UnitClass:Harvesting()
+    if not self:Is_Harvester() then
+        return false
+    end
+
+    if self:Is_Full() then
+        return false
+    end
+
+    -- Must be on tiberium
+    if not self:On_Tiberium() then
+        return false
+    end
+
+    local Game = require("src.core.game")
+    if not Game or not Game.grid then
+        return false
+    end
+
+    local my_coord = self:Center_Coord()
+    local cell_x = Coord.Cell_X(Coord.Coord_Cell(my_coord))
+    local cell_y = Coord.Cell_Y(Coord.Coord_Cell(my_coord))
+    local cell = Game.grid:get_cell(cell_x, cell_y)
+
+    if cell then
+        -- Extract one unit of tiberium from cell
+        local harvested = cell:harvest_tiberium(1)
+        if harvested > 0 then
+            -- Add to cargo
+            self.Tiberium = self.Tiberium + 1
+            return true
+        end
+    end
 
     return false
 end
@@ -332,21 +498,74 @@ end
 
 --[[
     Complete deployment (called when timer expires).
+
+    Reference: UnitClass::Try_To_Deploy from UNIT.CPP
+
+    When the MCV finishes its deployment animation, this creates the
+    Construction Yard building at the MCV's location and removes the MCV.
+
+    @return true if deployment succeeded
 ]]
 function UnitClass:Complete_Deploy()
     if not self.IsDeploying then
         return false
     end
 
+    self.IsDeploying = false
+
+    -- Get current coordinates
+    local coord = self:Center_Coord()
+    local cell = Coord.Coord_Cell(coord)
+    local cell_x = Coord.Cell_X(cell)
+    local cell_y = Coord.Cell_Y(cell)
+
     -- Create construction yard at this location
-    -- local coord = self:Center_Coord()
-    -- local building = BuildingClass:new(BuildingTypeClass.FACT, self.House)
-    -- building:Unlimbo(coord, 0)
+    local Game = require("src.core.game")
+    local BuildingClass = require("src.objects.building")
+    local BuildingTypeClass = require("src.objects.types.buildingtype")
 
-    -- Remove self
-    self:Limbo()
+    -- Get Construction Yard type (STRUCT_FACT = 9 typically)
+    local fact_type = BuildingTypeClass.As_Reference(BuildingTypeClass.STRUCT.FACT)
+    if not fact_type then
+        -- Fallback: try to create by name
+        fact_type = BuildingTypeClass.Create("FACT")
+    end
 
-    return true
+    if fact_type then
+        -- Create the building
+        local building = BuildingClass:new(fact_type, self.House)
+        if building then
+            -- Place it at this location
+            if building:Unlimbo(coord, 0) then
+                -- Add to game tracking
+                if Game and Game.buildings then
+                    Game.buildings[building] = building
+                end
+
+                -- Transfer ownership attributes
+                if self.House then
+                    self.House:add_building(building)
+                end
+
+                -- Remove the MCV
+                self:Limbo()
+
+                -- If game has units tracking, remove from it
+                if Game and Game.units then
+                    Game.units[self] = nil
+                end
+
+                return true
+            else
+                -- Failed to place building, delete it
+                building:Limbo()
+            end
+        end
+    end
+
+    -- Deployment failed - abort
+    self.IsDeploying = false
+    return false
 end
 
 --============================================================================
@@ -433,27 +652,121 @@ end
 --============================================================================
 
 --[[
-    Mission_Harvest - Harvester behavior.
+    Mission_Harvest - Harvester AI state machine.
+
+    Reference: UnitClass::Mission_Harvest from UNIT.CPP
+
+    Implements the full harvester behavior loop:
+    - LOOKING: Find tiberium field
+    - HARVESTING: Collect tiberium from current cell
+    - FINDHOME: Locate nearest refinery
+    - HEADINGHOME: Navigate to refinery
+    - GOINGTOIDLE: No tiberium available, go idle
+
+    The Status field tracks which phase we're in.
 ]]
 function UnitClass:Mission_Harvest()
+    -- Status values (matches original C++ enum)
+    local LOOKING = 0
+    local HARVESTING = 1
+    local FINDHOME = 2
+    local HEADINGHOME = 3
+    local GOINGTOIDLE = 4
+
+    -- Non-harvesting units just sit idle
     if not self:Is_Harvester() then
-        self:Enter_Idle_Mode()
-        return 15
+        return 15 * 30  -- Long delay
     end
 
-    -- Full? Return to refinery
-    if self:Is_Full() then
-        self:Find_Refinery()
-        return 15
+    -- Initialize status if needed
+    if not self.Status then
+        self.Status = LOOKING
     end
 
-    -- Try to harvest
-    if self:Harvest() then
+    if self.Status == LOOKING then
+        -- Go and find a Tiberium field to harvest
+        self.IsHarvesting = false
+
+        -- If TarCom is set, skip to finding home (used when ordered to return)
+        if Target.Is_Valid(self.TarCom) then
+            self:Assign_Target(Target.TARGET_NONE)
+            self.Status = FINDHOME
+            return 1
+        end
+
+        -- Try to find and move to tiberium
+        if self:On_Tiberium() then
+            -- Already on tiberium, start harvesting
+            self.IsHarvesting = true
+            self.Status = HARVESTING
+            self.ArchiveTarget = Target.As_Target_Coord(self:Center_Coord())
+            return 1
+        elseif self:Find_Tiberium() then
+            -- Found tiberium, will move there
+            -- Stay in LOOKING until we arrive
+            return 15
+        else
+            -- No tiberium found anywhere
+            if not Target.Is_Valid(self.NavCom) then
+                -- No destination and no tiberium - try archive or go idle
+                if Target.Is_Valid(self.ArchiveTarget) then
+                    self:Assign_Destination(self.ArchiveTarget)
+                else
+                    self.Status = GOINGTOIDLE
+                    return 15 * 15
+                end
+            end
+        end
+
+    elseif self.Status == HARVESTING then
+        -- Harvest at current location until full or tiberium exhausted
+        if not self:Harvesting() then
+            self.IsHarvesting = false
+            if self:Is_Full() then
+                -- Full load, head home
+                self.Status = FINDHOME
+            else
+                -- Not full but can't harvest here anymore
+                if not self:Find_Tiberium() and not Target.Is_Valid(self.NavCom) then
+                    -- No more tiberium available, go home with partial load
+                    self.ArchiveTarget = Target.TARGET_NONE
+                    self.Status = FINDHOME
+                else
+                    -- Found more tiberium, continue harvesting after we get there
+                    self.Status = LOOKING
+                end
+            end
+            return 1
+        else
+            -- Remember this location for future reference
+            if not Target.Is_Valid(self.NavCom) and self.ArchiveTarget == Target.TARGET_NONE then
+                self.ArchiveTarget = Target.As_Target_Coord(self:Center_Coord())
+            end
+        end
         return UnitClass.HARVEST_DELAY
-    end
 
-    -- No tiberium here, find more
-    self:Find_Tiberium()
+    elseif self.Status == FINDHOME then
+        -- Find and head to refinery
+        if not Target.Is_Valid(self.NavCom) then
+            if self:Find_Refinery() then
+                self.Status = HEADINGHOME
+            else
+                -- No refinery found, keep looking
+                return 15
+            end
+        end
+        return 1
+
+    elseif self.Status == HEADINGHOME then
+        -- In communication with refinery, let Mission_Enter handle docking
+        self:Assign_Mission(self.MISSION.ENTER)
+        return 1
+
+    elseif self.Status == GOINGTOIDLE then
+        -- No tiberium anywhere, go into guard mode
+        self:Enter_Idle_Mode()
+        return 1
+    end
 
     return 15
 end

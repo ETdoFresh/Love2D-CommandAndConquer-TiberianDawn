@@ -327,6 +327,7 @@ function IPC:process_command(command)
             "test_missions - Test FootClass mission methods and threat detection",
             "test_combat_system - Test Combat system (Explosion_Damage, BulletClass, Approach_Target)",
             "test_pathfinding - Test Pathfinding and Animation effects (SmudgeClass, Middle())",
+            "test_economy - Test Economy and Production systems (Phase 4: harvesters, MCV, factories)",
             "help - Show this help"
         }
 
@@ -354,6 +355,13 @@ function IPC:process_command(command)
     elseif cmd == "test_pathfinding" then
         -- Test Pathfinding and Animation Effects (Phase 3 completion)
         local test_result = self:test_pathfinding()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
+    elseif cmd == "test_economy" then
+        -- Test Economy and Production systems (Phase 4)
+        local test_result = self:test_economy()
         response.success = test_result.success
         response.tests = test_result.tests
         response.message = test_result.message
@@ -5482,6 +5490,179 @@ function IPC:test_pathfinding()
 
     if not ok7 then
         add_test("AnimTypeClass special weapons", false, tostring(err7))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test Mission Handlers and Economy Systems (Phase 4)
+function IPC:test_economy()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: UnitClass harvester methods exist
+    local ok1, err1 = pcall(function()
+        local UnitClass = require("src.objects.unit")
+
+        assert(UnitClass ~= nil, "UnitClass should load")
+        assert(type(UnitClass.Mission_Harvest) == "function", "Mission_Harvest should exist")
+        assert(type(UnitClass.Find_Tiberium) == "function", "Find_Tiberium should exist")
+        assert(type(UnitClass.Find_Refinery) == "function", "Find_Refinery should exist")
+        assert(type(UnitClass.Harvesting) == "function", "Harvesting should exist")
+        assert(type(UnitClass.On_Tiberium) == "function", "On_Tiberium should exist")
+        assert(type(UnitClass.Is_Harvester) == "function", "Is_Harvester should exist")
+        assert(type(UnitClass.Is_Full) == "function", "Is_Full should exist")
+
+        add_test("UnitClass harvester methods", true, "All harvester methods available")
+    end)
+
+    if not ok1 then
+        add_test("UnitClass harvester methods", false, tostring(err1))
+    end
+
+    -- Test 2: UnitClass MCV deployment methods exist
+    local ok2, err2 = pcall(function()
+        local UnitClass = require("src.objects.unit")
+
+        assert(type(UnitClass.Can_Deploy) == "function", "Can_Deploy should exist")
+        assert(type(UnitClass.Deploy) == "function", "Deploy should exist")
+        assert(type(UnitClass.Complete_Deploy) == "function", "Complete_Deploy should exist")
+
+        -- Check constants
+        assert(UnitClass.DEPLOY_TIME ~= nil, "DEPLOY_TIME constant should exist")
+        assert(UnitClass.TIBERIUM_CAPACITY ~= nil, "TIBERIUM_CAPACITY should exist")
+        assert(UnitClass.HARVEST_DELAY ~= nil, "HARVEST_DELAY should exist")
+
+        add_test("UnitClass MCV deployment", true, "All MCV deployment methods available")
+    end)
+
+    if not ok2 then
+        add_test("UnitClass MCV deployment", false, tostring(err2))
+    end
+
+    -- Test 3: Cell class has tiberium methods
+    local ok3, err3 = pcall(function()
+        local Cell = require("src.map.cell")
+
+        assert(Cell ~= nil, "Cell should load")
+        assert(type(Cell.has_tiberium) == "function", "has_tiberium should exist")
+        assert(type(Cell.harvest_tiberium) == "function", "harvest_tiberium should exist")
+        assert(type(Cell.get_tiberium_value) == "function", "get_tiberium_value should exist")
+        assert(type(Cell.grow_tiberium) == "function", "grow_tiberium should exist")
+
+        add_test("Cell tiberium methods", true, "All cell tiberium methods available")
+    end)
+
+    if not ok3 then
+        add_test("Cell tiberium methods", false, tostring(err3))
+    end
+
+    -- Test 4: HouseClass has economy methods
+    local ok4, err4 = pcall(function()
+        local HouseClass = require("src.house.house")
+
+        assert(HouseClass ~= nil, "HouseClass should load")
+        assert(type(HouseClass.add_credits) == "function", "add_credits should exist")
+        assert(type(HouseClass.spend_credits) == "function", "spend_credits should exist")
+        assert(type(HouseClass.can_afford) == "function", "can_afford should exist")
+        assert(type(HouseClass.add_building) == "function", "add_building should exist")
+        assert(type(HouseClass.update_power) == "function", "update_power should exist")
+
+        add_test("HouseClass economy methods", true, "All economy methods available")
+    end)
+
+    if not ok4 then
+        add_test("HouseClass economy methods", false, tostring(err4))
+    end
+
+    -- Test 5: FactoryClass production methods
+    local ok5, err5 = pcall(function()
+        local FactoryClass = require("src.production.factory")
+
+        assert(FactoryClass ~= nil, "FactoryClass should load")
+        assert(type(FactoryClass.Set) == "function", "Set should exist")
+        assert(type(FactoryClass.Start) == "function", "Start should exist")
+        assert(type(FactoryClass.Suspend) == "function", "Suspend should exist")
+        assert(type(FactoryClass.Abandon) == "function", "Abandon should exist")
+        assert(type(FactoryClass.Completed) == "function", "Completed should exist")
+        assert(type(FactoryClass.Cost_Per_Tick) == "function", "Cost_Per_Tick should exist")
+
+        add_test("FactoryClass production methods", true, "All production methods available")
+    end)
+
+    if not ok5 then
+        add_test("FactoryClass production methods", false, tostring(err5))
+    end
+
+    -- Test 6: FootClass mission methods exist
+    local ok6, err6 = pcall(function()
+        local FootClass = require("src.objects.foot")
+
+        assert(FootClass ~= nil, "FootClass should load")
+        assert(type(FootClass.Mission_Move) == "function", "Mission_Move should exist")
+        assert(type(FootClass.Mission_Attack) == "function", "Mission_Attack should exist")
+        assert(type(FootClass.Mission_Guard) == "function", "Mission_Guard should exist")
+        assert(type(FootClass.Mission_Hunt) == "function", "Mission_Hunt should exist")
+        assert(type(FootClass.Mission_Enter) == "function", "Mission_Enter should exist")
+        assert(type(FootClass.Assign_Destination) == "function", "Assign_Destination should exist")
+
+        add_test("FootClass mission methods", true, "All mission methods available")
+    end)
+
+    if not ok6 then
+        add_test("FootClass mission methods", false, tostring(err6))
+    end
+
+    -- Test 7: Grid search functionality
+    local ok7, err7 = pcall(function()
+        local Grid = require("src.map.grid")
+
+        assert(Grid ~= nil, "Grid should load")
+        assert(type(Grid.get_cell) == "function", "get_cell should exist")
+        assert(type(Grid.get_cells_in_radius) == "function", "get_cells_in_radius should exist")
+        assert(type(Grid.is_valid) == "function", "is_valid should exist")
+
+        -- Create a test grid
+        local grid = Grid.new(16, 16)
+        assert(grid ~= nil, "Should create grid")
+
+        local cell = grid:get_cell(8, 8)
+        assert(cell ~= nil, "Should get cell at valid coords")
+
+        local nil_cell = grid:get_cell(100, 100)
+        assert(nil_cell == nil, "Should return nil for invalid coords")
+
+        add_test("Grid search functionality", true, "Grid cell access works correctly")
+    end)
+
+    if not ok7 then
+        add_test("Grid search functionality", false, tostring(err7))
     end
 
     -- Summary
