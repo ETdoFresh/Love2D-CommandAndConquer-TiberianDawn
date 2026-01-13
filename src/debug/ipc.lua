@@ -263,6 +263,13 @@ function IPC:process_command(command)
         response.tests = test_result.tests
         response.message = test_result.message
 
+    elseif cmd == "test_combat" then
+        -- Test the Phase 3 combat classes (BulletClass, AnimClass, WeaponTypeClass, WarheadTypeClass)
+        local test_result = self:test_combat_classes()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
     elseif cmd == "help" then
         response.commands = {
             "input <key> - Simulate key press",
@@ -283,6 +290,7 @@ function IPC:process_command(command)
             "test_types - Test AbstractTypeClass, ObjectTypeClass, TechnoTypeClass",
             "test_concrete - Test InfantryClass, UnitClass, AircraftClass, BuildingClass",
             "test_specific_types - Test InfantryTypeClass, UnitTypeClass, AircraftTypeClass, BuildingTypeClass",
+            "test_combat - Test BulletClass, AnimClass, WeaponTypeClass, WarheadTypeClass",
             "help - Show this help"
         }
 
@@ -2719,6 +2727,296 @@ function IPC:test_specific_types()
 
     if not ok16 then
         add_test("BuildingTypeClass storage", false, tostring(err16))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test the Phase 3 combat classes (BulletClass, AnimClass, WeaponTypeClass, WarheadTypeClass)
+function IPC:test_combat_classes()
+    local result = { success = true, tests = {} }
+
+    local function add_test(name, passed, detail)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            detail = detail
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: Load all combat modules
+    local ok1, err1 = pcall(function()
+        local BulletTypeClass = require("src.objects.types.bullettype")
+        local AnimTypeClass = require("src.objects.types.animtype")
+        local BulletClass = require("src.objects.bullet")
+        local AnimClass = require("src.objects.anim")
+        local WeaponTypeClass = require("src.combat.weapon")
+        local WarheadTypeClass = require("src.combat.warhead")
+
+        assert(BulletTypeClass ~= nil, "BulletTypeClass should load")
+        assert(AnimTypeClass ~= nil, "AnimTypeClass should load")
+        assert(BulletClass ~= nil, "BulletClass should load")
+        assert(AnimClass ~= nil, "AnimClass should load")
+        assert(WeaponTypeClass ~= nil, "WeaponTypeClass should load")
+        assert(WarheadTypeClass ~= nil, "WarheadTypeClass should load")
+
+        add_test("Combat module loading", true, "All combat modules loaded")
+    end)
+
+    if not ok1 then
+        add_test("Combat module loading", false, tostring(err1))
+        return result
+    end
+
+    -- Test 2: BulletTypeClass creation and factory
+    local BulletTypeClass = require("src.objects.types.bullettype")
+    local ok2, err2 = pcall(function()
+        local bulletType = BulletTypeClass:new("TEST", "Test Bullet")
+        assert(bulletType.Type == BulletTypeClass.BULLET.NONE, "Should default to NONE")
+        assert(bulletType.IsHoming == false, "Should not be homing")
+        assert(bulletType.IsArcing == false, "Should not be arcing")
+
+        local ssm = BulletTypeClass.Create(BulletTypeClass.BULLET.SSM)
+        assert(ssm.IsHoming == true, "SSM should be homing")
+        assert(ssm.IsFlameEquipped == true, "SSM should have flame trail")
+
+        local grenade = BulletTypeClass.Create(BulletTypeClass.BULLET.GRENADE)
+        assert(grenade.IsArcing == true, "Grenade should arc")
+        assert(grenade.IsInaccurate == true, "Grenade should be inaccurate")
+
+        local sam = BulletTypeClass.Create(BulletTypeClass.BULLET.SAM)
+        assert(sam.IsAntiAircraft == true, "SAM should be anti-aircraft")
+
+        add_test("BulletTypeClass", true, "Bullet types work correctly")
+    end)
+
+    if not ok2 then
+        add_test("BulletTypeClass", false, tostring(err2))
+    end
+
+    -- Test 3: AnimTypeClass creation and factory
+    local AnimTypeClass = require("src.objects.types.animtype")
+    local ok3, err3 = pcall(function()
+        local animType = AnimTypeClass:new("TEST", "Test Anim")
+        assert(animType.Type == AnimTypeClass.ANIM.NONE, "Should default to NONE")
+        assert(animType.Stages == 1, "Should default to 1 stage")
+
+        local fball = AnimTypeClass.Create(AnimTypeClass.ANIM.FBALL1)
+        assert(fball.Stages == 14, "Fireball should have 14 stages")
+        assert(fball.IsScorcher == true, "Fireball should scorch")
+        assert(fball.IsCraterForming == true, "Fireball should make crater")
+
+        local napalm = AnimTypeClass.Create(AnimTypeClass.ANIM.NAPALM3)
+        assert(napalm.IsSticky == true, "Napalm should be sticky")
+        assert(napalm.Damage > 0, "Napalm should deal damage")
+
+        add_test("AnimTypeClass", true, "Animation types work correctly")
+    end)
+
+    if not ok3 then
+        add_test("AnimTypeClass", false, tostring(err3))
+    end
+
+    -- Test 4: BulletClass creation and fuse system
+    local BulletClass = require("src.objects.bullet")
+    local ok4, err4 = pcall(function()
+        local bulletType = BulletTypeClass.Create(BulletTypeClass.BULLET.SSM)
+        local bullet = BulletClass:new(bulletType)
+
+        assert(bullet.IsInLimbo == true, "Should start in limbo")
+        assert(bullet.Class == bulletType, "Should have type reference")
+        assert(bullet.SpeedAdd > 0, "Should have speed")
+
+        -- Test fuse arming
+        bullet:Arm_Fuse({x=100, y=100}, 50, 5)
+        assert(bullet.FuseTimer == 50, "Fuse timer should be 50")
+        assert(bullet.ArmingTimer == 5, "Arming timer should be 5")
+
+        -- Test fuse countdown
+        local triggered = bullet:Fuse_Checkup()
+        assert(triggered == false, "Should not trigger during arming")
+        assert(bullet.ArmingTimer == 4, "Arming should decrement")
+
+        add_test("BulletClass fuse system", true, "Fuse system works")
+    end)
+
+    if not ok4 then
+        add_test("BulletClass fuse system", false, tostring(err4))
+    end
+
+    -- Test 5: BulletClass arcing behavior
+    local ok5, err5 = pcall(function()
+        local grenadeType = BulletTypeClass.Create(BulletTypeClass.BULLET.GRENADE)
+        local bullet = BulletClass:new(grenadeType)
+
+        -- Simulate arc
+        bullet.ArcAltitude = 0
+        bullet.Riser = 20  -- Initial upward velocity
+
+        -- First tick - rising
+        bullet.ArcAltitude = bullet.ArcAltitude + bullet.Riser
+        bullet.Riser = bullet.Riser - BulletClass.GRAVITY
+        assert(bullet.ArcAltitude == 20, "Should rise")
+        assert(bullet.Riser == 17, "Riser should decrease by gravity")
+
+        add_test("BulletClass arcing", true, "Arcing physics work")
+    end)
+
+    if not ok5 then
+        add_test("BulletClass arcing", false, tostring(err5))
+    end
+
+    -- Test 6: AnimClass creation and attachment
+    local AnimClass = require("src.objects.anim")
+    local ok6, err6 = pcall(function()
+        local animType = AnimTypeClass.Create(AnimTypeClass.ANIM.FBALL1)
+        local anim = AnimClass:new(animType, {x=100, y=100}, 0, 1, false)
+
+        assert(anim.IsInLimbo == false, "Should not be in limbo")
+        assert(anim.Class == animType, "Should have type reference")
+        assert(anim.Loops == 1, "Should have 1 loop")
+
+        -- Test stage
+        assert(anim:Fetch_Stage() == 0, "Should start at stage 0")
+
+        add_test("AnimClass creation", true, "Animation creation works")
+    end)
+
+    if not ok6 then
+        add_test("AnimClass creation", false, tostring(err6))
+    end
+
+    -- Test 7: AnimClass looping
+    local ok7, err7 = pcall(function()
+        local animType = AnimTypeClass.Create(AnimTypeClass.ANIM.FIRE_SMALL)
+        local anim = AnimClass:new(animType, {x=100, y=100}, 0, 3, false)
+
+        assert(anim.Loops == 3, "Should have 3 loops")
+
+        -- Advance stage manually
+        anim:Set_Stage(5)
+        assert(anim:Fetch_Stage() == 5, "Stage should be 5")
+
+        add_test("AnimClass looping", true, "Animation looping works")
+    end)
+
+    if not ok7 then
+        add_test("AnimClass looping", false, tostring(err7))
+    end
+
+    -- Test 8: WarheadTypeClass creation and damage
+    local WarheadTypeClass = require("src.combat.warhead")
+    local ok8, err8 = pcall(function()
+        local sa = WarheadTypeClass.Create(WarheadTypeClass.WARHEAD.SA)
+        assert(sa.Name == "Small Arms", "Should be Small Arms")
+        assert(sa.SpreadFactor == 2, "Should have spread 2")
+
+        -- Test damage modification
+        local damage = sa:Modify_Damage(100, WarheadTypeClass.ARMOR.NONE)
+        assert(damage == 100, "Full damage vs NONE armor")
+
+        damage = sa:Modify_Damage(100, WarheadTypeClass.ARMOR.STEEL)
+        assert(damage == 25, "25% damage vs STEEL")
+
+        add_test("WarheadTypeClass damage", true, "Warhead damage calc works")
+    end)
+
+    if not ok8 then
+        add_test("WarheadTypeClass damage", false, tostring(err8))
+    end
+
+    -- Test 9: WarheadTypeClass types
+    local ok9, err9 = pcall(function()
+        local he = WarheadTypeClass.Create(WarheadTypeClass.WARHEAD.HE)
+        assert(he.IsWallDestroyer == true, "HE destroys walls")
+        assert(he.IsTiberiumDestroyer == true, "HE destroys tiberium")
+
+        local ap = WarheadTypeClass.Create(WarheadTypeClass.WARHEAD.AP)
+        assert(ap.IsWallDestroyer == true, "AP destroys walls")
+        local ap_damage = ap:Modify_Damage(100, WarheadTypeClass.ARMOR.STEEL)
+        assert(ap_damage == 100, "AP full damage vs steel")
+
+        local fire = WarheadTypeClass.Create(WarheadTypeClass.WARHEAD.FIRE)
+        assert(fire.IsWoodDestroyer == true, "Fire destroys wood")
+
+        add_test("WarheadTypeClass types", true, "Warhead types work")
+    end)
+
+    if not ok9 then
+        add_test("WarheadTypeClass types", false, tostring(err9))
+    end
+
+    -- Test 10: WeaponTypeClass creation
+    local WeaponTypeClass = require("src.combat.weapon")
+    local ok10, err10 = pcall(function()
+        local rifle = WeaponTypeClass.Create(WeaponTypeClass.WEAPON.RIFLE)
+        assert(rifle.Name == "Sniper Rifle", "Should be Sniper Rifle")
+        assert(rifle.Attack == 125, "Sniper does 125 damage")
+        assert(rifle.Fires == BulletTypeClass.BULLET.SNIPER, "Fires sniper bullet")
+
+        local cannon = WeaponTypeClass.Create(WeaponTypeClass.WEAPON._120MM)
+        assert(cannon.Attack == 40, "120mm does 40 damage")
+        assert(cannon.Fires == BulletTypeClass.BULLET.APDS, "Fires APDS")
+
+        add_test("WeaponTypeClass creation", true, "Weapon creation works")
+    end)
+
+    if not ok10 then
+        add_test("WeaponTypeClass creation", false, tostring(err10))
+    end
+
+    -- Test 11: WeaponTypeClass range
+    local ok11, err11 = pcall(function()
+        local pistol = WeaponTypeClass.Create(WeaponTypeClass.WEAPON.PISTOL)
+        assert(pistol:Range_In_Cells() == 1, "Pistol range ~1 cell")
+
+        local obelisk = WeaponTypeClass.Create(WeaponTypeClass.WEAPON.OBELISK_LASER)
+        assert(obelisk:Range_In_Cells() == 7, "Obelisk range 7 cells")
+        assert(obelisk.Attack == 200, "Obelisk does 200 damage")
+
+        local tomahawk = WeaponTypeClass.Create(WeaponTypeClass.WEAPON.TOMAHAWK)
+        assert(tomahawk:Range_In_Cells() == 7, "Tomahawk range 7 cells")
+
+        add_test("WeaponTypeClass range", true, "Weapon range works")
+    end)
+
+    if not ok11 then
+        add_test("WeaponTypeClass range", false, tostring(err11))
+    end
+
+    -- Test 12: WeaponTypeClass global lookup
+    local ok12, err12 = pcall(function()
+        WeaponTypeClass.Init()
+        local weapon = WeaponTypeClass.Get(WeaponTypeClass.WEAPON.M16)
+        assert(weapon ~= nil, "Should get M16")
+        assert(weapon.Name == "M16", "Should be M16")
+
+        WarheadTypeClass.Init()
+        local warhead = WarheadTypeClass.Get(WarheadTypeClass.WARHEAD.LASER)
+        assert(warhead ~= nil, "Should get Laser")
+        assert(warhead.Name == "Laser", "Should be Laser")
+
+        add_test("Global lookup tables", true, "Lookup tables work")
+    end)
+
+    if not ok12 then
+        add_test("Global lookup tables", false, tostring(err12))
     end
 
     -- Summary
