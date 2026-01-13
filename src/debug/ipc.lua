@@ -421,6 +421,13 @@ function IPC:process_command(command)
         response.tests = test_result.tests
         response.message = test_result.message
 
+    elseif cmd == "test_house_economy" then
+        -- Test House Economy (Harvested, Spend_Money, Refund_Money, etc.)
+        local test_result = self:test_house_economy()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
     else
         response.success = false
         response.error = "Unknown command: " .. cmd
@@ -6946,6 +6953,196 @@ function IPC:test_mission_handlers()
 
     if not ok6 then
         add_test("BuildingClass BSTATE constants", false, tostring(err6))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test House economy functions (Harvested, Spend_Money, Refund_Money, etc.)
+function IPC:test_house_economy()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: House economy methods exist
+    local ok1, err1 = pcall(function()
+        local House = require("src.house.house")
+
+        assert(type(House.Harvested) == "function", "Harvested should exist")
+        assert(type(House.Spend_Money) == "function", "Spend_Money should exist")
+        assert(type(House.Refund_Money) == "function", "Refund_Money should exist")
+        assert(type(House.Adjust_Capacity) == "function", "Adjust_Capacity should exist")
+        assert(type(House.Available_Money) == "function", "Available_Money should exist")
+        assert(type(House.Silo_Redraw_Check) == "function", "Silo_Redraw_Check should exist")
+        assert(type(House.Is_Maxed_Out) == "function", "Is_Maxed_Out should exist")
+        assert(type(House.Get_Tiberium) == "function", "Get_Tiberium should exist")
+        assert(type(House.Get_Capacity) == "function", "Get_Capacity should exist")
+        assert(type(House.Get_Fill_Percent) == "function", "Get_Fill_Percent should exist")
+
+        add_test("House economy methods", true, "All economy methods exist")
+    end)
+
+    if not ok1 then
+        add_test("House economy methods", false, tostring(err1))
+    end
+
+    -- Test 2: Available_Money returns Credits + Tiberium
+    local ok2, err2 = pcall(function()
+        local House = require("src.house.house")
+
+        local house = House.new(House.TYPE.GOOD, "TestHouse")
+        house.credits = 5000
+        house.tiberium = 3000
+
+        local total = house:Available_Money()
+        assert(total == 8000, "Available_Money should return Credits + Tiberium (got " .. total .. ")")
+
+        add_test("Available_Money calculation", true, "Returns Credits + Tiberium correctly")
+    end)
+
+    if not ok2 then
+        add_test("Available_Money calculation", false, tostring(err2))
+    end
+
+    -- Test 3: Harvested adds tiberium and caps at capacity
+    local ok3, err3 = pcall(function()
+        local House = require("src.house.house")
+
+        local house = House.new(House.TYPE.GOOD, "TestHouse")
+        house.credits = 0
+        house.tiberium = 0
+        house.credits_capacity = 1000
+
+        -- Add tiberium
+        house:Harvested(500)
+        assert(house.tiberium == 500, "Should have 500 tiberium")
+
+        -- Add more, capped at capacity
+        house:Harvested(700)
+        assert(house.tiberium == 1000, "Should be capped at 1000")
+        assert(house:Is_Maxed_Out() == true, "Should be maxed out")
+
+        add_test("Harvested tiberium capping", true, "Tiberium correctly capped at capacity")
+    end)
+
+    if not ok3 then
+        add_test("Harvested tiberium capping", false, tostring(err3))
+    end
+
+    -- Test 4: Spend_Money uses tiberium first, then credits
+    local ok4, err4 = pcall(function()
+        local House = require("src.house.house")
+
+        local house = House.new(House.TYPE.GOOD, "TestHouse")
+        house.credits = 5000
+        house.tiberium = 3000
+        house.credits_capacity = 5000
+
+        -- Spend 2000 - should come from tiberium
+        house:Spend_Money(2000)
+        assert(house.tiberium == 1000, "Tiberium should be 1000 (spent 2000)")
+        assert(house.credits == 5000, "Credits should still be 5000")
+
+        -- Spend 2000 more - should use remaining tiberium then credits
+        house:Spend_Money(2000)
+        assert(house.tiberium == 0, "Tiberium should be 0")
+        assert(house.credits == 4000, "Credits should be 4000 (5000 - 1000)")
+
+        add_test("Spend_Money priority", true, "Correctly spends tiberium first, then credits")
+    end)
+
+    if not ok4 then
+        add_test("Spend_Money priority", false, tostring(err4))
+    end
+
+    -- Test 5: Refund_Money adds to credits
+    local ok5, err5 = pcall(function()
+        local House = require("src.house.house")
+
+        local house = House.new(House.TYPE.GOOD, "TestHouse")
+        house.credits = 1000
+        house.tiberium = 500
+
+        house:Refund_Money(750)
+        assert(house.credits == 1750, "Credits should be 1750 after refund")
+        assert(house.tiberium == 500, "Tiberium should be unchanged")
+
+        add_test("Refund_Money", true, "Refund correctly adds to credits")
+    end)
+
+    if not ok5 then
+        add_test("Refund_Money", false, tostring(err5))
+    end
+
+    -- Test 6: Adjust_Capacity handles tiberium loss
+    local ok6, err6 = pcall(function()
+        local House = require("src.house.house")
+
+        local house = House.new(House.TYPE.GOOD, "TestHouse")
+        house.credits = 0
+        house.tiberium = 1000
+        house.credits_capacity = 2000
+
+        -- Increase capacity
+        local lost = house:Adjust_Capacity(1000, false)
+        assert(house.credits_capacity == 3000, "Capacity should be 3000")
+        assert(lost == 0, "No tiberium should be lost when increasing")
+
+        -- Decrease capacity below current tiberium
+        lost = house:Adjust_Capacity(-2500, true)
+        assert(house.credits_capacity == 500, "Capacity should be 500")
+        assert(house.tiberium == 500, "Tiberium should be capped at 500")
+        assert(lost == 500, "Should have lost 500 tiberium")
+
+        add_test("Adjust_Capacity", true, "Capacity adjustment and tiberium loss work correctly")
+    end)
+
+    if not ok6 then
+        add_test("Adjust_Capacity", false, tostring(err6))
+    end
+
+    -- Test 7: can_afford uses Available_Money
+    local ok7, err7 = pcall(function()
+        local House = require("src.house.house")
+
+        local house = House.new(House.TYPE.GOOD, "TestHouse")
+        house.credits = 2000
+        house.tiberium = 3000
+
+        assert(house:can_afford(5000) == true, "Should afford 5000 (2000+3000)")
+        assert(house:can_afford(5001) == false, "Should not afford 5001")
+        assert(house:can_afford(0) == true, "Should afford 0")
+
+        add_test("can_afford with combined funds", true, "can_afford correctly uses total money")
+    end)
+
+    if not ok7 then
+        add_test("can_afford with combined funds", false, tostring(err7))
     end
 
     -- Summary

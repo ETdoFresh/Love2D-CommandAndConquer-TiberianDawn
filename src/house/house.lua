@@ -191,15 +191,21 @@ function House.get_default_color(house_type)
     return colors[house_type] or {1, 1, 1}
 end
 
--- Credit management
+--============================================================================
+-- Economy Management
+-- Port of HOUSE.CPP economy functions
+--============================================================================
+
+--[[
+    Add raw credits to the house (initial cash, not harvested).
+    Used for scenario setup and bonuses.
+
+    @param amount - Credits to add
+    @return New credit total
+]]
 function House:add_credits(amount)
     local old_credits = self.credits
     self.credits = self.credits + amount
-
-    -- Cap at capacity if set
-    if self.credits_capacity > 0 and self.credits > self.credits_capacity then
-        self.credits = self.credits_capacity
-    end
 
     if amount > 0 then
         self.stats.credits_harvested = self.stats.credits_harvested + amount
@@ -209,6 +215,13 @@ function House:add_credits(amount)
     return self.credits
 end
 
+--[[
+    Simple credit deduction (used internally).
+    For production spending, use Spend_Money() instead.
+
+    @param amount - Credits to spend
+    @return true if spent successfully
+]]
 function House:spend_credits(amount)
     if self.credits >= amount then
         self.credits = self.credits - amount
@@ -219,16 +232,217 @@ function House:spend_credits(amount)
     return false
 end
 
+--[[
+    Check if house can afford a cost.
+    Uses total available money (Credits + Tiberium).
+
+    @param cost - Amount to check
+    @return true if can afford
+]]
 function House:can_afford(cost)
-    return self.credits >= cost
+    return self:Available_Money() >= cost
 end
 
+--[[
+    Get raw credits (initial cash reserves).
+]]
 function House:get_credits()
     return self.credits
 end
 
+--[[
+    Fetches the total credit worth of the house.
+    Port of HouseClass::Available_Money from HOUSE.CPP
+
+    This is the sum of harvested Tiberium in storage and
+    the initial unspent cash reserves.
+
+    @return Total credit value (Credits + Tiberium)
+]]
+function House:Available_Money()
+    return self.tiberium + self.credits
+end
+
+-- Alias for compatibility
 function House:available_money()
-    return self.credits
+    return self:Available_Money()
+end
+
+--[[
+    Adds Tiberium to the harvest storage.
+    Port of HouseClass::Harvested from HOUSE.CPP
+
+    Called when a harvester returns to refinery with ore.
+    Tiberium is capped at storage capacity.
+
+    @param tiberium - Amount of tiberium credits to add
+]]
+function House:Harvested(tiberium)
+    local old_tiberium = self.tiberium
+
+    self.tiberium = self.tiberium + tiberium
+
+    -- Cap at storage capacity
+    if self.credits_capacity > 0 and self.tiberium > self.credits_capacity then
+        self.tiberium = self.credits_capacity
+        self.is_maxed_out = true
+    end
+
+    -- Track harvested credits for statistics
+    self.stats.credits_harvested = self.stats.credits_harvested + tiberium
+
+    -- Check if silos need redraw
+    self:Silo_Redraw_Check(old_tiberium, self.credits_capacity)
+
+    Events.emit("TIBERIUM_HARVESTED", self, tiberium, self.tiberium)
+end
+
+--[[
+    Removes money from the house for production.
+    Port of HouseClass::Spend_Money from HOUSE.CPP
+
+    Money is extracted from Tiberium first. When Tiberium
+    is exhausted, then Credits are consumed.
+
+    @param money - Amount to spend
+]]
+function House:Spend_Money(money)
+    local old_tiberium = self.tiberium
+
+    if money > self.tiberium then
+        -- Not enough tiberium - use what we have, then use credits
+        money = money - self.tiberium
+        self.tiberium = 0
+        self.credits = self.credits - money
+    else
+        -- Enough tiberium to cover it
+        self.tiberium = self.tiberium - money
+    end
+
+    -- Ensure we don't go negative
+    self.credits = math.max(0, self.credits)
+
+    -- Check if silos need redraw
+    self:Silo_Redraw_Check(old_tiberium, self.credits_capacity)
+
+    self.stats.credits_spent = self.stats.credits_spent + money
+    Events.emit("MONEY_SPENT", self, money)
+end
+
+--[[
+    Refunds money back to the house.
+    Port of HouseClass::Refund_Money from HOUSE.CPP
+
+    Used when production is cancelled. At this point, the exact
+    breakdown of Tiberium or initial Credits used for the original
+    purchase is lost. Money is refunded as Credits.
+
+    @param money - Amount to refund
+]]
+function House:Refund_Money(money)
+    self.credits = self.credits + money
+    Events.emit("MONEY_REFUNDED", self, money)
+end
+
+--[[
+    Adjusts the house Tiberium storage capacity.
+    Port of HouseClass::Adjust_Capacity from HOUSE.CPP
+
+    Called when silos or refineries are built/destroyed.
+
+    @param adjust - Amount to adjust capacity by (can be negative)
+    @param in_anger - Is this a forced adjustment due to hostile event?
+    @return Number of Tiberium credits lost (if capacity reduced)
+]]
+function House:Adjust_Capacity(adjust, in_anger)
+    local old_capacity = self.credits_capacity
+    local lost = 0
+
+    self.credits_capacity = self.credits_capacity + adjust
+    self.credits_capacity = math.max(self.credits_capacity, 0)
+
+    -- If capacity reduced, may lose stored tiberium
+    if self.tiberium > self.credits_capacity then
+        lost = self.tiberium - self.credits_capacity
+        self.tiberium = self.credits_capacity
+
+        if in_anger then
+            -- Tiberium lost due to hostile action
+            Events.emit("TIBERIUM_LOST", self, lost)
+        end
+    end
+
+    -- Clear maxed out flag if we now have room
+    if self.tiberium < self.credits_capacity then
+        self.is_maxed_out = false
+    end
+
+    self:Silo_Redraw_Check(self.tiberium, old_capacity)
+    Events.emit("CAPACITY_CHANGED", self, old_capacity, self.credits_capacity)
+
+    return lost
+end
+
+--[[
+    Flags silos to be redrawn if necessary.
+    Port of HouseClass::Silo_Redraw_Check from HOUSE.CPP
+
+    Silos have different visual states based on fullness.
+    This checks if the fill level crossed a threshold.
+
+    @param old_tib - Previous tiberium amount
+    @param old_cap - Previous capacity (or current if unchanged)
+]]
+function House:Silo_Redraw_Check(old_tib, old_cap)
+    local new_tib = self.tiberium
+    local new_cap = self.credits_capacity
+
+    -- Calculate fill ratios (0-4 levels for display)
+    local old_ratio = 0
+    local new_ratio = 0
+
+    if old_cap > 0 then
+        old_ratio = math.floor((old_tib / old_cap) * 4)
+    end
+    if new_cap > 0 then
+        new_ratio = math.floor((new_tib / new_cap) * 4)
+    end
+
+    -- If ratio changed, silos need redraw
+    if old_ratio ~= new_ratio then
+        Events.emit("SILOS_REDRAW", self, new_ratio)
+    end
+end
+
+--[[
+    Check if tiberium storage is full.
+]]
+function House:Is_Maxed_Out()
+    return self.is_maxed_out or false
+end
+
+--[[
+    Get current tiberium amount.
+]]
+function House:Get_Tiberium()
+    return self.tiberium
+end
+
+--[[
+    Get storage capacity.
+]]
+function House:Get_Capacity()
+    return self.credits_capacity
+end
+
+--[[
+    Get fill percentage (0-100).
+]]
+function House:Get_Fill_Percent()
+    if self.credits_capacity <= 0 then
+        return 0
+    end
+    return math.floor((self.tiberium / self.credits_capacity) * 100)
 end
 
 -- Capacity management
