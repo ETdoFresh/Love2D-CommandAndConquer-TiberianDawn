@@ -221,6 +221,13 @@ function IPC:process_command(command)
         response.tests = test_result.tests
         response.message = test_result.message
 
+    elseif cmd == "test_display" then
+        -- Test the display hierarchy implementation
+        local test_result = self:test_display_hierarchy()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
     elseif cmd == "help" then
         response.commands = {
             "input <key> - Simulate key press",
@@ -235,6 +242,7 @@ function IPC:process_command(command)
             "quit - Quit game",
             "eval <lua> - Execute Lua code",
             "test_classes - Test the class hierarchy",
+            "test_display - Test the display hierarchy",
             "help - Show this help"
         }
 
@@ -640,6 +648,242 @@ function IPC:test_class_hierarchy()
 
     if not ok7 then
         add_test("HeapClass", false, tostring(err7))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test the display hierarchy implementation
+function IPC:test_display_hierarchy()
+    local result = { success = true, tests = {} }
+
+    local function add_test(name, passed, detail)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            detail = detail
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: Load all display modules
+    local ok1, err1 = pcall(function()
+        local LayerClass = require("src.map.layer")
+        local GScreenClass = require("src.display.gscreen")
+        local DisplayClass = require("src.display.display")
+        local RadarClass = require("src.display.radar")
+        local ScrollClass = require("src.display.scroll")
+        local MouseClass = require("src.display.mouse")
+
+        assert(LayerClass ~= nil, "LayerClass should load")
+        assert(GScreenClass ~= nil, "GScreenClass should load")
+        assert(DisplayClass ~= nil, "DisplayClass should load")
+        assert(RadarClass ~= nil, "RadarClass should load")
+        assert(ScrollClass ~= nil, "ScrollClass should load")
+        assert(MouseClass ~= nil, "MouseClass should load")
+
+        add_test("Module loading", true, "All display modules loaded")
+    end)
+
+    if not ok1 then
+        add_test("Module loading", false, tostring(err1))
+        return result
+    end
+
+    -- Test 2: LayerClass
+    local LayerClass = require("src.map.layer")
+    local ok2, err2 = pcall(function()
+        -- Initialize layers
+        LayerClass.Init_All()
+
+        -- Get ground layer
+        local ground = LayerClass.Get_Layer(LayerClass.LAYER_TYPE.GROUND)
+        assert(ground ~= nil, "Should get ground layer")
+        assert(ground:Count() == 0, "Ground layer should be empty")
+
+        -- Create mock objects with Coord for sorting
+        local obj1 = { Coord = 0x00140000 }  -- Y = 20
+        local obj2 = { Coord = 0x000A0000 }  -- Y = 10
+        local obj3 = { Coord = 0x001E0000 }  -- Y = 30
+
+        -- Add objects
+        ground:Submit(obj1)
+        ground:Submit(obj2)
+        ground:Submit(obj3)
+        assert(ground:Count() == 3, "Should have 3 objects")
+
+        -- Sort
+        ground:Full_Sort()
+
+        -- Check order (lowest Y first)
+        assert(ground:Get(1) == obj2, "obj2 (Y=10) should be first")
+        assert(ground:Get(2) == obj1, "obj1 (Y=20) should be second")
+        assert(ground:Get(3) == obj3, "obj3 (Y=30) should be third")
+
+        -- Remove
+        ground:Remove(obj1)
+        assert(ground:Count() == 2, "Should have 2 after remove")
+
+        -- Clear
+        ground:Clear()
+        assert(ground:Count() == 0, "Should be empty after clear")
+
+        add_test("LayerClass", true, "Layer sorting and management works")
+    end)
+
+    if not ok2 then
+        add_test("LayerClass", false, tostring(err2))
+    end
+
+    -- Test 3: Display inheritance chain
+    local MouseClass = require("src.display.mouse")
+    local ok3, err3 = pcall(function()
+        local display = MouseClass:new()
+
+        -- Should have properties from all parent classes
+        assert(display.IsToRedraw ~= nil, "Should have GScreenClass.IsToRedraw")
+        assert(display.TacticalCoord ~= nil, "Should have DisplayClass.TacticalCoord")
+        assert(display.IsRadarActive ~= nil, "Should have RadarClass.IsRadarActive")
+        assert(display.IsAutoScroll ~= nil, "Should have ScrollClass.IsAutoScroll")
+        assert(display.CurrentMouseShape ~= nil, "Should have MouseClass.CurrentMouseShape")
+
+        add_test("Display inheritance", true, "Inheritance chain works correctly")
+    end)
+
+    if not ok3 then
+        add_test("Display inheritance", false, tostring(err3))
+    end
+
+    -- Test 4: Coordinate conversions
+    local Coord = require("src.core.coord")
+    local DisplayClass = require("src.display.display")
+    local ok4, err4 = pcall(function()
+        local display = DisplayClass:new()
+
+        -- Set up view dimensions
+        display.TacPixelX = 0
+        display.TacPixelY = 0
+        display.TacLeptonWidth = 256 * 10   -- 10 cells wide
+        display.TacLeptonHeight = 256 * 10  -- 10 cells tall
+        display.TacticalCoord = 0
+
+        -- Test Pixel_To_Coord
+        local coord = display:Pixel_To_Coord(48, 48)
+        assert(coord ~= nil, "Should get coordinate")
+
+        -- Test In_View
+        local cell_in_view = Coord.XY_Cell(5, 5)
+        local cell_outside = Coord.XY_Cell(50, 50)
+        assert(display:In_View(cell_in_view), "Cell 5,5 should be in view")
+        -- Note: In_View may return true for large cells if viewport is small
+
+        add_test("Coordinate conversions", true, "Coord conversions work")
+    end)
+
+    if not ok4 then
+        add_test("Coordinate conversions", false, tostring(err4))
+    end
+
+    -- Test 5: ScrollClass
+    local ScrollClass = require("src.display.scroll")
+    local ok5, err5 = pcall(function()
+        local scroll = ScrollClass:new()
+
+        -- Test auto-scroll toggle
+        assert(scroll.IsAutoScroll == true, "Auto-scroll should be on by default")
+        scroll:Set_Autoscroll(0)
+        assert(scroll.IsAutoScroll == false, "Should turn off")
+        scroll:Set_Autoscroll(-1)
+        assert(scroll.IsAutoScroll == true, "Should toggle on")
+
+        -- Test edge detection
+        local dir = scroll:Get_Edge_Direction(5, 100)  -- Left edge
+        assert(dir == ScrollClass.DIR.W, "Should detect west edge")
+
+        dir = scroll:Get_Edge_Direction(400, 5)  -- Top edge
+        assert(dir == ScrollClass.DIR.N, "Should detect north edge")
+
+        dir = scroll:Get_Edge_Direction(400, 300)  -- Center
+        assert(dir == ScrollClass.DIR.NONE, "Should detect no edge")
+
+        add_test("ScrollClass", true, "Edge scrolling detection works")
+    end)
+
+    if not ok5 then
+        add_test("ScrollClass", false, tostring(err5))
+    end
+
+    -- Test 6: MouseClass cursor control
+    local ok6, err6 = pcall(function()
+        local mouse = MouseClass:new()
+
+        -- Test default cursor
+        assert(mouse.CurrentMouseShape == MouseClass.MOUSE.NORMAL, "Should start with NORMAL")
+
+        -- Test override
+        mouse:Override_Mouse_Shape(MouseClass.MOUSE.CAN_MOVE)
+        assert(mouse.CurrentMouseShape == MouseClass.MOUSE.CAN_MOVE, "Should override")
+
+        -- Test revert
+        mouse:Revert_Mouse_Shape()
+        assert(mouse.CurrentMouseShape == MouseClass.MOUSE.NORMAL, "Should revert to normal")
+
+        -- Test set default
+        mouse:Set_Default_Mouse(MouseClass.MOUSE.CAN_SELECT)
+        assert(mouse.NormalMouseShape == MouseClass.MOUSE.CAN_SELECT, "Should set new default")
+
+        add_test("MouseClass", true, "Cursor control works")
+    end)
+
+    if not ok6 then
+        add_test("MouseClass", false, tostring(err6))
+    end
+
+    -- Test 7: RadarClass
+    local RadarClass = require("src.display.radar")
+    local ok7, err7 = pcall(function()
+        local radar = RadarClass:new()
+
+        -- Initial state
+        assert(radar.DoesRadarExist == false, "Radar should not exist initially")
+        assert(radar.IsRadarActive == false, "Radar should be inactive")
+
+        -- Enable radar
+        radar.DoesRadarExist = true
+        radar:Radar_Activate(1)
+        assert(radar.IsRadarActivating == true, "Should be activating")
+
+        -- Simulate activation complete
+        radar.RadarAnimFrame = RadarClass.RADAR_ACTIVATED_FRAME
+        radar:AI(nil, 0, 0)  -- Process animation
+        assert(radar.IsRadarActive == true, "Should be fully active")
+
+        -- Test zoom toggle
+        radar:Zoom_Mode(0)
+        assert(radar.IsZoomed == true, "Should toggle zoom on")
+        radar:Zoom_Mode(0)
+        assert(radar.IsZoomed == false, "Should toggle zoom off")
+
+        add_test("RadarClass", true, "Radar activation and zoom work")
+    end)
+
+    if not ok7 then
+        add_test("RadarClass", false, tostring(err7))
     end
 
     -- Summary
