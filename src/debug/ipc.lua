@@ -242,6 +242,13 @@ function IPC:process_command(command)
         response.tests = test_result.tests
         response.message = test_result.message
 
+    elseif cmd == "test_types" then
+        -- Test the type class hierarchy
+        local test_result = self:test_type_classes()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
     elseif cmd == "help" then
         response.commands = {
             "input <key> - Simulate key press",
@@ -259,6 +266,7 @@ function IPC:process_command(command)
             "test_display - Test the display hierarchy",
             "test_techno - Test TechnoClass and FootClass",
             "test_drive - Test DriveClass, TurretClass, TarComClass, FlyClass",
+            "test_types - Test AbstractTypeClass, ObjectTypeClass, TechnoTypeClass",
             "help - Show this help"
         }
 
@@ -1598,6 +1606,311 @@ function IPC:test_drive_classes()
 
     if not ok12 then
         add_test("FlyClass VTOL hover", false, tostring(err12))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test the type class hierarchy (AbstractTypeClass, ObjectTypeClass, TechnoTypeClass)
+function IPC:test_type_classes()
+    local result = { success = true, tests = {} }
+
+    local function add_test(name, passed, detail)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            detail = detail
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: Load all type modules
+    local ok1, err1 = pcall(function()
+        local AbstractTypeClass = require("src.objects.types.abstracttype")
+        local ObjectTypeClass = require("src.objects.types.objecttype")
+        local TechnoTypeClass = require("src.objects.types.technotype")
+
+        assert(AbstractTypeClass ~= nil, "AbstractTypeClass should load")
+        assert(ObjectTypeClass ~= nil, "ObjectTypeClass should load")
+        assert(TechnoTypeClass ~= nil, "TechnoTypeClass should load")
+
+        add_test("Type module loading", true, "All type modules loaded")
+    end)
+
+    if not ok1 then
+        add_test("Type module loading", false, tostring(err1))
+        return result
+    end
+
+    -- Test 2: AbstractTypeClass initialization and naming
+    local AbstractTypeClass = require("src.objects.types.abstracttype")
+    local ok2, err2 = pcall(function()
+        local abst = AbstractTypeClass:new("E1", "Minigunner")
+
+        assert(abst.IniName == "E1", "IniName should be E1")
+        assert(abst.Name == "Minigunner", "Name should be Minigunner")
+        assert(abst:Get_Name() == "E1", "Get_Name should return E1")
+        assert(abst:Full_Name() == "Minigunner", "Full_Name should return Minigunner")
+
+        -- Test name truncation
+        abst:Set_Name("VERYLONGNAME")
+        assert(#abst.IniName <= 8, "IniName should be truncated to 8 chars")
+
+        add_test("AbstractTypeClass naming", true, "Name handling works")
+    end)
+
+    if not ok2 then
+        add_test("AbstractTypeClass naming", false, tostring(err2))
+    end
+
+    -- Test 3: AbstractTypeClass ownership
+    local ok3, err3 = pcall(function()
+        local abst = AbstractTypeClass:new("TEST", "Test")
+
+        -- Default ownership is all houses
+        assert(abst:Get_Ownable() == 0xFFFF, "Should allow all houses by default")
+
+        -- Test house check
+        assert(abst:Can_House_Own(0) == true, "House 0 should be allowed")
+        assert(abst:Can_House_Own(7) == true, "House 7 should be allowed")
+        assert(abst:Can_House_Own(-1) == false, "Invalid house should be rejected")
+        assert(abst:Can_House_Own(16) == false, "Invalid house should be rejected")
+
+        add_test("AbstractTypeClass ownership", true, "Ownership checks work")
+    end)
+
+    if not ok3 then
+        add_test("AbstractTypeClass ownership", false, tostring(err3))
+    end
+
+    -- Test 4: ObjectTypeClass initialization
+    local ObjectTypeClass = require("src.objects.types.objecttype")
+    local ok4, err4 = pcall(function()
+        local obj = ObjectTypeClass:new("TANK", "Medium Tank")
+
+        -- Should have AbstractTypeClass properties
+        assert(obj.IniName == "TANK", "Should have IniName")
+        assert(obj.Name == "Medium Tank", "Should have Name")
+
+        -- ObjectTypeClass specific
+        assert(obj.Armor == ObjectTypeClass.ARMOR.NONE, "Default armor should be NONE")
+        assert(obj.MaxStrength == 1, "Default MaxStrength should be 1")
+        assert(obj.IsSelectable == false, "Should not be selectable by default")
+        assert(obj.IsLegalTarget == true, "Should be legal target by default")
+
+        add_test("ObjectTypeClass initialization", true, "ObjectTypeClass initializes correctly")
+    end)
+
+    if not ok4 then
+        add_test("ObjectTypeClass initialization", false, tostring(err4))
+    end
+
+    -- Test 5: ObjectTypeClass dimensions and properties
+    local ok5, err5 = pcall(function()
+        local obj = ObjectTypeClass:new("BLDG", "Building")
+
+        -- Set dimensions
+        obj:Set_Dimensions(2, 3)
+        local w, h = obj:Dimensions()
+        assert(w == 2, "Width should be 2")
+        assert(h == 3, "Height should be 3")
+
+        -- Set health
+        obj:Set_Max_Strength(500)
+        assert(obj:Get_Max_Strength() == 500, "MaxStrength should be 500")
+
+        -- Set armor
+        obj:Set_Armor(ObjectTypeClass.ARMOR.HEAVY)
+        assert(obj:Get_Armor() == ObjectTypeClass.ARMOR.HEAVY, "Armor should be HEAVY")
+
+        -- Max pips based on dimensions
+        assert(obj:Max_Pips() == 3, "Max pips should be max(width, height)")
+
+        add_test("ObjectTypeClass properties", true, "Dimensions and properties work")
+    end)
+
+    if not ok5 then
+        add_test("ObjectTypeClass properties", false, tostring(err5))
+    end
+
+    -- Test 6: ObjectTypeClass occupy list
+    local ok6, err6 = pcall(function()
+        local obj = ObjectTypeClass:new("BLDG", "Building")
+
+        -- 1x1 should have empty occupy list
+        obj:Set_Dimensions(1, 1)
+        local list = obj:Occupy_List()
+        assert(#list == 0, "1x1 should have empty occupy list")
+
+        -- 2x2 should have 3 additional cells
+        obj:Set_Dimensions(2, 2)
+        list = obj:Occupy_List()
+        assert(#list == 3, "2x2 should have 3 additional cells")
+
+        add_test("ObjectTypeClass occupy list", true, "Occupy list generation works")
+    end)
+
+    if not ok6 then
+        add_test("ObjectTypeClass occupy list", false, tostring(err6))
+    end
+
+    -- Test 7: TechnoTypeClass initialization
+    local TechnoTypeClass = require("src.objects.types.technotype")
+    local ok7, err7 = pcall(function()
+        local tech = TechnoTypeClass:new("MTNK", "Medium Tank")
+
+        -- Should have all parent properties
+        assert(tech.IniName == "MTNK", "Should have IniName")
+        assert(tech.Armor ~= nil, "Should have Armor from ObjectTypeClass")
+
+        -- TechnoTypeClass specific
+        assert(tech.Cost == 0, "Default cost should be 0")
+        assert(tech.SightRange == 2, "Default sight range should be 2")
+        assert(tech.MaxSpeed == TechnoTypeClass.MPH.IMMOBILE, "Default speed should be immobile")
+        assert(tech.Primary == TechnoTypeClass.WEAPON.NONE, "No primary weapon by default")
+        assert(tech.IsBuildable == true, "Should be buildable by default")
+
+        add_test("TechnoTypeClass initialization", true, "TechnoTypeClass initializes correctly")
+    end)
+
+    if not ok7 then
+        add_test("TechnoTypeClass initialization", false, tostring(err7))
+    end
+
+    -- Test 8: TechnoTypeClass production properties
+    local ok8, err8 = pcall(function()
+        local tech = TechnoTypeClass:new("MTNK", "Medium Tank")
+
+        -- Set cost
+        tech:Set_Cost(800)
+        assert(tech.Cost == 800, "Cost should be 800")
+        assert(tech:Cost_Of() == 800, "Cost_Of should return 800")
+        assert(tech:Raw_Cost() == 800, "Raw_Cost should return 800")
+
+        -- Build time
+        local time = tech:Time_To_Build(0)
+        assert(time >= 15, "Build time should be at least 15")
+        assert(time == math.max(15, math.floor(800/5)), "Build time should be cost/5")
+
+        -- Prerequisites
+        tech.Prerequisites = TechnoTypeClass.PREREQ.FACTORY
+        assert(tech:Can_Build(TechnoTypeClass.PREREQ.FACTORY) == true, "Should build with factory")
+        assert(tech:Can_Build(0) == false, "Should not build without prereqs")
+
+        add_test("TechnoTypeClass production", true, "Production properties work")
+    end)
+
+    if not ok8 then
+        add_test("TechnoTypeClass production", false, tostring(err8))
+    end
+
+    -- Test 9: TechnoTypeClass combat properties
+    local ok9, err9 = pcall(function()
+        local tech = TechnoTypeClass:new("MLRS", "Rocket Launcher")
+
+        -- Set combat properties
+        tech:Set_Sight_Range(5)
+        assert(tech:Get_Sight_Range() == 5, "Sight range should be 5")
+
+        tech:Set_Max_Speed(TechnoTypeClass.MPH.MEDIUM)
+        assert(tech:Get_Max_Speed() == TechnoTypeClass.MPH.MEDIUM, "Speed should be MEDIUM")
+
+        -- Set weapons
+        tech.Primary = TechnoTypeClass.WEAPON.ROCKET
+        assert(tech:Get_Primary_Weapon() == TechnoTypeClass.WEAPON.ROCKET, "Primary should be ROCKET")
+        assert(tech:Is_Armed() == true, "Should be armed")
+
+        -- No secondary
+        assert(tech:Get_Secondary_Weapon() == TechnoTypeClass.WEAPON.NONE, "No secondary")
+
+        add_test("TechnoTypeClass combat", true, "Combat properties work")
+    end)
+
+    if not ok9 then
+        add_test("TechnoTypeClass combat", false, tostring(err9))
+    end
+
+    -- Test 10: TechnoTypeClass transport and repair
+    local ok10, err10 = pcall(function()
+        local tech = TechnoTypeClass:new("APC", "APC")
+
+        -- Not a transport by default
+        assert(tech:Max_Passengers() == 0, "Non-transport should have 0 capacity")
+
+        -- Make it a transport
+        tech.IsTransporter = true
+        assert(tech:Max_Passengers() == 5, "Transport should have 5 capacity")
+
+        -- Repair calculations
+        tech:Set_Cost(300)
+        tech:Set_Max_Strength(200)
+        local step = tech:Repair_Step()
+        assert(step >= 1, "Repair step should be at least 1")
+        local cost = tech:Repair_Cost()
+        assert(cost >= 0, "Repair cost should be non-negative")
+
+        add_test("TechnoTypeClass transport/repair", true, "Transport and repair work")
+    end)
+
+    if not ok10 then
+        add_test("TechnoTypeClass transport/repair", false, tostring(err10))
+    end
+
+    -- Test 11: TechnoTypeClass ownership restrictions
+    local ok11, err11 = pcall(function()
+        local tech = TechnoTypeClass:new("ORCA", "Orca")
+
+        -- Default all houses
+        assert(tech:Get_Ownable() == 0xFFFF, "Default should be all houses")
+
+        -- Restrict to GDI only (house 0)
+        tech:Set_Ownable(0x0001)
+        assert(tech:Get_Ownable() == 0x0001, "Should be GDI only")
+        assert(tech:Can_House_Own(0) == true, "GDI should own")
+        assert(tech:Can_House_Own(1) == false, "NOD should not own")
+
+        add_test("TechnoTypeClass ownership", true, "Ownership restrictions work")
+    end)
+
+    if not ok11 then
+        add_test("TechnoTypeClass ownership", false, tostring(err11))
+    end
+
+    -- Test 12: Type hierarchy inheritance
+    local ok12, err12 = pcall(function()
+        local tech = TechnoTypeClass:new("TEST", "Test")
+
+        -- Should have methods from all parents
+        assert(tech.Get_Name ~= nil, "Should have AbstractTypeClass.Get_Name")
+        assert(tech.Dimensions ~= nil, "Should have ObjectTypeClass.Dimensions")
+        assert(tech.Cost_Of ~= nil, "Should have TechnoTypeClass.Cost_Of")
+
+        -- Should be able to call them
+        assert(tech:Get_Name() == "TEST", "Get_Name should work")
+        local w, h = tech:Dimensions()
+        assert(w == 1, "Dimensions should work")
+        assert(tech:Cost_Of() == 0, "Cost_Of should work")
+
+        add_test("Type hierarchy inheritance", true, "Full inheritance chain works")
+    end)
+
+    if not ok12 then
+        add_test("Type hierarchy inheritance", false, tostring(err12))
     end
 
     -- Summary

@@ -123,6 +123,16 @@ function Class.extend(parent, name)
 end
 
 --[[
+    Create a new base class (alias for Class.new without parent)
+
+    Usage:
+        local MyClass = Class.create("MyClass")
+]]
+function Class.create(name)
+    return Class.new(name, nil)
+end
+
+--[[
     Include a mixin into a class (multiple inheritance emulation)
 
     Mixins are included in order, with later mixins taking precedence
