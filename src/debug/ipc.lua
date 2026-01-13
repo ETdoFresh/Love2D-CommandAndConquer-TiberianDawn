@@ -4609,6 +4609,97 @@ function IPC:test_phase6_integration()
         add_test("EventQueue Pending_Count and Cleanup", false, tostring(err16))
     end
 
+    -- Test 17: Random module
+    local ok17, err17 = pcall(function()
+        local Random = require("src.core.random")
+
+        -- Test that we can get random values
+        Random.Reset()
+        local v1 = Random.Sim_Random()
+        local v2 = Random.Sim_Random()
+        assert(v1 >= 0 and v1 <= 255, "Random value should be 0-255")
+        assert(v2 >= 0 and v2 <= 255, "Random value should be 0-255")
+
+        -- Test determinism - same seed should give same sequence
+        Random.Set_Seed(42)
+        local seq1_a = Random.Sim_Random()
+        local seq1_b = Random.Sim_Random()
+
+        Random.Set_Seed(42)
+        local seq2_a = Random.Sim_Random()
+        local seq2_b = Random.Sim_Random()
+
+        assert(seq1_a == seq2_a, "Same seed should give same first value")
+        assert(seq1_b == seq2_b, "Same seed should give same second value")
+
+        -- Test Sim_IRandom range
+        Random.Set_Seed(0)
+        for i = 1, 50 do
+            local r = Random.Sim_IRandom(10, 20)
+            assert(r >= 10 and r <= 20, "IRandom should be in range")
+        end
+
+        add_test("Random module", true, "Random number generator works correctly")
+    end)
+
+    if not ok17 then
+        add_test("Random module", false, tostring(err17))
+    end
+
+    -- Test 18: SessionClass
+    local ok18, err18 = pcall(function()
+        local SessionClass = require("src.network.session")
+
+        -- Test constants
+        assert(SessionClass.MAX_PLAYERS == 6, "MAX_PLAYERS should be 6")
+        assert(SessionClass.MPLAYER_NAME_MAX == 12, "MPLAYER_NAME_MAX should be 12")
+
+        -- Test creation
+        local session = SessionClass.new()
+        assert(session ~= nil, "Session should be created")
+        assert(session.Type == SessionClass.GAME_TYPE.NORMAL, "Type should be NORMAL")
+        assert(session.NumPlayers == 0, "NumPlayers should be 0")
+        assert(session.Handle == "Player", "Handle should be 'Player'")
+        assert(session.UniqueID ~= nil, "UniqueID should be set")
+
+        -- Test player management
+        local player = session:Add_Player("TestPlayer", 0, 1)
+        assert(player ~= nil, "Player should be added")
+        assert(session.NumPlayers == 1, "NumPlayers should be 1")
+        assert(player.Name == "TestPlayer", "Player name should match")
+
+        add_test("SessionClass", true, "SessionClass works correctly")
+    end)
+
+    if not ok18 then
+        add_test("SessionClass", false, tostring(err18))
+    end
+
+    -- Test 19: Pointers module
+    local ok19, err19 = pcall(function()
+        local Pointers = require("src.io.pointers")
+
+        -- Test RTTI constants
+        assert(Pointers.RTTI.NONE == 0, "RTTI.NONE should be 0")
+        assert(Pointers.RTTI.UNIT == 1, "RTTI.UNIT should be 1")
+        assert(Pointers.RTTI.BUILDING == 2, "RTTI.BUILDING should be 2")
+        assert(Pointers.RTTI.INFANTRY == 3, "RTTI.INFANTRY should be 3")
+
+        -- Test encoding nil
+        local encoded = Pointers.encode(nil)
+        assert(encoded == nil, "Encoding nil should return nil")
+
+        -- Test decode nil
+        local decoded = Pointers.decode(nil)
+        assert(decoded == nil, "Decoding nil should return nil")
+
+        add_test("Pointers module", true, "Pointers module works correctly")
+    end)
+
+    if not ok19 then
+        add_test("Pointers module", false, tostring(err19))
+    end
+
     -- Summary
     local passed = 0
     local failed = 0
