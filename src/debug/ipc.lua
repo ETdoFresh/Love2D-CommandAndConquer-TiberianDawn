@@ -428,6 +428,13 @@ function IPC:process_command(command)
         response.tests = test_result.tests
         response.message = test_result.message
 
+    elseif cmd == "test_building_states" then
+        -- Test Building States (Begin_Mode, Grand_Opening, etc.)
+        local test_result = self:test_building_states()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
     else
         response.success = false
         response.error = "Unknown command: " .. cmd
@@ -7143,6 +7150,200 @@ function IPC:test_house_economy()
 
     if not ok7 then
         add_test("can_afford with combined funds", false, tostring(err7))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test BuildingClass state methods (Begin_Mode, Grand_Opening, etc.)
+function IPC:test_building_states()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: Building state methods exist
+    local ok1, err1 = pcall(function()
+        local BuildingClass = require("src.objects.building")
+
+        assert(type(BuildingClass.Begin_Mode) == "function", "Begin_Mode should exist")
+        assert(type(BuildingClass.Grand_Opening) == "function", "Grand_Opening should exist")
+        assert(type(BuildingClass.Fetch_Anim_Control) == "function", "Fetch_Anim_Control should exist")
+        assert(type(BuildingClass.Toggle_Primary) == "function", "Toggle_Primary should exist")
+        assert(type(BuildingClass.Get_Factory_Type) == "function", "Get_Factory_Type should exist")
+        assert(type(BuildingClass.Spawn_Free_Harvester) == "function", "Spawn_Free_Harvester should exist")
+        assert(type(BuildingClass.Spawn_Free_Aircraft) == "function", "Spawn_Free_Aircraft should exist")
+
+        add_test("Building state methods exist", true, "All building state methods exist")
+    end)
+
+    if not ok1 then
+        add_test("Building state methods exist", false, tostring(err1))
+    end
+
+    -- Test 2: Begin_Mode transitions state correctly
+    local ok2, err2 = pcall(function()
+        local BuildingClass = require("src.objects.building")
+        local House = require("src.house.house")
+
+        local house = House.new(House.TYPE.GOOD, "TestHouse")
+        local building = BuildingClass:new(nil, house)
+
+        -- Initial state should be IDLE
+        assert(building.BState == BuildingClass.BSTATE.IDLE, "Initial state should be IDLE")
+
+        -- Begin_Mode to CONSTRUCTION should work immediately (special case)
+        building:Begin_Mode(BuildingClass.BSTATE.CONSTRUCTION)
+        assert(building.BState == BuildingClass.BSTATE.CONSTRUCTION, "Should transition to CONSTRUCTION")
+        assert(building.QueueBState == BuildingClass.BSTATE.NONE, "Queue should be cleared")
+
+        -- Set to NONE to test immediate transition
+        building.BState = BuildingClass.BSTATE.NONE
+        building:Begin_Mode(BuildingClass.BSTATE.ACTIVE)
+        assert(building.BState == BuildingClass.BSTATE.ACTIVE, "Should transition to ACTIVE from NONE")
+
+        add_test("Begin_Mode transitions", true, "Begin_Mode correctly transitions states")
+    end)
+
+    if not ok2 then
+        add_test("Begin_Mode transitions", false, tostring(err2))
+    end
+
+    -- Test 3: Begin_Mode queues when busy
+    local ok3, err3 = pcall(function()
+        local BuildingClass = require("src.objects.building")
+        local House = require("src.house.house")
+
+        local house = House.new(House.TYPE.GOOD, "TestHouse")
+        local building = BuildingClass:new(nil, house)
+
+        -- Set to a non-NONE, non-CONSTRUCTION state
+        building.BState = BuildingClass.BSTATE.IDLE
+
+        -- Try to transition to ACTIVE (should queue, not immediate)
+        building:Begin_Mode(BuildingClass.BSTATE.ACTIVE)
+
+        -- Since we're not in NONE and not going to CONSTRUCTION, it should queue
+        assert(building.QueueBState == BuildingClass.BSTATE.ACTIVE, "Should queue ACTIVE state")
+
+        add_test("Begin_Mode queuing", true, "Begin_Mode correctly queues when busy")
+    end)
+
+    if not ok3 then
+        add_test("Begin_Mode queuing", false, tostring(err3))
+    end
+
+    -- Test 4: Fetch_Anim_Control returns valid structure
+    local ok4, err4 = pcall(function()
+        local BuildingClass = require("src.objects.building")
+        local House = require("src.house.house")
+
+        local house = House.new(House.TYPE.GOOD, "TestHouse")
+
+        -- Create a building type with animation data
+        local building_type = {
+            IniName = "TEST",
+            Anims = {
+                [0] = { Start = 0, Count = 4, Rate = 2 },  -- CONSTRUCTION
+                [1] = { Start = 4, Count = 1, Rate = 0 },  -- IDLE
+                [2] = { Start = 5, Count = 3, Rate = 4 },  -- ACTIVE
+            }
+        }
+
+        local building = BuildingClass:new(building_type, house)
+
+        local ctrl = building:Fetch_Anim_Control()
+        assert(ctrl ~= nil, "Fetch_Anim_Control should return a value")
+        assert(ctrl.Start ~= nil, "Should have Start field")
+        assert(ctrl.Count ~= nil, "Should have Count field")
+        assert(ctrl.Rate ~= nil, "Should have Rate field")
+
+        -- Test that it returns correct animation for current state
+        building.BState = BuildingClass.BSTATE.ACTIVE  -- State 2
+        ctrl = building:Fetch_Anim_Control()
+        assert(ctrl.Start == 5, "ACTIVE state should have Start=5")
+        assert(ctrl.Count == 3, "ACTIVE state should have Count=3")
+
+        add_test("Fetch_Anim_Control", true, "Fetch_Anim_Control returns valid structure")
+    end)
+
+    if not ok4 then
+        add_test("Fetch_Anim_Control", false, tostring(err4))
+    end
+
+    -- Test 5: Grand_Opening calls Adjust_Capacity
+    local ok5, err5 = pcall(function()
+        local BuildingClass = require("src.objects.building")
+        local House = require("src.house.house")
+
+        local house = House.new(House.TYPE.GOOD, "TestHouse")
+        house.credits_capacity = 0
+
+        -- Create a building type with storage capacity
+        local building_type = {
+            IniName = "SILO",
+            StorageCapacity = 1000,
+            PowerDrain = 0,
+            IsFactory = false
+        }
+
+        local building = BuildingClass:new(building_type, house)
+
+        -- Initial capacity should be 0
+        assert(house.credits_capacity == 0, "Initial capacity should be 0")
+
+        -- Grand Opening should add capacity
+        building:Grand_Opening(false)
+
+        assert(house.credits_capacity == 1000, "Capacity should be 1000 after Grand_Opening")
+
+        add_test("Grand_Opening capacity", true, "Grand_Opening correctly adjusts storage capacity")
+    end)
+
+    if not ok5 then
+        add_test("Grand_Opening capacity", false, tostring(err5))
+    end
+
+    -- Test 6: QueueBState initialization
+    local ok6, err6 = pcall(function()
+        local BuildingClass = require("src.objects.building")
+        local House = require("src.house.house")
+
+        local house = House.new(House.TYPE.GOOD, "TestHouse")
+        local building = BuildingClass:new(nil, house)
+
+        assert(building.QueueBState == BuildingClass.BSTATE.NONE, "QueueBState should init to NONE")
+        assert(building.ScenarioInit == false, "ScenarioInit should init to false")
+
+        add_test("Building state initialization", true, "Building state fields initialized correctly")
+    end)
+
+    if not ok6 then
+        add_test("Building state initialization", false, tostring(err6))
     end
 
     -- Summary

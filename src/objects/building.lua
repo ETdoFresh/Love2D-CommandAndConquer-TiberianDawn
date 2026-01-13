@@ -101,6 +101,18 @@ function BuildingClass:init(type, house)
     self.BState = BuildingClass.BSTATE.IDLE
 
     --[[
+        Queued building state for transition.
+        Used by Begin_Mode when current state is busy.
+    ]]
+    self.QueueBState = BuildingClass.BSTATE.NONE
+
+    --[[
+        Scenario initialization flag.
+        True during initial scenario load.
+    ]]
+    self.ScenarioInit = false
+
+    --[[
         Animation frame for current state.
     ]]
     self.StateFrame = 0
@@ -267,6 +279,235 @@ end
 ]]
 function BuildingClass:On_State_Change(state)
     -- Override in derived building types
+end
+
+--[[
+    Begin a new building state with animation control.
+    Port of BuildingClass::Begin_Mode from BUILDING.CPP
+
+    This handles the building state machine transitions. If the building
+    is already in a state, the new state is queued. Immediate transition
+    occurs if no current state or during construction.
+
+    @param bstate - BStateType to transition to
+]]
+function BuildingClass:Begin_Mode(bstate)
+    -- Queue the state if we're busy
+    self.QueueBState = bstate
+
+    -- Immediate transition if:
+    -- - No current state (BSTATE_NONE)
+    -- - Construction is starting
+    -- - Scenario initialization (ScenarioInit flag)
+    if self.BState == BuildingClass.BSTATE.NONE or
+       bstate == BuildingClass.BSTATE.CONSTRUCTION or
+       self.ScenarioInit then
+
+        self.BState = bstate
+        self.QueueBState = BuildingClass.BSTATE.NONE
+
+        -- Get animation control for this state
+        local ctrl = self:Fetch_Anim_Control()
+
+        if ctrl then
+            local rate = ctrl.Rate or 0
+
+            -- Apply normalized delay for non-construction states
+            -- on regulated buildings (those affected by game speed)
+            if self.Class and self.Class.IsRegulated and
+               bstate ~= BuildingClass.BSTATE.CONSTRUCTION then
+                -- Normalize_Delay would adjust for game speed
+                -- For now, use rate directly
+                rate = rate
+            end
+
+            -- Set animation rate and starting frame
+            self:Set_Rate(rate)
+            self:Set_Stage(ctrl.Start or 0)
+        else
+            -- Default animation settings
+            self:Set_Rate(0)
+            self:Set_Stage(0)
+        end
+
+        -- Notify of state change
+        self:On_State_Change(bstate)
+    end
+end
+
+--[[
+    Fetch the animation control structure for the current state.
+
+    @return Animation control table with Start, Count, Rate fields
+]]
+function BuildingClass:Fetch_Anim_Control()
+    if not self.Class then
+        return nil
+    end
+
+    -- Get animation data for current state
+    local anims = self.Class.Anims
+    if not anims then
+        -- Return default animation control
+        return {
+            Start = 0,
+            Count = 1,
+            Rate = 0
+        }
+    end
+
+    -- Index by state (BSTATE enum values)
+    local state_idx = self.BState
+    if state_idx < 0 then
+        state_idx = 0
+    end
+
+    return anims[state_idx] or {
+        Start = 0,
+        Count = 1,
+        Rate = 0
+    }
+end
+
+--[[
+    Grand opening - activate building after construction.
+    Port of BuildingClass::Grand_Opening from BUILDING.CPP
+
+    Called when a building completes construction. This activates all
+    of the building's special features:
+    - Adjusts house power drain
+    - Adjusts house tiberium storage capacity
+    - Spawns free units for refineries and helipads
+
+    @param captured - true if building was captured (no free unit)
+]]
+function BuildingClass:Grand_Opening(captured)
+    captured = captured or false
+
+    if not self.House or not self.Class then
+        return
+    end
+
+    local type_class = self.Class
+
+    -- Adjust owning house power drain
+    local drain = type_class.PowerDrain or 0
+    if drain > 0 then
+        -- House tracks power through update_power()
+        -- Power is recalculated when buildings change
+    end
+
+    -- Adjust tiberium storage capacity
+    local capacity = type_class.StorageCapacity or 0
+    if capacity > 0 then
+        self.House:Adjust_Capacity(capacity, false)
+    end
+
+    -- Mark house for recalculation
+    self.House.IsRecalcNeeded = true
+
+    -- Update house's building tracking
+    self.House:update_power()
+
+    -- Special case: Refineries get a free harvester
+    local ini_name = type_class.IniName or ""
+    local is_refinery = (ini_name == "PROC")
+
+    if is_refinery and not captured then
+        -- Check if this was a full-price purchase (not scenario init)
+        local give_free_harvester = true
+
+        -- Don't give free harvester if:
+        -- - Scenario is initializing (pre-placed buildings)
+        -- - Building was captured
+        -- - Player already paid reduced price for building alone
+        if self.ScenarioInit then
+            give_free_harvester = false
+        end
+
+        if self.House.is_human and self.PurchasePrice and self.PurchasePrice > 0 then
+            -- If player paid less than full raw cost, they bought building only
+            local raw_cost = type_class.Cost or 0
+            if self.PurchasePrice < raw_cost then
+                give_free_harvester = false
+            end
+        end
+
+        if give_free_harvester then
+            self:Spawn_Free_Harvester()
+        end
+    end
+
+    -- Special case: Helipads get a free aircraft
+    local is_helipad = (ini_name == "HPAD")
+
+    if is_helipad and not captured then
+        local give_free_aircraft = true
+
+        if self.ScenarioInit then
+            give_free_aircraft = false
+        end
+
+        if self.House.is_human and self.PurchasePrice and self.PurchasePrice > 0 then
+            local raw_cost = type_class.Cost or 0
+            if self.PurchasePrice < raw_cost then
+                give_free_aircraft = false
+            end
+        end
+
+        if give_free_aircraft then
+            self:Spawn_Free_Aircraft()
+        end
+    end
+
+    -- For production buildings, auto-set as primary if first of type
+    if type_class.IsFactory then
+        local factory_type = self:Get_Factory_Type()
+        if factory_type then
+            -- Check if house already has a primary of this type
+            local current_primary = self.House.factories and self.House.factories[factory_type]
+            if not current_primary then
+                self:Toggle_Primary()
+            end
+        end
+    end
+end
+
+--[[
+    Spawn a free harvester for a refinery.
+    Helper for Grand_Opening.
+]]
+function BuildingClass:Spawn_Free_Harvester()
+    -- This would create and place a harvester unit
+    -- For now, emit an event that the game loop can handle
+    local Events = require("src.core.events")
+
+    -- Calculate spawn position (southwest of refinery)
+    local spawn_coord = self.Coord
+    if spawn_coord then
+        -- Offset to southwest
+        local cell = Coord.Coord_Cell(spawn_coord)
+        local spawn_cell = cell - 1 - 64  -- One cell west, one cell south
+
+        Events.emit("SPAWN_FREE_UNIT", self.House, "HARVESTER", spawn_cell, self)
+    end
+end
+
+--[[
+    Spawn a free aircraft for a helipad.
+    Helper for Grand_Opening.
+]]
+function BuildingClass:Spawn_Free_Aircraft()
+    local Events = require("src.core.events")
+
+    -- Determine aircraft type based on faction
+    local aircraft_type = "ORCA"  -- GDI default
+    if self.House and self.House.side == "NOD" then
+        aircraft_type = "APACHE"
+    end
+
+    -- Aircraft spawns on the helipad itself
+    Events.emit("SPAWN_FREE_UNIT", self.House, aircraft_type, self.Coord, self)
 end
 
 --[[
