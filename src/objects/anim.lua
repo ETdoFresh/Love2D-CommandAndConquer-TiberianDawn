@@ -408,25 +408,126 @@ end
 
 --[[
     Called at midpoint (largest frame) for ground effects.
+
+    This is when explosions reach their largest visual size - the ideal
+    time to spawn scorch marks, craters, and secondary effects.
+
+    Reference: ANIM.CPP AnimClass::Middle()
 ]]
 function AnimClass:Middle()
     if not self.Class then return end
 
+    local Random = require("src.core.random")
+    local SmudgeClass = require("src.objects.smudge")
+    local SmudgeTypeClass = require("src.objects.types.smudgetype")
+    local AnimTypeClass = require("src.objects.types.animtype")
+    local Combat = require("src.combat.combat")
+
     local coord = self:Center_Coord()
+    local cell = Coord.Coord_Cell(coord)
 
-    -- Create scorch marks
+    -- Handle special weapon animations (atom blast, ion cannon)
+    local anim_type = self.Class.Type
+
+    --========================================================================
+    -- Atom Blast (Nuclear Strike)
+    --========================================================================
+    if anim_type == AnimTypeClass.ANIM.ATOM_BLAST then
+        -- Find someone to blame the explosion on for kill attribution
+        local building = nil
+        if self.OwnerHouse and self.OwnerHouse >= 0 then
+            -- Would search for Temple of Nod owned by OwnerHouse
+            -- For now, just use OwnerHouse for attribution
+        end
+
+        -- Nuke damage radius and strength
+        local radius = 4
+        local rawdamage = 1000
+
+        -- Apply damage in radius around impact
+        for x = -radius, radius do
+            for y = -radius, radius do
+                local cell_x = Coord.Cell_X(cell) + x
+                local cell_y = Coord.Cell_Y(cell) + y
+
+                -- Bounds check
+                if cell_x >= 0 and cell_x < 64 and cell_y >= 0 and cell_y < 64 then
+                    local tcell = Coord.XY_Cell(cell_x, cell_y)
+                    local tcoord = Coord.Cell_Coord(tcell)
+
+                    -- Damage decreases with distance from center
+                    local dist = math.abs(x) + math.abs(y)
+                    local damage = math.floor(rawdamage / (math.floor(dist / 2) + 1))
+
+                    -- Apply explosion damage
+                    Combat.Explosion_Damage(tcoord, damage, nil, 2)  -- WARHEAD_FIRE
+
+                    -- Create scorch marks everywhere in blast radius
+                    SmudgeClass.Create_Scorch(tcell)
+                end
+            end
+        end
+
+        -- Screen shake effect would go here
+        return
+    end
+
+    --========================================================================
+    -- Ion Cannon
+    --========================================================================
+    if anim_type == AnimTypeClass.ANIM.ION_CANNON then
+        -- Find Advanced Communications Center for kill attribution
+        local building = nil
+        if self.OwnerHouse and self.OwnerHouse >= 0 then
+            -- Would search for Eye (Advanced Comm Center) owned by OwnerHouse
+        end
+
+        -- Ion cannon does 600 damage with armor-piercing warhead
+        Combat.Explosion_Damage(coord, 600, nil, 4)  -- WARHEAD_PB (armor piercing)
+        return
+    end
+
+    --========================================================================
+    -- Napalm Effects (spawn secondary fires)
+    --========================================================================
+    if anim_type == AnimTypeClass.ANIM.NAPALM1 or
+       anim_type == AnimTypeClass.ANIM.NAPALM2 or
+       anim_type == AnimTypeClass.ANIM.NAPALM3 then
+        -- Napalm spawns additional fire animations nearby
+        -- Would create FIRE_SMALL animations at scattered coordinates
+        -- For now, just create a scorch mark
+        SmudgeClass.Create_Scorch(cell)
+        return
+    end
+
+    --========================================================================
+    -- Flamethrower Effects
+    --========================================================================
+    if anim_type >= AnimTypeClass.ANIM.FLAME_N and anim_type <= AnimTypeClass.ANIM.FLAME_NW then
+        -- Flamethrowers leave scorch marks and spawn fires
+        SmudgeClass.Create_Scorch(cell)
+
+        -- Would also spawn FIRE_SMALL animations at offset positions
+        -- based on the flame direction
+        return
+    end
+
+    --========================================================================
+    -- Standard Scorch/Crater Effects
+    --========================================================================
+
+    -- Create scorch marks for scorching animations
     if self.Class.IsScorcher then
-        -- Would create SmudgeClass (scorch mark) here
+        SmudgeClass.Create_Scorch(cell)
     end
 
-    -- Create craters (also reduces Tiberium)
+    -- Create craters for crater-forming animations (reduces Tiberium too)
     if self.Class.IsCraterForming then
-        -- Would create SmudgeClass (crater) here
-        -- Would also remove Tiberium from cell
+        -- Craters reduce Tiberium in the cell
+        -- Would call: Map[cell]:Reduce_Tiberium(6)
+        -- For now, just create the crater
+        SmudgeClass.Create_Crater(cell)
     end
-
-    -- Special handling for specific animations
-    -- (Ion cannon, nuke, napalm spawning fires, etc.)
 end
 
 --[[

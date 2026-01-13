@@ -326,6 +326,7 @@ function IPC:process_command(command)
             "test_terrain_smudge - Test TerrainClass, SmudgeClass and type classes",
             "test_missions - Test FootClass mission methods and threat detection",
             "test_combat_system - Test Combat system (Explosion_Damage, BulletClass, Approach_Target)",
+            "test_pathfinding - Test Pathfinding and Animation effects (SmudgeClass, Middle())",
             "help - Show this help"
         }
 
@@ -346,6 +347,13 @@ function IPC:process_command(command)
     elseif cmd == "test_combat_system" then
         -- Test Combat system (Explosion_Damage, BulletClass:Detonate, FootClass:Approach_Target)
         local test_result = self:test_combat()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
+    elseif cmd == "test_pathfinding" then
+        -- Test Pathfinding and Animation Effects (Phase 3 completion)
+        local test_result = self:test_pathfinding()
         response.success = test_result.success
         response.tests = test_result.tests
         response.message = test_result.message
@@ -5302,6 +5310,178 @@ function IPC:test_combat()
 
     if not ok7 then
         add_test("TechnoClass threat detection", false, tostring(err7))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test Pathfinding and Animation Effects (Phase 3 completion)
+function IPC:test_pathfinding()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: FindPath module loads and has key functions
+    local ok1, err1 = pcall(function()
+        local FindPath = require("src.pathfinding.findpath")
+
+        assert(FindPath ~= nil, "FindPath module should load")
+        assert(type(FindPath.new) == "function", "FindPath.new should be a function")
+        assert(type(FindPath.find_path) == "function", "find_path should be a function")
+        assert(type(FindPath.follow_edge) == "function", "follow_edge should be a function")
+        assert(type(FindPath.register_cell) == "function", "register_cell should be a function")
+
+        -- Check constants
+        assert(FindPath.FACING ~= nil, "FACING constants should exist")
+        assert(FindPath.FACING.N == 0, "FACING.N should be 0")
+        assert(FindPath.FACING.COUNT == 8, "Should have 8 directions")
+        assert(FindPath.MOVE ~= nil, "MOVE constants should exist")
+
+        add_test("FindPath module structure", true, "All pathfinding functions available")
+    end)
+
+    if not ok1 then
+        add_test("FindPath module structure", false, tostring(err1))
+    end
+
+    -- Test 2: FindPath can find simple path
+    local ok2, err2 = pcall(function()
+        local FindPath = require("src.pathfinding.findpath")
+
+        -- Create pathfinder without map (uses default passability)
+        local pathfinder = FindPath.new(nil)
+        assert(pathfinder ~= nil, "Should create pathfinder instance")
+
+        -- Find path from cell 0,0 to cell 5,5
+        local start_cell = pathfinder:cell_index(10, 10)
+        local dest_cell = pathfinder:cell_index(15, 15)
+
+        local path = pathfinder:find_path(start_cell, dest_cell)
+        assert(path ~= nil, "Should find path")
+        assert(path.Length > 0, "Path should have length > 0")
+        assert(path.Command ~= nil, "Path should have Command array")
+
+        add_test("FindPath basic pathfinding", true, string.format("Found path with %d steps", path.Length))
+    end)
+
+    if not ok2 then
+        add_test("FindPath basic pathfinding", false, tostring(err2))
+    end
+
+    -- Test 3: FindPath coordinate interface
+    local ok3, err3 = pcall(function()
+        local FindPath = require("src.pathfinding.findpath")
+
+        local pathfinder = FindPath.new(nil)
+
+        -- Test coordinate-based path finding
+        local waypoints = pathfinder:find_path_coords(5, 5, 10, 10)
+        assert(waypoints ~= nil, "Should find waypoints")
+        assert(#waypoints > 0, "Should have waypoints")
+        assert(waypoints[1].x == 5 and waypoints[1].y == 5, "First waypoint should be start")
+
+        add_test("FindPath coordinate interface", true, string.format("Found %d waypoints", #waypoints))
+    end)
+
+    if not ok3 then
+        add_test("FindPath coordinate interface", false, tostring(err3))
+    end
+
+    -- Test 4: SmudgeClass exists and has factory methods
+    local ok4, err4 = pcall(function()
+        local SmudgeClass = require("src.objects.smudge")
+
+        assert(SmudgeClass ~= nil, "SmudgeClass should load")
+        assert(type(SmudgeClass.Create_Crater) == "function", "Create_Crater should exist")
+        assert(type(SmudgeClass.Create_Scorch) == "function", "Create_Scorch should exist")
+        assert(type(SmudgeClass.Create_Bib) == "function", "Create_Bib should exist")
+        assert(SmudgeClass.RTTI == 12, "SmudgeClass RTTI should be 12")
+
+        add_test("SmudgeClass factory methods", true, "All smudge factory methods available")
+    end)
+
+    if not ok4 then
+        add_test("SmudgeClass factory methods", false, tostring(err4))
+    end
+
+    -- Test 5: SmudgeTypeClass has crater/scorch types
+    local ok5, err5 = pcall(function()
+        local SmudgeTypeClass = require("src.objects.types.smudgetype")
+
+        assert(SmudgeTypeClass ~= nil, "SmudgeTypeClass should load")
+        assert(SmudgeTypeClass.SMUDGE ~= nil, "SMUDGE enum should exist")
+        assert(SmudgeTypeClass.SMUDGE.CRATER1 ~= nil, "CRATER1 should exist")
+        assert(SmudgeTypeClass.SMUDGE.SCORCH1 ~= nil, "SCORCH1 should exist")
+
+        -- Test random picker functions
+        assert(type(SmudgeTypeClass.Random_Crater) == "function", "Random_Crater should exist")
+        assert(type(SmudgeTypeClass.Random_Scorch) == "function", "Random_Scorch should exist")
+
+        add_test("SmudgeTypeClass types", true, "All smudge types defined")
+    end)
+
+    if not ok5 then
+        add_test("SmudgeTypeClass types", false, tostring(err5))
+    end
+
+    -- Test 6: AnimClass has Middle() method
+    local ok6, err6 = pcall(function()
+        local AnimClass = require("src.objects.anim")
+
+        assert(AnimClass ~= nil, "AnimClass should load")
+        assert(type(AnimClass.Middle) == "function", "Middle should be a function")
+        assert(type(AnimClass.Chain) == "function", "Chain should be a function")
+        assert(type(AnimClass.Start) == "function", "Start should be a function")
+
+        add_test("AnimClass Middle method", true, "AnimClass has Middle() for effects")
+    end)
+
+    if not ok6 then
+        add_test("AnimClass Middle method", false, tostring(err6))
+    end
+
+    -- Test 7: AnimTypeClass has special weapon animation types
+    local ok7, err7 = pcall(function()
+        local AnimTypeClass = require("src.objects.types.animtype")
+
+        assert(AnimTypeClass ~= nil, "AnimTypeClass should load")
+        assert(AnimTypeClass.ANIM ~= nil, "ANIM enum should exist")
+        assert(AnimTypeClass.ANIM.ATOM_BLAST ~= nil, "ATOM_BLAST should exist")
+        assert(AnimTypeClass.ANIM.ION_CANNON ~= nil, "ION_CANNON should exist")
+        assert(AnimTypeClass.ANIM.NAPALM1 ~= nil, "NAPALM1 should exist")
+        assert(AnimTypeClass.ANIM.FLAME_N ~= nil, "FLAME_N should exist")
+        assert(AnimTypeClass.ANIM.FIRE_SMALL ~= nil, "FIRE_SMALL should exist")
+
+        add_test("AnimTypeClass special weapons", true, "All special weapon anim types defined")
+    end)
+
+    if not ok7 then
+        add_test("AnimTypeClass special weapons", false, tostring(err7))
     end
 
     -- Summary
