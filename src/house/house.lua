@@ -981,4 +981,49 @@ function House.deserialize(data)
     return house
 end
 
+--============================================================================
+-- Debug
+--============================================================================
+
+--[[
+    Debug dump of house state.
+    Reference: HOUSE.H Debug_Dump() pattern
+]]
+function House:Debug_Dump()
+    print(string.format("HouseClass: name=%s type=%d side=%s",
+        self.name, self.type, self.side))
+    print(string.format("  Economy: credits=%d capacity=%d tiberium=%d",
+        self.credits, self.credits_capacity, self.tiberium))
+    print(string.format("  Power: output=%d drain=%d has_power=%s",
+        self.power_output, self.power_drain, tostring(self.has_power)))
+    print(string.format("  Units: count=%d max=%d buildings=%d/%d",
+        self.unit_count, self.max_units, self.building_count, self.max_buildings))
+    print(string.format("  Flags: is_player=%s is_human=%s is_defeated=%s radar=%s",
+        tostring(self.is_player), tostring(self.is_human),
+        tostring(self.is_defeated), tostring(self.radar_active)))
+    print(string.format("  AI: difficulty=%d iq=%d tech_level=%d",
+        self.ai_difficulty, self.iq, self.tech_level))
+
+    -- Factory counts
+    print(string.format("  Factories: infantry=%d unit=%d aircraft=%d building=%d",
+        self.infantry_factories, self.unit_factories,
+        self.aircraft_factories, self.building_factories))
+
+    -- Special weapons
+    for name, weapon in pairs(self.special_weapons) do
+        if weapon.available then
+            print(string.format("  SpecialWeapon[%s]: ready=%s charge=%d/%d",
+                name, tostring(weapon.ready), weapon.charge, weapon.max_charge))
+        end
+    end
+
+    -- Statistics
+    print(string.format("  Stats: units_built=%d units_lost=%d units_killed=%d",
+        self.stats.units_built, self.stats.units_lost, self.stats.units_killed))
+    print(string.format("  Stats: buildings_built=%d buildings_lost=%d buildings_destroyed=%d",
+        self.stats.buildings_built, self.stats.buildings_lost, self.stats.buildings_destroyed))
+    print(string.format("  Stats: credits_harvested=%d credits_spent=%d",
+        self.stats.credits_harvested, self.stats.credits_spent))
+end
+
 return House

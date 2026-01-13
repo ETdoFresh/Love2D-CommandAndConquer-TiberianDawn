@@ -1059,4 +1059,62 @@ function TeamSystem:reset()
     self.next_team_id = 1
 end
 
+--============================================================================
+-- Debug
+--============================================================================
+
+--[[
+    Debug dump of team system state.
+    Reference: TEAM.H Debug_Dump() pattern
+]]
+function TeamSystem:Debug_Dump()
+    print("TeamSystem:")
+    print(string.format("  Team types: %d defined", self:count_team_types()))
+    print(string.format("  Active teams: %d", self:count_active_teams()))
+    print(string.format("  Next team ID: %d", self.next_team_id))
+
+    -- Dump team types
+    for name, team_type in pairs(self.team_types) do
+        local member_str = ""
+        for _, member in ipairs(team_type.members) do
+            if member_str ~= "" then member_str = member_str .. ", " end
+            member_str = member_str .. string.format("%s x%d", member.type, member.count or 1)
+        end
+        print(string.format("  TeamType[%s]: house=%s mission=%d autocreate=%s members=[%s]",
+            name, tostring(team_type.house), team_type.mission,
+            tostring(team_type.autocreate), member_str))
+    end
+
+    -- Dump active teams
+    for team_id, team in pairs(self.active_teams) do
+        local mission_name = self:get_mission_name(team.mission)
+        print(string.format("  ActiveTeam[%d]: type=%s house=%s mission=%s members=%d formed=%s waypoint=%d/%d",
+            team_id, team.type_name, tostring(team.house), mission_name,
+            #team.members, tostring(team.formed),
+            team.current_waypoint, #(team.waypoints or {})))
+    end
+end
+
+-- Helper: Count team types
+function TeamSystem:count_team_types()
+    local count = 0
+    for _ in pairs(self.team_types) do count = count + 1 end
+    return count
+end
+
+-- Helper: Count active teams
+function TeamSystem:count_active_teams()
+    local count = 0
+    for _ in pairs(self.active_teams) do count = count + 1 end
+    return count
+end
+
+-- Helper: Get mission name
+function TeamSystem:get_mission_name(mission)
+    for name, value in pairs(TeamSystem.MISSION) do
+        if value == mission then return name end
+    end
+    return "UNKNOWN"
+end
+
 return TeamSystem

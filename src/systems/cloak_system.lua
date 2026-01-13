@@ -451,4 +451,67 @@ function CloakSystem:draw_shimmer_outline(x, y, width, height, entity)
     love.graphics.setColor(1, 1, 1, 1)
 end
 
+--============================================================================
+-- Debug
+--============================================================================
+
+--[[
+    Debug dump of cloak system state.
+]]
+function CloakSystem:Debug_Dump()
+    print("CloakSystem:")
+    print(string.format("  Timing: cloak_delay=%.1fs cloak_duration=%.1fs uncloak_duration=%.1fs",
+        self.cloak_delay, self.cloak_duration, self.uncloak_duration))
+
+    -- List cloakable types
+    local types = {}
+    for unit_type, _ in pairs(self.cloakable_types) do
+        table.insert(types, unit_type)
+    end
+    print(string.format("  Cloakable types: [%s]", table.concat(types, ", ")))
+
+    -- Count entities by cloak state
+    if self.world then
+        local entities = self.world:get_entities_with("cloak")
+        local states = {
+            [CloakSystem.STATE.UNCLOAKED] = 0,
+            [CloakSystem.STATE.CLOAKING] = 0,
+            [CloakSystem.STATE.CLOAKED] = 0,
+            [CloakSystem.STATE.UNCLOAKING] = 0
+        }
+
+        for _, entity in ipairs(entities) do
+            local cloak = entity:get("cloak")
+            if cloak and states[cloak.state] then
+                states[cloak.state] = states[cloak.state] + 1
+            end
+        end
+
+        print(string.format("  Entities: uncloaked=%d cloaking=%d cloaked=%d uncloaking=%d",
+            states[CloakSystem.STATE.UNCLOAKED],
+            states[CloakSystem.STATE.CLOAKING],
+            states[CloakSystem.STATE.CLOAKED],
+            states[CloakSystem.STATE.UNCLOAKING]))
+
+        -- Dump individual cloaked/cloaking entities
+        for _, entity in ipairs(entities) do
+            local cloak = entity:get("cloak")
+            if cloak and cloak.state ~= CloakSystem.STATE.UNCLOAKED then
+                local state_name = self:get_state_name(cloak.state)
+                print(string.format("    Entity[%s]: state=%s progress=%.2f timer=%.2f detected=%s",
+                    tostring(entity.id), state_name, cloak.progress, cloak.timer,
+                    tostring(cloak.detected)))
+            end
+        end
+    end
+end
+
+-- Helper: Get state name
+function CloakSystem:get_state_name(state)
+    for name, value in pairs(CloakSystem.STATE) do
+        if value == state then return name end
+    end
+    return "UNKNOWN"
+end
+
 return CloakSystem

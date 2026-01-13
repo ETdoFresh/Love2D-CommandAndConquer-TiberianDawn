@@ -1063,4 +1063,82 @@ function TriggerSystem:get_house_stats(house)
     return self.house_stats[house]
 end
 
+--============================================================================
+-- Debug
+--============================================================================
+
+--[[
+    Debug dump of trigger system state.
+    Reference: TRIGGER.H Debug_Dump() pattern
+]]
+function TriggerSystem:Debug_Dump()
+    print("TriggerSystem:")
+    print(string.format("  Triggers: %d total", self:count_triggers()))
+    print(string.format("  Cell triggers: %d", self:count_cell_triggers()))
+    print(string.format("  Object triggers: %d", self:count_object_triggers()))
+    print(string.format("  Pending actions: %d", #self.pending_actions))
+    print(string.format("  Mission timer: %s (running=%s)",
+        self:get_timer_display() or "N/A", tostring(self.mission_timer_running)))
+    print(string.format("  Game state: win_allowed=%s game_over=%s victory=%s",
+        tostring(self.win_allowed), tostring(self.game_over), tostring(self.victory)))
+
+    -- Dump globals
+    local active_globals = {}
+    for i = 0, 31 do
+        if self.globals[i] then
+            table.insert(active_globals, i)
+        end
+    end
+    if #active_globals > 0 then
+        print(string.format("  Active globals: [%s]", table.concat(active_globals, ", ")))
+    end
+
+    -- Dump each trigger
+    for name, trigger in pairs(self.triggers) do
+        local event_name = self:get_event_name(trigger.event)
+        local action_name = self:get_action_name(trigger.action)
+        print(string.format("  Trigger[%s]: event=%s(%d) action=%s(%d) house=%d enabled=%s fired=%s",
+            name, event_name, trigger.event_param or 0,
+            action_name, trigger.action_param or 0,
+            trigger.house, tostring(trigger.enabled), tostring(trigger.fired)))
+    end
+end
+
+-- Helper: Count triggers
+function TriggerSystem:count_triggers()
+    local count = 0
+    for _ in pairs(self.triggers) do count = count + 1 end
+    return count
+end
+
+-- Helper: Count cell triggers
+function TriggerSystem:count_cell_triggers()
+    local count = 0
+    for _ in pairs(self.cell_triggers) do count = count + 1 end
+    return count
+end
+
+-- Helper: Count object triggers
+function TriggerSystem:count_object_triggers()
+    local count = 0
+    for _ in pairs(self.object_triggers) do count = count + 1 end
+    return count
+end
+
+-- Helper: Get event name
+function TriggerSystem:get_event_name(event)
+    for name, value in pairs(TriggerSystem.EVENT) do
+        if value == event then return name end
+    end
+    return "UNKNOWN"
+end
+
+-- Helper: Get action name
+function TriggerSystem:get_action_name(action)
+    for name, value in pairs(TriggerSystem.ACTION) do
+        if value == action then return name end
+    end
+    return "UNKNOWN"
+end
+
 return TriggerSystem

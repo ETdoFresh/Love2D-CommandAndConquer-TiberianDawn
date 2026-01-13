@@ -383,4 +383,45 @@ function FogSystem:reset()
     self.sight_ranges = {}
 end
 
+--============================================================================
+-- Debug
+--============================================================================
+
+--[[
+    Debug dump of fog system state.
+]]
+function FogSystem:Debug_Dump()
+    print("FogSystem:")
+    print(string.format("  Enabled: fog=%s shroud=%s",
+        tostring(self.fog_enabled), tostring(self.shroud_enabled)))
+    print(string.format("  Player house: %d", self.player_house))
+    print(string.format("  Default sight range: %d cells", self.default_sight_range))
+    print(string.format("  Sight range cache entries: %d", self:count_sight_ranges()))
+
+    -- Count visibility per house
+    for house, house_vis in pairs(self.visibility) do
+        local unseen, fogged, visible = 0, 0, 0
+        for y, row in pairs(house_vis) do
+            for x, state in pairs(row) do
+                if state == FogSystem.VISIBILITY.UNSEEN then
+                    unseen = unseen + 1
+                elseif state == FogSystem.VISIBILITY.FOGGED then
+                    fogged = fogged + 1
+                elseif state == FogSystem.VISIBILITY.VISIBLE then
+                    visible = visible + 1
+                end
+            end
+        end
+        print(string.format("  House %d visibility: unseen=%d fogged=%d visible=%d",
+            house, unseen, fogged, visible))
+    end
+end
+
+-- Helper: Count sight range cache entries
+function FogSystem:count_sight_ranges()
+    local count = 0
+    for _ in pairs(self.sight_ranges) do count = count + 1 end
+    return count
+end
+
 return FogSystem

@@ -705,4 +705,46 @@ function SpecialWeapons:get_available_weapons(house)
     return result
 end
 
+--============================================================================
+-- Debug
+--============================================================================
+
+--[[
+    Debug dump of special weapons system state.
+]]
+function SpecialWeapons:Debug_Dump()
+    print("SpecialWeapons:")
+    print(string.format("  Targeting: %s (house=%s)",
+        self.targeting and self:get_weapon_name(self.targeting) or "none",
+        tostring(self.targeting_house)))
+    print(string.format("  Active effects: %d", #self.active_effects))
+
+    -- Dump weapons per house
+    for house, house_weapons in pairs(self.weapons) do
+        print(string.format("  House %d weapons:", house))
+        for weapon_type, weapon in pairs(house_weapons) do
+            local data = SpecialWeapons.DATA[weapon_type]
+            local name = data and data.name or "Unknown"
+            local cooldown_pct = data and math.floor((weapon.cooldown_remaining / data.cooldown) * 100) or 0
+            print(string.format("    %s: available=%s ready=%s cooldown=%d%% one_time=%s",
+                name, tostring(weapon.available), tostring(weapon.cooldown_remaining <= 0),
+                100 - cooldown_pct, tostring(weapon.one_time)))
+        end
+    end
+
+    -- Dump active effects
+    for i, effect in ipairs(self.active_effects) do
+        print(string.format("  Effect[%d]: type=%s target=(%d,%d) stage=%d timer=%.2f",
+            i, self:get_weapon_name(effect.type),
+            effect.target_x, effect.target_y,
+            effect.stage or 0, effect.timer or 0))
+    end
+end
+
+-- Helper: Get weapon name
+function SpecialWeapons:get_weapon_name(weapon_type)
+    local data = SpecialWeapons.DATA[weapon_type]
+    return data and data.name or "Unknown"
+end
+
 return SpecialWeapons

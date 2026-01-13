@@ -599,4 +599,70 @@ function Cell:bridge_is_passable()
     return self:has_bridge() and self.bridge_health > 0
 end
 
+--============================================================================
+-- Debug
+--============================================================================
+
+--[[
+    Debug dump of cell state.
+    Reference: CELL.H Debug_Dump() pattern
+]]
+function Cell:Debug_Dump()
+    print(string.format("CellClass: x=%d y=%d cell#=%d",
+        self.x, self.y, self:get_cell_number()))
+    print(string.format("  Terrain: template_type=%d template_icon=%d",
+        self.template_type, self.template_icon))
+    print(string.format("  Overlay: type=%d data=%d",
+        self.overlay, self.overlay_data))
+    print(string.format("  Smudge: type=%d data=%d",
+        self.smudge, self.smudge_data))
+    print(string.format("  Flags: 0x%04X owner=%d",
+        self.flags, self.owner))
+
+    -- Decode flags
+    local flag_names = {}
+    if self:has_flag_set(Cell.FLAG.CENTER) then table.insert(flag_names, "CENTER") end
+    if self:has_flag_set(Cell.FLAG.NW) then table.insert(flag_names, "NW") end
+    if self:has_flag_set(Cell.FLAG.NE) then table.insert(flag_names, "NE") end
+    if self:has_flag_set(Cell.FLAG.SW) then table.insert(flag_names, "SW") end
+    if self:has_flag_set(Cell.FLAG.SE) then table.insert(flag_names, "SE") end
+    if self:has_flag_set(Cell.FLAG.VEHICLE) then table.insert(flag_names, "VEHICLE") end
+    if self:has_flag_set(Cell.FLAG.MONOLITH) then table.insert(flag_names, "MONOLITH") end
+    if self:has_flag_set(Cell.FLAG.BUILDING) then table.insert(flag_names, "BUILDING") end
+    if self:has_flag_set(Cell.FLAG.WALL) then table.insert(flag_names, "WALL") end
+
+    if #flag_names > 0 then
+        print(string.format("  FlagNames: %s", table.concat(flag_names, ", ")))
+    end
+
+    -- Special states
+    if self:has_tiberium() then
+        print(string.format("  Tiberium: value=%d", self:get_tiberium_value()))
+    end
+    if self:has_wall() then
+        print(string.format("  Wall: health=%d frame=%d", self:get_wall_health(), self:get_wall_frame()))
+    end
+    if self:has_bridge() then
+        print(string.format("  Bridge: health=%d passable=%s", self:get_bridge_health(), tostring(self:bridge_is_passable())))
+    end
+    if self:has_smudge() then
+        local smudge_name = self.smudge <= 5 and "CRATER" or "SCORCH"
+        print(string.format("  Smudge: type=%s%d", smudge_name, (self.smudge % 6) + 1))
+    end
+
+    -- References
+    if self.occupier then
+        print(string.format("  Occupier: %s", tostring(self.occupier)))
+    end
+    if #self.overlappers > 0 then
+        print(string.format("  Overlappers: %d entities", #self.overlappers))
+    end
+    if self.trigger then
+        print(string.format("  Trigger: %s", tostring(self.trigger)))
+    end
+    if self.waypoint then
+        print(string.format("  Waypoint: %s", tostring(self.waypoint)))
+    end
+end
+
 return Cell
