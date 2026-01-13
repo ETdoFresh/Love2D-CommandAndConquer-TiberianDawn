@@ -239,12 +239,65 @@ function AudioSystem:register_events()
         self:queue_speech("Cannot deploy here")
     end)
 
+    -- EVA speech from triggers and game events
+    -- Reference: Original C&C trigger system uses EVA_SPEECH for mission announcements
+    Events.on("EVA_SPEECH", function(speech_text, house)
+        -- Only play for player house or if house is -1 (all houses)
+        if house == -1 or house == nil or house == self.player_house then
+            self:queue_speech(speech_text)
+        end
+    end)
+
+    -- Structure/unit loss announcements
+    -- Reference: Original C&C announces when structures or units are lost
+    Events.on("STRUCTURE_LOST", function(house, building_type)
+        if house == self.player_house then
+            self:queue_speech("Structure lost")
+        end
+    end)
+
+    Events.on("UNIT_LOST", function(house, unit_type)
+        if house == self.player_house then
+            self:queue_speech("Unit lost")
+        end
+    end)
+
+    -- Fire Sale announcement
+    Events.on("FIRE_SALE", function(house)
+        if house == self.player_house then
+            self:queue_speech("Selling all structures")
+        end
+    end)
+
+    -- Airstrike/bombing run announcements
+    Events.on("AIRSTRIKE_INCOMING", function(house)
+        if house ~= self.player_house then
+            self:queue_speech("Enemy aircraft approaching")
+        end
+    end)
+
+    -- Ion cannon warning (affects all players)
+    Events.on("ION_CANNON_FIRED", function(house, target_x, target_y)
+        self:queue_speech("Ion cannon activated")
+    end)
+
+    -- Nuclear warning (affects all players)
+    Events.on("NUCLEAR_LAUNCHED", function(house, target_x, target_y)
+        self:queue_speech("Nuclear warhead approaching")
+        self:play_sound("nuke_warn")
+    end)
+
     -- Selection response - play unit acknowledgment when units are selected
     Events.on(Events.EVENTS.SELECTION_CHANGED, function(units)
         if units and #units > 0 then
             self:play_unit_response("select", units)
         end
     end)
+end
+
+-- Set the player house for speech filtering
+function AudioSystem:set_player_house(house)
+    self.player_house = house
 end
 
 -- Unit response sound mappings by unit type

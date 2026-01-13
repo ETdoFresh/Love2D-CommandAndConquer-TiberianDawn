@@ -998,6 +998,10 @@ function ProductionSystem:place_building(construction_yard, cell_x, cell_y, grid
             self:spawn_free_unit(building, data.free_unit, owner.house, cell_x, cell_y, data.size)
         end
 
+        -- Grant special weapons when key buildings are completed
+        -- Reference: Original C&C grants weapons when building is placed
+        self:grant_special_weapons(building_type, owner.house)
+
         -- Clear production state
         production.ready_to_place = false
         production.placing_type = nil
@@ -1008,6 +1012,31 @@ function ProductionSystem:place_building(construction_yard, cell_x, cell_y, grid
     end
 
     return nil, "Failed to create building"
+end
+
+-- Grant special weapons when certain buildings are constructed
+-- Reference: Original C&C - EYE grants Ion Cannon, TMPL grants Nuke
+function ProductionSystem:grant_special_weapons(building_type, house)
+    -- Ion Cannon from Advanced Communications Center (GDI)
+    if building_type == "EYE" then
+        Events.emit("ADD_SPECIAL", house, 1, true)  -- 1 = ION_CANNON, repeating
+        Events.emit("EVA_SPEECH", "ion cannon ready", house)
+
+    -- Nuclear Strike from Temple of Nod (NOD)
+    elseif building_type == "TMPL" then
+        Events.emit("ADD_SPECIAL", house, 2, true)  -- 2 = NUCLEAR_STRIKE, repeating
+        Events.emit("EVA_SPEECH", "nuclear strike available", house)
+
+    -- Airstrike from Communications Center (GDI only - requires Advanced Comm for Ion)
+    elseif building_type == "HQ" then
+        -- Check if this is GDI (Good house)
+        if house == Constants.HOUSE.GOOD then
+            Events.emit("ADD_SPECIAL", house, 3, true)  -- 3 = AIRSTRIKE, repeating
+        else
+            -- Nod gets Napalm Strike from Comm Center
+            Events.emit("ADD_SPECIAL", house, 4, true)  -- 4 = NAPALM_STRIKE, repeating
+        end
+    end
 end
 
 -- Spawn a free unit when a building is placed (e.g., Harvester from Refinery)

@@ -67,6 +67,15 @@ function Sidebar.new()
     -- Mission timer reference
     self.trigger_system = nil
 
+    -- Sell/Repair mode
+    -- Reference: Original C&C had sell and repair buttons in sidebar
+    self.sell_mode = false
+    self.repair_mode = false
+
+    -- Callbacks for sell/repair
+    self.on_sell_click = nil
+    self.on_repair_click = nil
+
     return self
 end
 
@@ -275,13 +284,58 @@ function Sidebar:draw()
     local harvester_y = prod_y + 28
     local harvester_height = self:draw_harvester_status(x + 4, harvester_y, self.width - 8)
 
+    -- Sell/Repair buttons (above tabs)
+    local sell_repair_y = harvester_y + harvester_height + 4
+    self:draw_sell_repair_buttons(x, sell_repair_y)
+
     -- Tabs
-    local tabs_y = harvester_y + harvester_height + 4
+    local tabs_y = sell_repair_y + 22
     self:draw_tabs(x, tabs_y)
 
     -- Items
     local items_y = tabs_y + Sidebar.TABS_HEIGHT + 4
     self:draw_items(x, items_y)
+end
+
+-- Draw sell and repair buttons
+-- Reference: Original C&C sidebar had sell (dollar sign) and repair (wrench) buttons
+function Sidebar:draw_sell_repair_buttons(x, y)
+    local button_w = (self.width - Sidebar.BUTTON_MARGIN * 3) / 2
+    local button_h = 18
+
+    -- Sell button
+    local sell_x = x + Sidebar.BUTTON_MARGIN
+    if self.sell_mode then
+        love.graphics.setColor(0.7, 0.3, 0.3, 1)
+    else
+        love.graphics.setColor(0.3, 0.25, 0.25, 1)
+    end
+    love.graphics.rectangle("fill", sell_x, y, button_w, button_h)
+
+    love.graphics.setColor(0.5, 0.4, 0.4, 1)
+    love.graphics.rectangle("line", sell_x, y, button_w, button_h)
+
+    love.graphics.setColor(1, 0.8, 0.2, self.sell_mode and 1 or 0.7)
+    love.graphics.printf("SELL", sell_x, y + 3, button_w, "center")
+
+    -- Repair button
+    local repair_x = sell_x + button_w + Sidebar.BUTTON_MARGIN
+    if self.repair_mode then
+        love.graphics.setColor(0.3, 0.5, 0.7, 1)
+    else
+        love.graphics.setColor(0.25, 0.3, 0.35, 1)
+    end
+    love.graphics.rectangle("fill", repair_x, y, button_w, button_h)
+
+    love.graphics.setColor(0.4, 0.5, 0.6, 1)
+    love.graphics.rectangle("line", repair_x, y, button_w, button_h)
+
+    love.graphics.setColor(0.5, 0.8, 1, self.repair_mode and 1 or 0.7)
+    love.graphics.printf("REPAIR", repair_x, y + 3, button_w, "center")
+
+    -- Store button bounds for click detection
+    self.sell_button_bounds = {x = sell_x, y = y, w = button_w, h = button_h}
+    self.repair_button_bounds = {x = repair_x, y = y, w = button_w, h = button_h}
 end
 
 -- Draw mission timer if active
@@ -754,8 +808,36 @@ function Sidebar:mousepressed(mx, my, button)
         return false
     end
 
+    -- Check sell button click
+    if self.sell_button_bounds then
+        local b = self.sell_button_bounds
+        if mx >= b.x and mx < b.x + b.w and my >= b.y and my < b.y + b.h then
+            self.sell_mode = not self.sell_mode
+            self.repair_mode = false  -- Cancel repair mode
+            if self.on_sell_click then
+                self.on_sell_click(self.sell_mode)
+            end
+            Events.emit("SIDEBAR_SELL_MODE", self.sell_mode)
+            return true
+        end
+    end
+
+    -- Check repair button click
+    if self.repair_button_bounds then
+        local b = self.repair_button_bounds
+        if mx >= b.x and mx < b.x + b.w and my >= b.y and my < b.y + b.h then
+            self.repair_mode = not self.repair_mode
+            self.sell_mode = false  -- Cancel sell mode
+            if self.on_repair_click then
+                self.on_repair_click(self.repair_mode)
+            end
+            Events.emit("SIDEBAR_REPAIR_MODE", self.repair_mode)
+            return true
+        end
+    end
+
     -- Check tabs
-    local tabs_y = self.y + 44
+    local tabs_y = self.y + 66  -- Adjusted for sell/repair buttons
     if my >= tabs_y and my < tabs_y + Sidebar.TABS_HEIGHT then
         local num_tabs = self.special_weapons_available and 3 or 2
         local tab_width = self.width / num_tabs
@@ -864,6 +946,48 @@ end
 -- Set callback for building production
 function Sidebar:set_building_click_callback(callback)
     self.on_building_click = callback
+end
+
+-- Set callback for sell mode toggle
+function Sidebar:set_sell_callback(callback)
+    self.on_sell_click = callback
+end
+
+-- Set callback for repair mode toggle
+function Sidebar:set_repair_callback(callback)
+    self.on_repair_click = callback
+end
+
+-- Check if sell mode is active
+function Sidebar:is_sell_mode()
+    return self.sell_mode
+end
+
+-- Check if repair mode is active
+function Sidebar:is_repair_mode()
+    return self.repair_mode
+end
+
+-- Cancel sell/repair mode (called when action is complete or ESC pressed)
+function Sidebar:cancel_modes()
+    self.sell_mode = false
+    self.repair_mode = false
+end
+
+-- Set sell mode directly
+function Sidebar:set_sell_mode(enabled)
+    self.sell_mode = enabled
+    if enabled then
+        self.repair_mode = false
+    end
+end
+
+-- Set repair mode directly
+function Sidebar:set_repair_mode(enabled)
+    self.repair_mode = enabled
+    if enabled then
+        self.sell_mode = false
+    end
 end
 
 function Sidebar:wheelmoved(x, y)
