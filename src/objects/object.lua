@@ -21,6 +21,9 @@ local Coord = require("src.core.coord")
 local Target = require("src.core.target")
 local Constants = require("src.core.constants")
 
+-- Lazy-loaded combat module
+local WarheadTypeClass = nil
+
 -- Create ObjectClass extending AbstractClass
 local ObjectClass = Class.extend(AbstractClass, "ObjectClass")
 
@@ -637,21 +640,75 @@ function ObjectClass:Take_Damage(damage, distance, warhead, source)
         return ObjectClass.RESULT.NONE
     end
 
-    -- Apply distance falloff
-    -- (Actual calculation happens in derived classes)
+    -- Lazy load warhead module
+    if not WarheadTypeClass then
+        WarheadTypeClass = require("src.combat.warhead")
+    end
+
+    -- Get warhead definition
+    local warhead_def = nil
+    if warhead and warhead >= 0 then
+        warhead_def = WarheadTypeClass.Get(warhead)
+    end
+
+    -- Apply warhead armor modifier
+    local modified_damage = damage
+    if warhead_def then
+        -- Get this object's armor type
+        local armor = self:Get_Armor()
+
+        -- Modify damage by armor
+        modified_damage = warhead_def:Modify_Damage(damage, armor)
+
+        -- Apply distance falloff
+        if distance and distance > 0 then
+            modified_damage = warhead_def:Distance_Damage(modified_damage, distance)
+        end
+    end
+
+    -- Ensure damage is at least 1 if original was > 0
+    if damage > 0 and modified_damage < 1 then
+        modified_damage = 1
+    end
 
     local old_strength = self.Strength
-    self.Strength = math.max(0, self.Strength - damage)
+    self.Strength = math.max(0, self.Strength - modified_damage)
 
+    -- Handle destruction
     if self.Strength <= 0 then
+        -- Record kill attribution
+        if source then
+            self:Record_The_Kill(source)
+        end
         return ObjectClass.RESULT.DESTROYED
     elseif self.Strength < old_strength / 2 and old_strength >= old_strength / 2 then
         return ObjectClass.RESULT.HALF
-    elseif damage > 0 then
+    elseif modified_damage > 0 then
         return ObjectClass.RESULT.LIGHT
     end
 
     return ObjectClass.RESULT.NONE
+end
+
+--[[
+    Get the armor type of this object.
+    Override in derived classes.
+
+    @return ArmorType enum value
+]]
+function ObjectClass:Get_Armor()
+    -- Default to no armor
+    return 0  -- ARMOR_NONE
+end
+
+--[[
+    Record kill attribution.
+    Called when this object is destroyed.
+
+    @param killer - The object that killed us
+]]
+function ObjectClass:Record_The_Kill(killer)
+    -- Override in TechnoClass for proper kill tracking
 end
 
 --[[

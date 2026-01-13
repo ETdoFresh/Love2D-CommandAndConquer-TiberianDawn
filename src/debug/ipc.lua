@@ -270,6 +270,13 @@ function IPC:process_command(command)
         response.tests = test_result.tests
         response.message = test_result.message
 
+    elseif cmd == "test_phase3" then
+        -- Test Phase 3 integration (pathfinding, combat system)
+        local test_result = self:test_phase3_integration()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
     elseif cmd == "help" then
         response.commands = {
             "input <key> - Simulate key press",
@@ -291,6 +298,7 @@ function IPC:process_command(command)
             "test_concrete - Test InfantryClass, UnitClass, AircraftClass, BuildingClass",
             "test_specific_types - Test InfantryTypeClass, UnitTypeClass, AircraftTypeClass, BuildingTypeClass",
             "test_combat - Test BulletClass, AnimClass, WeaponTypeClass, WarheadTypeClass",
+            "test_phase3 - Test Phase 3 integration (pathfinding, combat)",
             "help - Show this help"
         }
 
@@ -3017,6 +3025,292 @@ function IPC:test_combat_classes()
 
     if not ok12 then
         add_test("Global lookup tables", false, tostring(err12))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test Phase 3 integration (pathfinding, combat system)
+function IPC:test_phase3_integration()
+    local result = { success = true, tests = {} }
+
+    local function add_test(name, passed, detail)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            detail = detail
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: FindPath module loading
+    local ok1, err1 = pcall(function()
+        local FindPath = require("src.pathfinding.findpath")
+        assert(FindPath ~= nil, "FindPath module should load")
+        assert(FindPath.FACING ~= nil, "Should have FACING constants")
+        assert(FindPath.ADJACENT_CELL ~= nil, "Should have ADJACENT_CELL table")
+        add_test("FindPath module loading", true, "FindPath loaded successfully")
+    end)
+
+    if not ok1 then
+        add_test("FindPath module loading", false, tostring(err1))
+        return result
+    end
+
+    -- Test 2: FindPath cell utilities
+    local FindPath = require("src.pathfinding.findpath")
+    local ok2, err2 = pcall(function()
+        local pathfinder = FindPath.new(nil)
+
+        -- Test cell_index
+        local idx = pathfinder:cell_index(5, 10)
+        assert(idx == 645, "cell_index(5,10) = 645 for 64-wide map")
+
+        -- Test cell_coords
+        local x, y = pathfinder:cell_coords(645)
+        assert(x == 5 and y == 10, "cell_coords(645) = (5,10)")
+
+        -- Test is_valid_cell
+        assert(pathfinder:is_valid_cell(0) == true, "Cell 0 valid")
+        assert(pathfinder:is_valid_cell(4095) == true, "Cell 4095 valid")
+        assert(pathfinder:is_valid_cell(-1) == false, "Cell -1 invalid")
+        assert(pathfinder:is_valid_cell(4096) == false, "Cell 4096 invalid")
+
+        add_test("FindPath cell utilities", true, "Cell utilities work")
+    end)
+
+    if not ok2 then
+        add_test("FindPath cell utilities", false, tostring(err2))
+    end
+
+    -- Test 3: FindPath adjacent cells
+    local ok3, err3 = pcall(function()
+        local pathfinder = FindPath.new(nil)
+
+        -- Cell in middle of map
+        local cell = pathfinder:cell_index(32, 32)  -- 32 + 32*64 = 2080
+
+        -- Test adjacent cells
+        local n = pathfinder:adjacent_cell(cell, FindPath.FACING.N)
+        local s = pathfinder:adjacent_cell(cell, FindPath.FACING.S)
+        local e = pathfinder:adjacent_cell(cell, FindPath.FACING.E)
+        local w = pathfinder:adjacent_cell(cell, FindPath.FACING.W)
+
+        assert(n == cell - 64, "North is cell - 64")
+        assert(s == cell + 64, "South is cell + 64")
+        assert(e == cell + 1, "East is cell + 1")
+        assert(w == cell - 1, "West is cell - 1")
+
+        add_test("FindPath adjacent cells", true, "Adjacent cell calculation works")
+    end)
+
+    if not ok3 then
+        add_test("FindPath adjacent cells", false, tostring(err3))
+    end
+
+    -- Test 4: FindPath facing calculation
+    local ok4, err4 = pcall(function()
+        local pathfinder = FindPath.new(nil)
+
+        local cell1 = pathfinder:cell_index(10, 10)
+        local cell2 = pathfinder:cell_index(11, 9)  -- NE of cell1
+
+        local facing = pathfinder:cell_facing(cell1, cell2)
+        assert(facing == FindPath.FACING.NE, "Should face NE")
+
+        cell2 = pathfinder:cell_index(10, 11)  -- S of cell1
+        facing = pathfinder:cell_facing(cell1, cell2)
+        assert(facing == FindPath.FACING.S, "Should face S")
+
+        add_test("FindPath facing calculation", true, "Facing calculation works")
+    end)
+
+    if not ok4 then
+        add_test("FindPath facing calculation", false, tostring(err4))
+    end
+
+    -- Test 5: FindPath simple path
+    local ok5, err5 = pcall(function()
+        local pathfinder = FindPath.new(nil)
+
+        local start = pathfinder:cell_index(10, 10)
+        local dest = pathfinder:cell_index(12, 10)  -- 2 cells east
+
+        local path = pathfinder:find_path(start, dest)
+        assert(path ~= nil, "Should find path")
+        assert(path.Length == 2, "Path length should be 2")
+        assert(path.Command[1] == FindPath.FACING.E, "First move should be E")
+        assert(path.Command[2] == FindPath.FACING.E, "Second move should be E")
+
+        add_test("FindPath simple path", true, "Simple pathfinding works")
+    end)
+
+    if not ok5 then
+        add_test("FindPath simple path", false, tostring(err5))
+    end
+
+    -- Test 6: FindPath diagonal path
+    local ok6, err6 = pcall(function()
+        local pathfinder = FindPath.new(nil)
+
+        local start = pathfinder:cell_index(10, 10)
+        local dest = pathfinder:cell_index(12, 12)  -- 2 cells SE
+
+        local path = pathfinder:find_path(start, dest)
+        assert(path ~= nil, "Should find diagonal path")
+        assert(path.Length == 2, "Diagonal path length should be 2")
+        assert(path.Command[1] == FindPath.FACING.SE, "First move should be SE")
+
+        add_test("FindPath diagonal path", true, "Diagonal pathfinding works")
+    end)
+
+    if not ok6 then
+        add_test("FindPath diagonal path", false, tostring(err6))
+    end
+
+    -- Test 7: WarheadTypeClass damage modification
+    local ok7, err7 = pcall(function()
+        local WarheadTypeClass = require("src.combat.warhead")
+
+        local ap = WarheadTypeClass.Create(WarheadTypeClass.WARHEAD.AP)
+        assert(ap ~= nil, "Should create AP warhead")
+
+        -- AP should do full damage to steel
+        local steel_damage = ap:Modify_Damage(100, WarheadTypeClass.ARMOR.STEEL)
+        assert(steel_damage == 100, "AP full damage vs steel")
+
+        -- AP should do reduced damage to infantry (NONE armor)
+        local inf_damage = ap:Modify_Damage(100, WarheadTypeClass.ARMOR.NONE)
+        assert(inf_damage == 25, "AP 25% damage vs infantry")
+
+        add_test("Warhead damage modification", true, "Damage modifiers work")
+    end)
+
+    if not ok7 then
+        add_test("Warhead damage modification", false, tostring(err7))
+    end
+
+    -- Test 8: WarheadTypeClass distance falloff
+    local ok8, err8 = pcall(function()
+        local WarheadTypeClass = require("src.combat.warhead")
+
+        local he = WarheadTypeClass.Create(WarheadTypeClass.WARHEAD.HE)
+
+        -- At impact point
+        local damage0 = he:Distance_Damage(100, 0)
+        assert(damage0 == 100, "Full damage at impact")
+
+        -- At distance
+        local damage_far = he:Distance_Damage(100, 100)
+        assert(damage_far < 100, "Reduced damage at distance")
+        assert(damage_far > 0, "Still some damage at distance")
+
+        add_test("Warhead distance falloff", true, "Distance falloff works")
+    end)
+
+    if not ok8 then
+        add_test("Warhead distance falloff", false, tostring(err8))
+    end
+
+    -- Test 9: WeaponTypeClass integration
+    local ok9, err9 = pcall(function()
+        local WeaponTypeClass = require("src.combat.weapon")
+        local BulletTypeClass = require("src.objects.types.bullettype")
+
+        local cannon = WeaponTypeClass.Create(WeaponTypeClass.WEAPON._120MM)
+        assert(cannon ~= nil, "Should create 120mm weapon")
+        assert(cannon.Attack == 40, "120mm does 40 damage")
+        assert(cannon.Fires == BulletTypeClass.BULLET.APDS, "Fires APDS")
+
+        local bullet = BulletTypeClass.Create(cannon.Fires)
+        assert(bullet ~= nil, "Should create APDS bullet")
+        assert(bullet.IsFaceless == true, "APDS is faceless")
+
+        add_test("Weapon/Bullet integration", true, "Weapon-bullet chain works")
+    end)
+
+    if not ok9 then
+        add_test("Weapon/Bullet integration", false, tostring(err9))
+    end
+
+    -- Test 10: ObjectClass Take_Damage with warhead
+    local ok10, err10 = pcall(function()
+        local ObjectClass = require("src.objects.object")
+        local WarheadTypeClass = require("src.combat.warhead")
+
+        local obj = ObjectClass:new()
+        obj.Strength = 100
+        obj.IsActive = true
+        obj.IsInLimbo = false
+
+        -- Take damage with SA warhead
+        local result_type = obj:Take_Damage(30, 0, WarheadTypeClass.WARHEAD.SA, nil)
+        assert(result_type == ObjectClass.RESULT.LIGHT, "Should take light damage")
+        assert(obj.Strength == 70, "30 SA damage reduces to 70")
+
+        add_test("ObjectClass Take_Damage", true, "Take_Damage with warhead works")
+    end)
+
+    if not ok10 then
+        add_test("ObjectClass Take_Damage", false, tostring(err10))
+    end
+
+    -- Test 11: TechnoClass Get_Armor
+    local ok11, err11 = pcall(function()
+        local TechnoClass = require("src.objects.techno")
+
+        local techno = TechnoClass:new()
+        local armor = techno:Get_Armor()
+        assert(armor == 0, "Default armor is NONE")
+
+        add_test("TechnoClass Get_Armor", true, "Get_Armor works")
+    end)
+
+    if not ok11 then
+        add_test("TechnoClass Get_Armor", false, tostring(err11))
+    end
+
+    -- Test 12: FootClass pathfinding integration
+    local ok12, err12 = pcall(function()
+        local FootClass = require("src.objects.foot")
+        local Coord = require("src.core.coord")
+        local Target = require("src.core.target")
+
+        local foot = FootClass:new()
+        foot.Strength = 100
+        foot.IsActive = true
+        foot.IsInLimbo = false
+        foot.Coord = Coord.Cell_Coord(10, 10)
+
+        -- Set destination using As_Coord (encodes coord as target)
+        local dest_coord = Coord.Cell_Coord(12, 10)
+        foot.NavCom = Target.As_Coord(dest_coord)
+
+        -- Calculate path
+        local success = foot:Basic_Path()
+        assert(success == true, "Should calculate path")
+        assert(foot.Path[1] == FootClass.FACING.E, "First step should be East")
+
+        add_test("FootClass pathfinding", true, "FootClass uses FindPath")
+    end)
+
+    if not ok12 then
+        add_test("FootClass pathfinding", false, tostring(err12))
     end
 
     -- Summary

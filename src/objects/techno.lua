@@ -28,6 +28,13 @@ local RadioClass = require("src.objects.radio")
 local Target = require("src.core.target")
 local Coord = require("src.core.coord")
 
+-- Combat classes (lazy loaded to avoid circular deps)
+local BulletClass = nil
+local BulletTypeClass = nil
+local WeaponTypeClass = nil
+local AnimClass = nil
+local AnimTypeClass = nil
+
 -- Import mixins
 local FlasherClass = require("src.objects.mixins.flasher")
 local StageClass = require("src.objects.mixins.stage")
@@ -303,6 +310,20 @@ end
 function TechnoClass:Techno_Type_Class()
     -- Override in derived classes
     return nil
+end
+
+--[[
+    Get the armor type of this object.
+    Returns ArmorType enum from warhead.lua
+
+    @return ArmorType value
+]]
+function TechnoClass:Get_Armor()
+    local type_class = self:Techno_Type_Class()
+    if type_class and type_class.Armor then
+        return type_class.Armor
+    end
+    return 0  -- ARMOR_NONE
 end
 
 --[[
@@ -689,6 +710,15 @@ function TechnoClass:Fire_At(target, which)
         return nil
     end
 
+    -- Lazy load combat classes to avoid circular dependencies
+    if not BulletClass then
+        BulletClass = require("src.objects.bullet")
+        BulletTypeClass = require("src.objects.types.bullettype")
+        WeaponTypeClass = require("src.combat.weapon")
+        AnimClass = require("src.objects.anim")
+        AnimTypeClass = require("src.objects.types.animtype")
+    end
+
     -- Consume ammo
     if self.Ammo > 0 then
         self.Ammo = self.Ammo - 1
@@ -705,11 +735,88 @@ function TechnoClass:Fire_At(target, which)
         self:Do_Uncloak()
     end
 
-    -- Create bullet (simplified - would use BulletClass)
-    -- local bullet = BulletClass:new(target, self, which)
-    -- return bullet
+    -- Get weapon from type class
+    local type_class = self:Techno_Type_Class()
+    if not type_class then
+        return nil
+    end
 
-    return nil  -- Placeholder until BulletClass is implemented
+    local weapon_type = nil
+    if which == 0 then
+        weapon_type = type_class.Primary
+    else
+        weapon_type = type_class.Secondary
+    end
+
+    if not weapon_type or weapon_type < 0 then
+        return nil
+    end
+
+    -- Get weapon definition
+    local weapon = WeaponTypeClass.Get(weapon_type)
+    if not weapon then
+        return nil
+    end
+
+    -- Get bullet type from weapon
+    local bullet_type = BulletTypeClass.Create(weapon.Fires)
+    if not bullet_type then
+        return nil
+    end
+
+    -- Create bullet
+    local bullet = BulletClass:new(bullet_type)
+    bullet.Payback = self  -- Attribute kills to firer
+
+    -- Get fire position (muzzle)
+    local fire_coord = self:Fire_Coord(which)
+
+    -- Get target coordinate
+    local target_coord = nil
+    if type(target) == "table" and target.Center_Coord then
+        target_coord = target:Center_Coord()
+        bullet.TarCom = target
+    elseif Target.Is_Valid(target) then
+        local obj = Target.As_Object(target)
+        if obj then
+            target_coord = obj:Center_Coord()
+            bullet.TarCom = obj
+        else
+            target_coord = Target.As_Coord(target)
+        end
+    else
+        target_coord = target  -- Assume it's a coordinate
+    end
+
+    -- Calculate facing to target
+    local facing = 0
+    if fire_coord and target_coord then
+        facing = Coord.Direction_To(fire_coord, target_coord)
+    end
+
+    -- Inherit inaccuracy
+    if self.IsInaccurate or (type_class and type_class.IsInaccurate) then
+        bullet.IsInaccurate = true
+    end
+
+    -- Spawn the bullet
+    if bullet:Unlimbo(fire_coord, facing, target_coord) then
+        -- Spawn muzzle flash animation
+        if weapon.Anim >= 0 then
+            local anim_type = AnimTypeClass.Create(weapon.Anim)
+            if anim_type then
+                local anim = AnimClass:new(anim_type, fire_coord, 0, 1, false)
+                anim.OwnerHouse = self.House
+            end
+        end
+
+        -- Play firing sound
+        -- (would call Sound.Play here)
+
+        return bullet
+    end
+
+    return nil
 end
 
 --[[

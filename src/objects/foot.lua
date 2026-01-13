@@ -22,6 +22,7 @@ local Class = require("src.objects.class")
 local TechnoClass = require("src.objects.techno")
 local Target = require("src.core.target")
 local Coord = require("src.core.coord")
+local FindPath = require("src.pathfinding.findpath")
 
 -- Create FootClass extending TechnoClass
 local FootClass = Class.extend(TechnoClass, "FootClass")
@@ -34,6 +35,9 @@ local FootClass = Class.extend(TechnoClass, "FootClass")
 FootClass.CONQUER_PATH_MAX = 24  -- Maximum path length
 FootClass.PATH_DELAY = 15        -- Delay before retry after failure
 FootClass.PATH_RETRY = 10        -- Number of retry attempts
+
+-- Shared pathfinder instance (lazy initialized)
+FootClass._pathfinder = nil
 
 -- Facing types (for path)
 FootClass.FACING = {
@@ -309,11 +313,15 @@ function FootClass:Basic_Path()
 
     -- Get destination coordinate
     local dest_coord
-    local obj = Target.As_Object(self.NavCom)
-    if obj then
-        dest_coord = obj:Center_Coord()
+    local rtti = Target.Get_RTTI(self.NavCom)
+
+    if rtti == Target.RTTI.CELL or rtti == Target.RTTI.COORD then
+        -- It's a cell or coordinate target
+        dest_coord = Target.As_Coordinate(self.NavCom)
     else
-        dest_coord = Target.As_Coord(self.NavCom)
+        -- It's an object target - would need heap lookup
+        -- For now, try to get as coordinate
+        dest_coord = Target.As_Coordinate(self.NavCom)
     end
 
     if dest_coord == 0 then
@@ -330,37 +338,71 @@ function FootClass:Basic_Path()
         return true
     end
 
-    -- Simple straight-line path for now
-    -- Full pathfinding will be in findpath.lua
-    local dx = Coord.Cell_X(dest_cell) - Coord.Cell_X(src_cell)
-    local dy = Coord.Cell_Y(dest_cell) - Coord.Cell_Y(src_cell)
+    -- Clear existing path
+    self:Clear_Path()
 
-    local facing = FootClass.FACING.NONE
-
-    if dx > 0 and dy < 0 then
-        facing = FootClass.FACING.NE
-    elseif dx > 0 and dy > 0 then
-        facing = FootClass.FACING.SE
-    elseif dx < 0 and dy < 0 then
-        facing = FootClass.FACING.NW
-    elseif dx < 0 and dy > 0 then
-        facing = FootClass.FACING.SW
-    elseif dx > 0 then
-        facing = FootClass.FACING.E
-    elseif dx < 0 then
-        facing = FootClass.FACING.W
-    elseif dy > 0 then
-        facing = FootClass.FACING.S
-    elseif dy < 0 then
-        facing = FootClass.FACING.N
+    -- Use FindPath for proper LOS + edge-following pathfinding
+    -- Lazy initialize pathfinder
+    if not FootClass._pathfinder then
+        FootClass._pathfinder = FindPath.new(nil)  -- nil map for now, uses passable_callback
     end
 
-    if facing ~= FootClass.FACING.NONE then
-        self.Path[1] = facing
-        return true
+    local pathfinder = FootClass._pathfinder
+
+    -- Set up passability callback based on unit type
+    pathfinder.passable_callback = function(cell, facing)
+        -- Default passability check
+        -- In full implementation, this would call self:Can_Enter_Cell()
+        return FindPath.MOVE.OK
     end
 
-    return false
+    -- Find path using LOS + edge-following algorithm
+    local path = pathfinder:find_path(src_cell, dest_cell, FootClass.CONQUER_PATH_MAX)
+
+    if not path or path.Length == 0 then
+        -- Path failed, try simple straight line as fallback
+        local dx = Coord.Cell_X(dest_cell) - Coord.Cell_X(src_cell)
+        local dy = Coord.Cell_Y(dest_cell) - Coord.Cell_Y(src_cell)
+
+        local facing = FootClass.FACING.NONE
+
+        if dx > 0 and dy < 0 then
+            facing = FootClass.FACING.NE
+        elseif dx > 0 and dy > 0 then
+            facing = FootClass.FACING.SE
+        elseif dx < 0 and dy < 0 then
+            facing = FootClass.FACING.NW
+        elseif dx < 0 and dy > 0 then
+            facing = FootClass.FACING.SW
+        elseif dx > 0 then
+            facing = FootClass.FACING.E
+        elseif dx < 0 then
+            facing = FootClass.FACING.W
+        elseif dy > 0 then
+            facing = FootClass.FACING.S
+        elseif dy < 0 then
+            facing = FootClass.FACING.N
+        end
+
+        if facing ~= FootClass.FACING.NONE then
+            self.Path[1] = facing
+            return true
+        end
+        return false
+    end
+
+    -- Copy path commands to unit's Path array
+    -- Limited to CONQUER_PATH_MAX entries
+    local count = math.min(path.Length, FootClass.CONQUER_PATH_MAX)
+    for i = 1, count do
+        local dir = path.Command[i]
+        if dir == FindPath.FACING.END or dir < 0 then
+            break
+        end
+        self.Path[i] = dir
+    end
+
+    return true
 end
 
 --============================================================================
