@@ -2,7 +2,7 @@
 
 ## Overview
 
-A faithful port of Command & Conquer: Tiberian Dawn to Love2D, recreating the original gameplay experience with optional HD graphics support. This is a fan project requiring ownership of C&C Remastered Collection for assets.
+A faithful port of Command & Conquer: Tiberian Dawn to Love2D, recreating the original gameplay experience with optional HD graphics support. This port mirrors the original C++ class hierarchy to ensure behavioral accuracy and maintainability.
 
 **Target**: Playable fan remake for C&C enthusiasts
 **Engine**: Love2D 11.5+ (LuaJIT)
@@ -27,14 +27,81 @@ A faithful port of Command & Conquer: Tiberian Dawn to Love2D, recreating the or
 | Hotkeys | Fixed bindings | Fully rebindable |
 | Cutscenes | Low-res FMV | Remastered HD videos |
 
+**Note**: All deviations are implemented in separate adapter modules, keeping the core game classes faithful to the original.
+
+---
+
+## Architecture: C++ Class Hierarchy Port
+
+This port replicates the original C++ class hierarchy using Lua metatables and mixins. The goal is behavioral and structural equivalence with the original source code.
+
+### Game Object Inheritance Hierarchy
+
+```
+AbstractClass
+    └── ObjectClass
+            └── MissionClass
+                    └── RadioClass
+                            └── TechnoClass [+ Mixins: Flasher, Stage, Cargo, Door, Crew]
+                                    ├── FootClass
+                                    │       ├── InfantryClass
+                                    │       ├── UnitClass (via TarComClass/DriveClass)
+                                    │       └── AircraftClass (via FlyClass)
+                                    └── BuildingClass
+```
+
+### Type Class Hierarchy (Static Data)
+
+```
+AbstractTypeClass
+    └── ObjectTypeClass
+            └── TechnoTypeClass
+                    ├── InfantryTypeClass
+                    ├── UnitTypeClass
+                    ├── AircraftTypeClass
+                    └── BuildingTypeClass
+```
+
+### Additional Object Hierarchies
+
+```
+ObjectClass
+    ├── BulletClass
+    ├── AnimClass
+    ├── TerrainClass
+    ├── OverlayClass
+    └── SmudgeClass
+```
+
+### Display/View Hierarchy
+
+```
+GScreenClass
+    └── MapClass
+            └── DisplayClass
+                    └── RadarClass
+                            └── ScrollClass
+                                    └── MouseClass
+```
+
+### Mixin Classes (Multiple Inheritance Emulation)
+
+TechnoClass incorporates behavior from:
+- **FlasherClass**: Damage flash visual effect
+- **StageClass**: Animation frame staging
+- **CargoClass**: Unit transport/passenger management
+- **DoorClass**: Building door animation state
+- **CrewClass**: Crew/survivor generation
+
 ---
 
 ## Naming Conventions
 
-- **Files/directories**: `snake_case` (e.g., `movement_system.lua`, `src/systems/`)
-- **Class tables**: `PascalCase` (e.g., `local MovementSystem = {}`)
-- **Functions/variables**: `snake_case` (e.g., `function Entity:get_component()`)
-- **Constants**: `UPPER_SNAKE_CASE` (e.g., `CELL_SIZE = 24`)
+- **Files/directories**: Match C++ naming in lowercase (e.g., `techno.lua`, `infantry.lua`)
+- **Class tables**: `PascalCase` matching C++ names (e.g., `TechnoClass`, `InfantryClass`)
+- **Methods**: Exact C++ signatures (e.g., `AI()`, `Take_Damage()`, `Can_Fire()`)
+- **Fields**: Match C++ names with boolean prefix for flags (e.g., `IsDown`, `IsTethered`)
+- **Constants**: `UPPER_SNAKE_CASE` (e.g., `CELL_SIZE`, `TICKS_PER_SECOND`)
 
 ---
 
@@ -51,16 +118,40 @@ A faithful port of Command & Conquer: Tiberian Dawn to Love2D, recreating the or
 - **Coordinate System**: Leptons (256 leptons per cell)
 - **Game Speed Levels**: Slowest / Slower / Normal / Faster / Fastest
 
+### Data Encoding (Match Original)
+- **COORDINATE**: 32-bit packed (cell + lepton offset)
+- **CELL**: 16-bit packed (x << 8 | y for 64x64 map)
+- **TARGET**: Packed type (RTTI) + heap index
+- **Direction**: 0-255 (256 directions, 8 cardinal)
+
+### Object Pools (Match Original Limits)
+| Type | Pool Size |
+|------|-----------|
+| Infantry | 500 |
+| Units | 500 |
+| Buildings | 500 |
+| Aircraft | 100 |
+| Bullets | 50 |
+| Anims | 100 |
+| Teams | 50 |
+| Triggers | 100 |
+
 ### Networking
 - **Transport**: LuaSocket (TCP/UDP)
 - **Protocol**: Deterministic lockstep
 - **Max Players**: 6 (original limit)
 - **Disconnect Handling**: Game ends immediately
+- **Event System**: Port of EventClass with all EventType variants
 
-### Data Format
-- **Configuration**: JSON data files
-- **Validation**: Runtime only (error on invalid data)
-- **Scenarios**: JSON (converted from original INI)
+### Random Number Generator
+- **Algorithm**: Exact LCG port from original
+- **Usage**: All gameplay randomness uses seeded deterministic RNG
+- **Sync**: RNG state included in frame CRC for desync detection
+
+### Save/Load System
+- **Pattern**: Port Code_Pointers()/Decode_Pointers() system
+- **Format**: Convert object references to heap indices for serialization
+- **Compatibility**: Save format allows cross-platform loading
 
 ---
 
@@ -72,122 +163,137 @@ Love2D-CommandAndConquer-TiberianDawn/
 ├── conf.lua
 │
 ├── src/
-│   ├── core/
+│   ├── objects/                    # Game object class hierarchy
+│   │   ├── abstract.lua            # AbstractClass - base coordinate/active state
+│   │   ├── object.lua              # ObjectClass - map presence, health, targeting
+│   │   ├── mission.lua             # MissionClass - AI mission state machine
+│   │   ├── radio.lua               # RadioClass - inter-object communication
+│   │   ├── techno.lua              # TechnoClass - combat entities
+│   │   ├── foot.lua                # FootClass - mobile units base
+│   │   ├── infantry.lua            # InfantryClass - infantry units
+│   │   ├── unit.lua                # UnitClass - vehicles
+│   │   ├── aircraft.lua            # AircraftClass - air units
+│   │   ├── building.lua            # BuildingClass - structures
+│   │   ├── bullet.lua              # BulletClass - projectiles
+│   │   ├── anim.lua                # AnimClass - visual effects
+│   │   ├── terrain.lua             # TerrainClass - trees, rocks
+│   │   ├── overlay.lua             # OverlayClass - tiberium, walls
+│   │   ├── smudge.lua              # SmudgeClass - craters, scorch marks
+│   │   │
+│   │   ├── mixins/                 # Multiple inheritance components
+│   │   │   ├── flasher.lua         # FlasherClass - damage flash
+│   │   │   ├── stage.lua           # StageClass - animation staging
+│   │   │   ├── cargo.lua           # CargoClass - transport cargo
+│   │   │   ├── door.lua            # DoorClass - building doors
+│   │   │   └── crew.lua            # CrewClass - survivor generation
+│   │   │
+│   │   └── drive/                  # Movement specializations
+│   │       ├── drive.lua           # DriveClass - ground vehicle movement
+│   │       ├── fly.lua             # FlyClass - aircraft movement
+│   │       └── tarcom.lua          # TarComClass - turret targeting
+│   │
+│   ├── types/                      # Type classes (static data)
+│   │   ├── abstract_type.lua       # AbstractTypeClass
+│   │   ├── object_type.lua         # ObjectTypeClass
+│   │   ├── techno_type.lua         # TechnoTypeClass
+│   │   ├── infantry_type.lua       # InfantryTypeClass
+│   │   ├── unit_type.lua           # UnitTypeClass
+│   │   ├── aircraft_type.lua       # AircraftTypeClass
+│   │   ├── building_type.lua       # BuildingTypeClass
+│   │   ├── bullet_type.lua         # BulletTypeClass
+│   │   ├── anim_type.lua           # AnimTypeClass
+│   │   ├── terrain_type.lua        # TerrainTypeClass
+│   │   └── overlay_type.lua        # OverlayTypeClass
+│   │
+│   ├── map/                        # Map and cell system
+│   │   ├── cell.lua                # CellClass - individual map cells
+│   │   ├── map.lua                 # MapClass - cell grid management
+│   │   ├── layer.lua               # LayerClass - render layer sorting
+│   │   └── theater.lua             # Theater terrain sets
+│   │
+│   ├── display/                    # Display hierarchy
+│   │   ├── gscreen.lua             # GScreenClass - base screen
+│   │   ├── display.lua             # DisplayClass - tactical view
+│   │   ├── radar.lua               # RadarClass - minimap
+│   │   ├── scroll.lua              # ScrollClass - map scrolling
+│   │   └── mouse.lua               # MouseClass - cursor handling
+│   │
+│   ├── house/                      # Faction management
+│   │   ├── house.lua               # HouseClass - full field set
+│   │   └── house_type.lua          # HouseTypeClass
+│   │
+│   ├── production/                 # Production system
+│   │   └── factory.lua             # FactoryClass - build queue management
+│   │
+│   ├── scenario/                   # Campaign/scenario system
+│   │   ├── trigger.lua             # TriggerClass - event triggers
+│   │   ├── team.lua                # TeamClass - AI team instances
+│   │   ├── team_type.lua           # TeamTypeClass - team definitions
+│   │   └── scenario.lua            # Scenario loading/management
+│   │
+│   ├── combat/                     # Combat calculations
+│   │   ├── weapon.lua              # WeaponTypeClass
+│   │   ├── warhead.lua             # WarheadTypeClass
+│   │   └── armor.lua               # ArmorType handling
+│   │
+│   ├── pathfinding/                # Movement pathfinding
+│   │   └── findpath.lua            # Port of FINDPATH.CPP algorithm
+│   │
+│   ├── network/                    # Multiplayer networking
+│   │   ├── event.lua               # EventClass - network events
+│   │   ├── queue.lua               # Command queue
+│   │   ├── lockstep.lua            # Deterministic lockstep
+│   │   └── session.lua             # SessionClass - game session
+│   │
+│   ├── heap/                       # Object pool management
+│   │   ├── heap.lua                # HeapClass - object allocation
+│   │   └── globals.lua             # Global object arrays
+│   │
+│   ├── core/                       # Core utilities
 │   │   ├── init.lua
-│   │   ├── game.lua              # Main game state machine
-│   │   ├── constants.lua         # CELL_SIZE, TICK_RATE, LEPTON_PER_CELL
-│   │   ├── events.lua            # Event bus
-│   │   └── pool.lua              # Object pooling
+│   │   ├── game.lua                # Main game loop (per-object AI)
+│   │   ├── constants.lua           # All game constants
+│   │   ├── coord.lua               # COORDINATE/CELL macros
+│   │   ├── target.lua              # TARGET encoding/decoding
+│   │   ├── random.lua              # Exact LCG RNG port
+│   │   └── defines.lua             # Enum definitions from DEFINES.H
 │   │
-│   ├── ecs/
-│   │   ├── init.lua              # Custom lightweight ECS manager
-│   │   ├── entity.lua            # Entity factory
-│   │   ├── component.lua         # Component registry
-│   │   ├── system.lua            # System base class
-│   │   └── world.lua             # World container
+│   ├── io/                         # Save/Load system
+│   │   ├── save.lua                # Save game handling
+│   │   ├── load.lua                # Load game handling
+│   │   └── pointers.lua            # Code_Pointers/Decode_Pointers
 │   │
-│   ├── components/
-│   │   ├── transform.lua         # x, y (leptons), cell, facing
-│   │   ├── renderable.lua        # sprite, frame, animation
-│   │   ├── health.lua            # hp, armor_type
-│   │   ├── owner.lua             # house, discovered_by
-│   │   ├── selectable.lua        # is_selected, group (1-9)
-│   │   ├── mobile.lua            # speed, path, destination
-│   │   ├── combat.lua            # weapons, target, ammo
-│   │   ├── production.lua        # queue, progress
-│   │   ├── harvester.lua         # tiberium_load, refinery
-│   │   ├── mission.lua           # current_mission, timer
-│   │   ├── turret.lua            # turret_facing
-│   │   ├── power.lua             # produces, consumes
-│   │   └── cloakable.lua         # cloak_state, cloak_timer
+│   ├── adapters/                   # Deviation adapters (separate from core)
+│   │   ├── hd_graphics.lua         # HD sprite rendering adapter
+│   │   ├── controller.lua          # Controller input adapter
+│   │   ├── spectator.lua           # Observer mode adapter
+│   │   ├── hotkeys.lua             # Rebindable hotkey adapter
+│   │   └── remastered_audio.lua    # Remastered audio adapter
 │   │
-│   ├── systems/
-│   │   ├── render_system.lua
-│   │   ├── movement_system.lua   # Original pathfinding behavior
-│   │   ├── combat_system.lua
-│   │   ├── ai_system.lua         # Original team-based AI
-│   │   ├── production_system.lua # Single-item queue
-│   │   ├── harvest_system.lua
-│   │   ├── animation_system.lua
-│   │   ├── selection_system.lua  # Configurable classic/modern
-│   │   ├── trigger_system.lua
-│   │   ├── power_system.lua
-│   │   ├── fog_system.lua        # Shroud + fog
-│   │   └── cloak_system.lua
-│   │
-│   ├── map/
-│   │   ├── init.lua
-│   │   ├── cell.lua              # Cell data (terrain, occupancy, overlay)
-│   │   ├── grid.lua              # 64x64 cell grid
-│   │   ├── terrain.lua           # Templates, overlays
-│   │   ├── pathfinding.lua       # A* with original blocking behavior
-│   │   ├── theater.lua           # Temperate/Winter/Desert
-│   │   └── shroud.lua            # Fog of war
-│   │
-│   ├── house/
-│   │   ├── init.lua
-│   │   ├── house.lua             # Faction class (max 6 players)
-│   │   ├── economy.lua           # Credits, capacity
-│   │   ├── tech_tree.lua         # Prerequisites
-│   │   └── ai_controller.lua     # Original scripted AI behavior
-│   │
-│   ├── scenario/
-│   │   ├── init.lua
-│   │   ├── loader.lua            # Scenario loader
-│   │   ├── trigger.lua           # Campaign trigger system
-│   │   ├── team.lua              # AI teams
-│   │   └── waypoints.lua         # Named locations
-│   │
-│   ├── ui/
-│   │   ├── init.lua
-│   │   ├── sidebar.lua           # Build sidebar (single-item queue)
-│   │   ├── radar.lua             # Minimap (requires power + Comm Center)
-│   │   ├── selection_box.lua     # Drag selection
-│   │   ├── cursor.lua            # Mouse cursors
-│   │   ├── messages.lua          # In-game messages
-│   │   ├── power_bar.lua         # Power indicator
+│   ├── ui/                         # User interface
+│   │   ├── sidebar.lua             # Build sidebar
+│   │   ├── power_bar.lua           # Power indicator
+│   │   ├── messages.lua            # In-game messages
+│   │   ├── cursor.lua              # Mouse cursors
 │   │   └── menu/
-│   │       ├── main_menu.lua     # Animated globe background
-│   │       ├── campaign_map.lua  # World map mission selection
-│   │       ├── options.lua       # Settings (match original layout)
-│   │       └── multiplayer.lua   # Lobby UI
+│   │       ├── main_menu.lua
+│   │       ├── campaign_map.lua
+│   │       ├── options.lua
+│   │       └── multiplayer.lua
 │   │
-│   ├── input/
-│   │   ├── init.lua
-│   │   ├── keyboard.lua          # Fully rebindable hotkeys
-│   │   ├── mouse.lua
-│   │   ├── controller.lua        # Virtual cursor + radial menus
-│   │   └── commands.lua          # Command pattern
-│   │
-│   ├── audio/
-│   │   ├── init.lua
-│   │   ├── music.lua             # Switchable classic/remastered
-│   │   ├── sfx.lua               # Switchable classic/remastered
-│   │   └── speech.lua            # EVA voice
+│   ├── debug/                      # Debug support
+│   │   ├── dump.lua                # Debug_Dump() implementations
+│   │   ├── mono.lua                # MonoClass equivalent
+│   │   └── ipc.lua                 # IPC debugging system
 │   │
 │   ├── video/
-│   │   └── cutscene.lua          # Remastered video playback
-│   │
-│   ├── net/
-│   │   ├── init.lua
-│   │   ├── protocol.lua          # Message encoding
-│   │   ├── lockstep.lua          # Deterministic sync
-│   │   ├── lobby.lua             # Game lobby (6 players max)
-│   │   └── spectator.lua         # Observer mode
-│   │
-│   ├── editor/
-│   │   ├── init.lua
-│   │   ├── terrain_brush.lua
-│   │   ├── unit_placer.lua
-│   │   ├── trigger_editor.lua
-│   │   └── export.lua            # Save to JSON scenario
+│   │   └── cutscene.lua
 │   │
 │   └── util/
-│       ├── vector.lua            # 2D vector math
-│       ├── direction.lua         # 8/32 direction helpers
-│       ├── crc.lua               # CRC32 for sync
-│       ├── random.lua            # Deterministic RNG (match original LCG)
-│       └── serialize.lua         # Full state save/load
+│       ├── vector.lua
+│       ├── direction.lua
+│       ├── crc.lua
+│       └── serialize.lua
 │
 ├── data/
 │   ├── units/
@@ -213,11 +319,11 @@ Love2D-CommandAndConquer-TiberianDawn/
 │   │   └── tech_trees.json
 │   │
 │   ├── scenarios/
-│   │   ├── gdi/                  # 15 GDI missions
-│   │   ├── nod/                  # 13 Nod missions
-│   │   ├── covert_ops/           # 15 expansion missions
-│   │   ├── funpark/              # Dinosaur missions
-│   │   └── multiplayer/          # Skirmish maps
+│   │   ├── gdi/
+│   │   ├── nod/
+│   │   ├── covert_ops/
+│   │   ├── funpark/
+│   │   └── multiplayer/
 │   │
 │   └── audio/
 │       ├── themes.json
@@ -225,360 +331,512 @@ Love2D-CommandAndConquer-TiberianDawn/
 │
 ├── assets/
 │   ├── sprites/
-│   │   ├── classic/              # Original 320x200 sprites
-│   │   │   ├── infantry/
-│   │   │   ├── vehicles/
-│   │   │   ├── aircraft/
-│   │   │   ├── buildings/
-│   │   │   ├── terrain/
-│   │   │   ├── effects/
-│   │   │   └── ui/
-│   │   └── hd/                   # Remastered HD sprites
-│   │       └── (same structure)
+│   │   ├── classic/
+│   │   └── hd/
 │   │
 │   ├── audio/
 │   │   ├── classic/
-│   │   │   ├── music/            # .ogg converted from AUD
-│   │   │   ├── sfx/
-│   │   │   └── speech/
 │   │   └── remastered/
-│   │       └── (same structure)
 │   │
 │   └── video/
-│       └── cutscenes/            # Remastered .mp4 files
+│       └── cutscenes/
 │
 ├── temp/
 │   └── CnC_Remastered_Collection/
 │       └── TIBERIANDAWN/
-│           ├── *.CPP, *.H        # Source code reference
-│           └── MIX/              # Original game assets
-│               ├── CD1/
-│               ├── CD2/
-│               └── CD3/
 │
 └── tools/
     ├── mix_extractor/
-    │   ├── main.lua              # Standalone Lua script
-    │   ├── mix_format.lua
-    │   └── crc_lookup.lua
-    │
     ├── sprite_converter/
-    │   ├── main.lua
-    │   ├── shp_parser.lua        # Classic SHP format
-    │   ├── hd_parser.lua         # Remastered format
-    │   ├── palette.lua
-    │   └── spritesheet.lua
-    │
     ├── audio_converter/
-    │   ├── main.lua
-    │   ├── classic_converter.lua  # AUD/VOC to OGG
-    │   └── hd_extractor.lua       # Remastered audio
-    │
     └── scenario_converter/
-        ├── main.lua
-        └── ini_parser.lua
 ```
+
+---
+
+## C++ to Lua Source File Mapping
+
+| Original C++ File | Lua File | Description |
+|-------------------|----------|-------------|
+| ABSTRACT.H/CPP | src/objects/abstract.lua | Base class with Coord, IsActive |
+| OBJECT.H/CPP | src/objects/object.lua | Map object with health, selection |
+| MISSION.H/CPP | src/objects/mission.lua | Mission state machine |
+| RADIO.H/CPP | src/objects/radio.lua | Inter-object communication |
+| TECHNO.H/CPP | src/objects/techno.lua | Combat entity base |
+| FOOT.H/CPP | src/objects/foot.lua | Mobile unit base |
+| INFANTRY.H/CPP | src/objects/infantry.lua | Infantry units |
+| UNIT.H/CPP | src/objects/unit.lua | Vehicle units |
+| AIRCRAFT.H/CPP | src/objects/aircraft.lua | Air units |
+| BUILDING.H/CPP | src/objects/building.lua | Structures |
+| BULLET.H/CPP | src/objects/bullet.lua | Projectiles |
+| ANIM.H/CPP | src/objects/anim.lua | Animations |
+| TERRAIN.H/CPP | src/objects/terrain.lua | Terrain objects |
+| OVERLAY.H/CPP | src/objects/overlay.lua | Overlays (tiberium, walls) |
+| SMUDGE.H/CPP | src/objects/smudge.lua | Smudges (craters) |
+| FLASHER.H/CPP | src/objects/mixins/flasher.lua | Damage flash mixin |
+| STAGE.H/CPP | src/objects/mixins/stage.lua | Animation stage mixin |
+| CARGO.H/CPP | src/objects/mixins/cargo.lua | Cargo management mixin |
+| DOOR.H/CPP | src/objects/mixins/door.lua | Door animation mixin |
+| CREW.H/CPP | src/objects/mixins/crew.lua | Crew generation mixin |
+| DRIVE.H/CPP | src/objects/drive/drive.lua | Ground movement |
+| FLY.H/CPP | src/objects/drive/fly.lua | Air movement |
+| TARCOM.H/CPP | src/objects/drive/tarcom.lua | Turret targeting |
+| CELL.H/CPP | src/map/cell.lua | Map cell |
+| MAP.H/CPP | src/map/map.lua | Map grid |
+| LAYER.H/CPP | src/map/layer.lua | Render layers |
+| GSCREEN.H/CPP | src/display/gscreen.lua | Base screen |
+| DISPLAY.H/CPP | src/display/display.lua | Tactical display |
+| RADAR.H/CPP | src/display/radar.lua | Minimap |
+| SCROLL.H/CPP | src/display/scroll.lua | Map scrolling |
+| MOUSE.H/CPP | src/display/mouse.lua | Cursor handling |
+| HOUSE.H/CPP | src/house/house.lua | Faction management |
+| FACTORY.H/CPP | src/production/factory.lua | Production queue |
+| TRIGGER.H/CPP | src/scenario/trigger.lua | Event triggers |
+| TEAM.H/CPP | src/scenario/team.lua | AI teams |
+| EVENT.H/CPP | src/network/event.lua | Network events |
+| FINDPATH.CPP | src/pathfinding/findpath.lua | Pathfinding algorithm |
+| HEAP.H/CPP | src/heap/heap.lua | Object pools |
+| DEFINES.H | src/core/defines.lua | Enums and constants |
+| COORD.CPP | src/core/coord.lua | Coordinate functions |
+| TARGET.H | src/core/target.lua | Target encoding |
 
 ---
 
 ## Implementation Phases
 
-### Phase 1: Foundation
-**Goal**: Render map, place units, move them around with save/load
-
-**Priority Order**:
-1. Asset pipeline (MIX extraction first)
-2. Game systems with real assets
+### Phase 1: Base Classes & Infrastructure
+**Goal**: Establish class hierarchy foundation and map system
 
 **Deliverables**:
 
-1. **Asset Pipeline** - `tools/`
-   - MIX extractor (from MIXFILE.H format)
-   - SHP to PNG converter with palette support
-   - HD asset extractor from Remastered data
-   - Audio converter (classic AUD + remastered)
-   - Initial JSON data files for units/buildings
+1. **Class System Infrastructure**
+   - Lua OOP base with metatables
+   - Mixin composition system
+   - HeapClass object pool implementation
 
-2. **ECS Framework** - `src/ecs/`
-   - Custom lightweight Entity, Component, System, World
-   - Query system for component combinations
+2. **Base Class Chain** - `src/objects/`
+   - `AbstractClass` with Coord, IsActive, IsRecentlyCreated
+   - `ObjectClass` with IsDown, IsInLimbo, IsSelected, Strength, Next, Trigger
+   - `MissionClass` with Mission, SuspendedMission, MissionQueue, Timer
+   - `RadioClass` with Radio contact, LastMessage, Transmit_Message(), Receive_Message()
 
-3. **Map System** - `src/map/`
-   - 64x64 cell grid (from CELL.H)
-   - Cell data: terrain, occupancy, overlay
-   - All three theaters (Temperate, Winter, Desert)
-   - Basic terrain rendering (classic + HD toggle)
+3. **Core Utilities** - `src/core/`
+   - COORDINATE/CELL bit-packing (coord.lua)
+   - TARGET encoding/decoding (target.lua)
+   - Exact LCG random number generator (random.lua)
+   - All enums from DEFINES.H (defines.lua)
 
-4. **Core Components** - `src/components/`
-   - Transform (with lepton coordinates)
-   - Renderable, Selectable, Mobile
+4. **Map System** - `src/map/`
+   - CellClass with terrain, occupancy, overlay, objects list
+   - MapClass with 64x64 grid, cell access
+   - LayerClass with GROUND, AIR, TOP layers and Sort_Y() ordering
+   - Theater support (Temperate, Winter, Desert)
 
-5. **Basic Systems** - `src/systems/`
-   - RenderSystem (with HD/classic toggle)
-   - SelectionSystem (configurable classic/modern presets)
-   - MovementSystem (original pathfinding behavior)
+5. **Display Hierarchy** - `src/display/`
+   - GScreenClass base
+   - MapClass tactical view
+   - DisplayClass rendering
+   - Basic scrolling
 
-6. **Settings System** - `src/ui/menu/`
-   - Options menu matching original layout
-   - Resolution toggle (classic/HD)
-   - Audio toggle (classic/remastered)
-   - Hotkey rebinding
+**Key Methods to Implement**:
+```lua
+-- AbstractClass
+AbstractClass:AI()
+AbstractClass:Center_Coord()
+AbstractClass:Target_Coord()
+AbstractClass:Distance(target)
+AbstractClass:Direction(target)
 
-7. **Save/Load** - `src/util/serialize.lua`
-   - Full state serialization
+-- ObjectClass
+ObjectClass:Limbo()
+ObjectClass:Unlimbo(coord, facing)
+ObjectClass:Mark(mark_type)
+ObjectClass:Render(forced)
+ObjectClass:Take_Damage(damage, distance, warhead, source)
+ObjectClass:Select()
+ObjectClass:What_Action(object)
+ObjectClass:What_Action(cell)
 
-**Acceptance Criteria**:
-- All unit types moving on map
-- All three theaters rendering
-- Save and load working
-- Classic/HD graphics toggle functional
+-- MissionClass
+MissionClass:Assign_Mission(mission)
+MissionClass:Get_Mission()
+MissionClass:Commence()
+MissionClass:Override_Mission(mission, tarcom, navcom)
+MissionClass:Restore_Mission()
+MissionClass:Mission_Sleep()
+MissionClass:Mission_Guard()
+MissionClass:Mission_Attack()
+-- ... all Mission_X() functions
 
-**Key Source Reference**:
-- [CELL.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/CELL.H)
-- [DEFINES.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/DEFINES.H)
-- [MIXFILE.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/MIXFILE.H)
-
----
-
-### Phase 2: Combat & AI
-**Goal**: Units fight and respond to threats
-
-1. **Weapons System** - `src/systems/combat_system.lua`
-   - Projectile spawning and travel
-   - Damage calculation with armor modifiers
-   - Warhead effects (from original data)
-
-2. **Mission System** - `src/systems/ai_system.lua`
-   - MissionType enum: Guard, Attack, Move, Hunt, etc.
-   - Target acquisition and threat evaluation
-   - Original team-based scripted AI
-
-3. **Pathfinding** - `src/map/pathfinding.lua`
-   - A* for cell-based movement
-   - Original blocking behavior (units can get stuck)
-   - Multi-cell building avoidance
-
-4. **Combat Components** - `src/components/`
-   - Combat, Mission, Health with armor types
+-- RadioClass
+RadioClass:Transmit_Message(message, param, to)
+RadioClass:Receive_Message(from, message, param)
+RadioClass:In_Radio_Contact()
+RadioClass:Contact_With_Whom()
+```
 
 **Acceptance Criteria**:
-- Units attack enemies automatically
-- Units die and explode with correct animations
-- AI responds to threats appropriately
+- Class inheritance chain working with metatables
+- HeapClass pools allocating/deallocating objects
+- Map renders with cells and layers
+- Basic object placement on map
+- Save/load with Code_Pointers/Decode_Pointers
 
-**Key Source Reference**:
+**Source Reference**:
+- [ABSTRACT.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/ABSTRACT.H)
+- [OBJECT.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/OBJECT.H)
 - [MISSION.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/MISSION.H)
+- [RADIO.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/RADIO.H)
+- [CELL.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/CELL.H)
+
+---
+
+### Phase 2: TechnoClass & Game Objects
+**Goal**: Implement combat-capable game objects
+
+**Deliverables**:
+
+1. **Mixin Classes** - `src/objects/mixins/`
+   - FlasherClass (damage flash timing)
+   - StageClass (animation frame management)
+   - CargoClass (passenger/cargo list)
+   - DoorClass (door open/close state)
+   - CrewClass (survivor type generation)
+
+2. **TechnoClass** - Combat entity base
+   - All flags: IsCloakable, IsLeader, IsALoaner, IsTethered, etc.
+   - House ownership
+   - Cloak state management
+   - TarCom (target computer)
+   - PrimaryFacing
+   - Arm (rearm countdown)
+   - Ammo tracking
+   - Mixin composition
+
+3. **FootClass** - Mobile units
+   - NavCom (navigation target)
+   - Path[] array for pathfinding
+   - PathDelay timer
+   - Team membership
+   - Group assignment (1-9)
+   - Movement flags: IsInitiated, IsDriving, IsRotating
+
+4. **Movement Specializations** - `src/objects/drive/`
+   - DriveClass for ground vehicles
+   - FlyClass for aircraft
+   - TarComClass for turret-equipped units
+
+5. **Concrete Classes**
+   - InfantryClass with Fear, Doing (DoType), prone state
+   - UnitClass with harvester support, door animations
+   - AircraftClass with flight altitude, landing
+   - BuildingClass with Factory pointer, power, production
+
+6. **Type Classes** - `src/types/`
+   - TechnoTypeClass with all static data
+   - InfantryTypeClass, UnitTypeClass, AircraftTypeClass, BuildingTypeClass
+   - Load data from JSON files
+
+**Key Methods to Implement**:
+```lua
+-- TechnoClass
+TechnoClass:AI()
+TechnoClass:Fire_At(target, which)
+TechnoClass:Can_Fire(target, which)
+TechnoClass:Assign_Target(target)
+TechnoClass:In_Range(target, which)
+TechnoClass:Take_Damage(damage, distance, warhead, source)
+TechnoClass:Captured(newowner)
+TechnoClass:Greatest_Threat(threat)
+TechnoClass:Do_Cloak()
+TechnoClass:Do_Uncloak()
+TechnoClass:Revealed(house)
+TechnoClass:Player_Assign_Mission(order, target, destination)
+
+-- FootClass
+FootClass:Assign_Destination(target)
+FootClass:Start_Driver(coord)
+FootClass:Stop_Driver()
+FootClass:Mission_Move()
+FootClass:Mission_Attack()
+FootClass:Mission_Guard()
+FootClass:Mission_Hunt()
+
+-- InfantryClass
+InfantryClass:Do_Action(todo, force)
+InfantryClass:Set_Occupy_Bit(cell, spot)
+InfantryClass:Clear_Occupy_Bit(cell, spot)
+InfantryClass:Made_A_Kill()
+
+-- BuildingClass
+BuildingClass:Grand_Opening(captured)
+BuildingClass:Update_Buildables()
+BuildingClass:Toggle_Primary()
+BuildingClass:Begin_Mode(bstate)
+```
+
+**Acceptance Criteria**:
+- Infantry, Units, Buildings placeable on map
+- Basic movement working
+- Selection and group assignment
+- Unit facing and animation
+- Building production icons visible
+
+**Source Reference**:
 - [TECHNO.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/TECHNO.H)
+- [FOOT.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/FOOT.H)
+- [INFANTRY.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/INFANTRY.H)
+- [UNIT.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/UNIT.H)
+- [BUILDING.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/BUILDING.H)
+
+---
+
+### Phase 3: Combat Systems
+**Goal**: Implement weapons, damage, and projectiles
+
+**Deliverables**:
+
+1. **BulletClass** - `src/objects/bullet.lua`
+   - Projectile movement and tracking
+   - Warhead effects on impact
+   - Fuse timing
+
+2. **AnimClass** - `src/objects/anim.lua`
+   - Explosion animations
+   - Muzzle flash
+   - Death animations
+
+3. **Weapon System** - `src/combat/`
+   - WeaponTypeClass with range, damage, ROF
+   - WarheadTypeClass with armor modifiers, spread
+   - Armor type handling
+
+4. **Combat Integration**
+   - Fire_At() projectile spawning
+   - Take_Damage() with armor calculations
+   - Death handling and debris
+   - Record_The_Kill() for scoring
+
+5. **Pathfinding** - `src/pathfinding/findpath.lua`
+   - Port of FINDPATH.CPP algorithm
+   - PathType struct equivalent
+   - Follow_Edge() edge-following
+   - Register_Cell() path recording
+   - Threat evaluation
+
+**Key Methods**:
+```lua
+-- BulletClass
+BulletClass:AI()
+BulletClass:Unlimbo(coord, facing)
+
+-- Combat
+TechnoClass:Rearm_Delay(second)
+TechnoClass:Weapon_Range(which)
+FootClass:Approach_Target()
+```
+
+**Acceptance Criteria**:
+- Units fire at enemies
+- Projectiles travel and impact
+- Damage calculations match original
+- Death animations play
+- Pathfinding navigates around obstacles
+
+**Source Reference**:
 - [BULLET.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/BULLET.H)
+- [ANIM.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/ANIM.H)
+- [COMBAT.CPP](temp/CnC_Remastered_Collection/TIBERIANDAWN/COMBAT.CPP)
+- [FINDPATH.CPP](temp/CnC_Remastered_Collection/TIBERIANDAWN/FINDPATH.CPP)
 
 ---
 
-### Phase 3: Economy, Production & Editor
-**Goal**: Build bases, harvest Tiberium, train units, create maps
+### Phase 4: Economy & Production
+**Goal**: Build bases, harvest Tiberium, produce units
 
-1. **Tiberium System**
-   - Tiberium overlay spawning and growth (original spreading)
-   - Harvester collection logic
+**Deliverables**:
+
+1. **HouseClass** - `src/house/house.lua`
+   - All fields: ActLike, Allies, Power, Drain, Credits, Capacity
+   - Tiberium tracking
+   - BuildStructure/BuildUnit/BuildInfantry/BuildAircraft
+   - Tech tree prerequisites
+
+2. **FactoryClass** - `src/production/factory.lua`
+   - Build queue management
+   - Set(), Start(), Suspend(), Abandon()
+   - Completed() callback
+   - Progress tracking
+
+3. **Tiberium System**
+   - OverlayClass for tiberium fields
+   - Harvester collection logic (Mission_Harvest)
    - Refinery processing
-   - Infantry damage from Tiberium
+   - Tiberium growth/spread
 
-2. **Production System** - `src/systems/production_system.lua`
-   - Building placement with strict adjacency
-   - Single-item build queue (original behavior)
-   - Factory assignment (primary)
-   - Original unit limits
-
-3. **Power System** - `src/systems/power_system.lua`
-   - Power production/consumption tracking
+4. **Power System**
+   - Power production/consumption per building
    - Low power penalties
-   - Radar requires power + Communications Center
+   - Power bar UI
 
-4. **Sidebar UI** - `src/ui/sidebar.lua`
-   - Build icons with progress
-   - Single-item queue display
-   - Credits counter
-
-5. **Scenario Editor** - `src/editor/`
-   - Terrain placement
-   - Unit/building placement
-   - Trigger creation
-   - Export to JSON
-
-6. **Skirmish Mode**
-   - Random/custom map selection
-   - AI opponent configuration
-   - Victory conditions
+5. **Construction**
+   - Building placement with adjacency
+   - MCV deployment
+   - Factory assignment (primary)
 
 **Acceptance Criteria**:
-- Build from MCV to full base
-- Harvest Tiberium and produce units
-- Create and save custom scenarios
-- Play skirmish against AI
+- MCV deploys to Construction Yard
+- Buildings produce when placed
+- Harvesters collect and return tiberium
+- Credits increase from harvesting
+- Power affects building function
 
-**Key Source Reference**:
-- [FACTORY.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/FACTORY.H)
+**Source Reference**:
 - [HOUSE.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/HOUSE.H)
+- [FACTORY.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/FACTORY.H)
 
 ---
 
-### Phase 4: Multiplayer
-**Goal**: Stable 2-6 player online matches with spectating
+### Phase 5: AI, Triggers & Teams
+**Goal**: Campaign AI and scripting
 
-1. **Deterministic Lockstep** - `src/net/lockstep.lua`
-   - Frame-synchronized command execution
-   - Input delay for network latency
+**Deliverables**:
 
-2. **Deterministic RNG** - `src/util/random.lua`
-   - Seeded LCG matching original algorithm
-   - No floats in gameplay calculations
+1. **TriggerClass** - `src/scenario/trigger.lua`
+   - Event types (destroyed, time, discovered, etc.)
+   - Action types (reinforcement, win, lose, etc.)
+   - Persistence flags
+   - House association
 
-3. **Network Protocol** - `src/net/protocol.lua`
-   - Event encoding (from EVENT.H)
-   - CRC sync checks per frame
-   - LuaSocket TCP/UDP implementation
+2. **TeamClass** - `src/scenario/team.lua`
+   - Team member management
+   - Formation (none - original behavior)
+   - Team missions
+   - Waypoint following
 
-4. **Desync Detection**
-   - State CRC comparison
-   - Game ends on disconnect (no recovery)
+3. **TeamTypeClass** - `src/scenario/team_type.lua`
+   - Team composition definitions
+   - Mission queue
 
-5. **Lobby System** - `src/net/lobby.lua`
-   - Host/join games
-   - 6 player slots
-   - Faction selection
+4. **AI Controller**
+   - Base building AI
+   - Attack coordination
+   - Threat evaluation
 
-6. **Observer Mode** - `src/net/spectator.lua`
-   - Full map vision
-   - Switch between player perspectives
-   - Toggle fog of war view
+5. **Scenario System**
+   - Scenario loading
+   - Mission briefings
+   - Victory/defeat conditions
 
 **Acceptance Criteria**:
-- Host game, join from second client
-- Play synchronized match
-- Spectator can watch with perspective switching
+- Campaign missions load with triggers
+- AI builds bases and attacks
+- Triggers fire correctly
+- Teams coordinate movement
 
-**Key Source Reference**:
+**Source Reference**:
+- [TRIGGER.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/TRIGGER.H)
+- [TEAM.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/TEAM.H)
+
+---
+
+### Phase 6: Network & Polish
+**Goal**: Multiplayer and feature completion
+
+**Deliverables**:
+
+1. **EventClass** - `src/network/event.lua`
+   - All EventType variants from original
+   - Event encoding/decoding
+   - Timestamp handling
+
+2. **Lockstep System** - `src/network/lockstep.lua`
+   - Frame-synchronized execution
+   - Input delay
+   - CRC sync checking
+
+3. **Session Management**
+   - Lobby system
+   - Player slots
+   - Game start synchronization
+
+4. **Special Weapons**
+   - Ion Cannon
+   - Nuclear Strike
+   - Airstrike
+
+5. **Fog of War**
+   - Shroud (never seen)
+   - Fog (previously seen)
+   - Sight range per unit type
+
+6. **Cloaking**
+   - Stealth tank mechanics
+   - Detection logic
+
+7. **Adapter Modules** - `src/adapters/`
+   - HD graphics rendering
+   - Controller support
+   - Spectator mode
+   - Rebindable hotkeys
+   - Remastered audio
+
+8. **Debug Support**
+   - Debug_Dump() for all classes
+   - MonoClass equivalent logging
+   - Cheat commands
+
+**Acceptance Criteria**:
+- Two clients play synchronized match
+- Replay files produce identical results
+- All special weapons functional
+- Controller fully playable
+
+**Source Reference**:
 - [EVENT.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/EVENT.H)
 - [SESSION.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/SESSION.H)
 
 ---
 
-### Phase 5: Campaign & Scenarios
-**Goal**: Full GDI + Nod + Covert Ops campaigns
-
-1. **Trigger System** - `src/scenario/trigger.lua`
-   - Event conditions (unit destroyed, time elapsed, etc.)
-   - Actions (reinforcements, messages, win/lose)
-
-2. **Team System** - `src/scenario/team.lua`
-   - AI team coordination
-   - No formation movement (original behavior)
-
-3. **Scenario Loader** - `src/scenario/loader.lua`
-   - Parse JSON scenario files
-   - Place initial units/buildings
-   - Set up triggers
-
-4. **Mission Briefings**
-   - Text display
-   - Map reveal animations
-   - World map mission selection (original style)
-
-5. **All Missions**
-   - 15 GDI missions
-   - 13 Nod missions
-   - 15 Covert Operations missions
-   - Funpark/Dinosaur missions
-   - Branching paths
-
-**Acceptance Criteria**:
-- Complete any campaign mission
-- All triggers function correctly
-- Mission branching works on world map
-
-**Key Source Reference**:
-- [TRIGGER.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/TRIGGER.H)
-- [TEAM.H](temp/CnC_Remastered_Collection/TIBERIANDAWN/TEAM.H)
-- [SCENARIO.CPP](temp/CnC_Remastered_Collection/TIBERIANDAWN/SCENARIO.CPP)
-
----
-
-### Phase 6: Polish
-**Goal**: Feature complete, release quality
-
-1. **Fog of War** - `src/systems/fog_system.lua`
-   - Shroud (never seen) vs fog (previously seen)
-   - Unit sight ranges
-
-2. **Special Weapons**
-   - Ion Cannon, Nuclear Strike, Airstrike
-   - Original targeting UI (click sidebar, click map)
-
-3. **Audio System** - `src/audio/`
-   - Background music (classic/remastered toggle)
-   - Unit responses
-   - EVA announcements
-
-4. **Cutscenes** - `src/video/cutscene.lua`
-   - Remastered video playback for briefings
-
-5. **Cloaking** - `src/systems/cloak_system.lua`
-   - Stealth tank mechanics
-
-6. **Controller Support** - `src/input/controller.lua`
-   - Virtual cursor
-   - Radial menus for commands
-   - Full gamepad playability
-
-7. **Main Menu** - `src/ui/menu/main_menu.lua`
-   - Animated globe/map background (original style)
-   - Campaign / Skirmish / Multiplayer / Options / Exit
-
-**Acceptance Criteria**:
-- Full playthrough of both campaigns
-- All audio working with toggle
-- Controller fully playable
-
----
-
-## Critical Source Files
-
-Reference these during implementation:
-
-| File | Purpose |
-|------|---------|
-| `DEFINES.H` | All enums (units, buildings, weapons, missions), TICKS_PER_SECOND=15 |
-| `TECHNO.H` | Core combat entity functionality |
-| `CELL.H` | Map cell structure, lepton system |
-| `EVENT.H` | Network event types for multiplayer |
-| `TRIGGER.H` | Campaign trigger/scripting system |
-| `MISSION.H` | AI mission types |
-| `HOUSE.H` | Faction and economy |
-| `SESSION.H` | Multiplayer session, MAX_PLAYERS=6 |
-| `MIXFILE.H` | Asset archive format |
-
----
-
 ## Verification Plan
 
-### During Development
-- Run with `love .` from project root
-- Use Love2D console for debugging (`io.write`, `print`)
+### Replay Compatibility Testing
+The primary acceptance criterion is **replay compatibility**: given identical inputs and initial random seed, the game should produce identical game states frame-by-frame.
+
+**Testing Method**:
+1. Record input sequences with timestamps
+2. Run replay on both implementations
+3. Compare frame CRCs at each game tick
+4. Any CRC mismatch indicates behavioral divergence
+
+### Debug Functions
+All classes implement `Debug_Dump()` for state inspection:
+```lua
+function TechnoClass:Debug_Dump()
+    print(string.format("TechnoClass: House=%s TarCom=%s Mission=%s",
+        self.House and self.House:Get_Name() or "none",
+        Target_As_String(self.TarCom),
+        Mission_Name(self.Mission)))
+    -- Call parent
+    RadioClass.Debug_Dump(self)
+end
+```
 
 ### Per-Phase Testing
-1. **Phase 1**: Render all theaters, select units, move them, save/load, toggle HD
-2. **Phase 2**: Units attack enemies, die, explode correctly
-3. **Phase 3**: Build from MCV, harvest, produce units, create map in editor
-4. **Phase 4**: Host game, join from second client, play synchronized, spectate
-5. **Phase 5**: Load GDI mission 1, complete objectives, win
-6. **Phase 6**: Full playthrough of both campaigns with controller
 
-### Multiplayer Sync Testing
-- Run same inputs on two clients, compare frame-by-frame CRC
+| Phase | Test |
+|-------|------|
+| 1 | Object creation, map rendering, save/load cycle |
+| 2 | Unit placement, selection, basic movement |
+| 3 | Combat engagement, damage values match original |
+| 4 | Full base build, harvest cycle, unit production |
+| 5 | Campaign mission 1 completable, triggers fire |
+| 6 | 2-player sync match, replay verification |
 
 ### Performance Targets
 - 60 FPS at 1080p
 - 500+ entities without slowdown
-- No GC stutters during gameplay
+- No GC stutters during gameplay (use object pools)
 
 ---
 
@@ -599,10 +857,41 @@ Reference these during implementation:
 | `SPEECH.MIX` | EVA voice (AUD) |
 | `SCORES.MIX` | Music tracks |
 | `MOVIES.MIX` | Cutscene videos |
-| `SC-000.MIX`, `SC-001.MIX` | Scenario data |
 
-### Output Structure
-- Classic sprites: `assets/sprites/classic/`
-- HD sprites: `assets/sprites/hd/`
-- Classic audio: `assets/audio/classic/`
-- Remastered audio: `assets/audio/remastered/`
+---
+
+## Migration Notes
+
+### Removing Current ECS
+The current `src/ecs/` implementation will be replaced by the class hierarchy. Files to remove:
+- `src/ecs/entity.lua`
+- `src/ecs/component.lua`
+- `src/ecs/system.lua`
+- `src/ecs/world.lua`
+- `src/ecs/init.lua`
+- `src/components/` (all files)
+- `src/systems/` (most files - some logic migrates to class methods)
+
+### Preserved Functionality
+- `src/debug/ipc.lua` - Keep IPC debugging system
+- `src/util/` - Keep utility modules
+- `src/map/theater.lua` - Adapt for CellClass
+- `src/graphics/sprite_loader.lua` - Keep asset loading
+
+---
+
+## Critical Source Files Reference
+
+| File | Purpose |
+|------|---------|
+| `DEFINES.H` | All enums (units, buildings, weapons, missions), TICKS_PER_SECOND=15 |
+| `TECHNO.H` | Core combat entity functionality |
+| `CELL.H` | Map cell structure, lepton system |
+| `EVENT.H` | Network event types for multiplayer |
+| `TRIGGER.H` | Campaign trigger/scripting system |
+| `MISSION.H` | AI mission types |
+| `HOUSE.H` | Faction and economy |
+| `SESSION.H` | Multiplayer session, MAX_PLAYERS=6 |
+| `MIXFILE.H` | Asset archive format |
+| `FINDPATH.CPP` | Pathfinding algorithm |
+| `COMBAT.CPP` | Damage calculations |
