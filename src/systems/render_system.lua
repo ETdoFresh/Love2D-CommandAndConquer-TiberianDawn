@@ -196,6 +196,16 @@ function RenderSystem:draw_entity(entity)
     px = px + (renderable.offset_x or 0)
     py = py + (renderable.offset_y or 0)
 
+    -- Apply infantry sub-position offset (5 infantry can fit in one cell)
+    -- Reference: Original C&C - sub_position 0=center, 1=NW, 2=NE, 3=SW, 4=SE
+    if entity:has("infantry") then
+        local infantry = entity:get("infantry")
+        local sub_pos = infantry.sub_position or 0
+        local sub_offset = self:get_infantry_sub_offset(sub_pos)
+        px = px + sub_offset.x
+        py = py + sub_offset.y
+    end
+
     -- Apply shimmer offset for cloaked units
     if shimmer_enabled then
         px = px + shimmer_x
@@ -576,6 +586,23 @@ function RenderSystem:is_visible(world_x, world_y)
     local screen_w, screen_h = love.graphics.getDimensions()
     local sx, sy = self:world_to_screen(world_x, world_y)
     return sx >= 0 and sx < screen_w and sy >= 0 and sy < screen_h
+end
+
+-- Infantry sub-position offsets within a cell
+-- Reference: Original C&C - 5 infantry per cell at different sub-positions
+-- Sub-positions: 0=center, 1=NW, 2=NE, 3=SW, 4=SE
+-- Offsets are in pixels, relative to cell center
+RenderSystem.INFANTRY_SUB_OFFSETS = {
+    [0] = {x = 0,  y = 0},   -- Center
+    [1] = {x = -6, y = -6},  -- NW
+    [2] = {x = 6,  y = -6},  -- NE
+    [3] = {x = -6, y = 6},   -- SW
+    [4] = {x = 6,  y = 6}    -- SE
+}
+
+-- Get the pixel offset for an infantry sub-position
+function RenderSystem:get_infantry_sub_offset(sub_position)
+    return self.INFANTRY_SUB_OFFSETS[sub_position] or self.INFANTRY_SUB_OFFSETS[0]
 end
 
 return RenderSystem

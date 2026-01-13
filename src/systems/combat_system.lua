@@ -154,19 +154,34 @@ function CombatSystem:process_entity(dt, entity)
     local combat = entity:get("combat")
     local transform = entity:get("transform")
 
-    -- Decrease rearm timer (buildings fire slower when power is low)
+    -- Decrease rearm timer (fire rate affected by power level)
+    -- Reference: Original C&C - low power affects defensive structures fire rate
+    -- Extended: All units have reduced fire rate at critical power (< 50%)
     if combat.rearm_timer > 0 then
         local decrement = 1
-        -- Apply power penalty for defensive buildings
-        if entity:has("building") and entity:has("owner") then
+
+        if entity:has("owner") then
             local owner = entity:get("owner")
             local power_system = self.world:get_system("power")
+
             if power_system then
-                -- defense_mult is 1.0 at full power, 0.5 at low, 0.25 at critical
-                local defense_mult = power_system:get_defense_multiplier(owner.house)
-                decrement = defense_mult  -- Lower power = slower rearm
+                if entity:has("building") then
+                    -- Defensive buildings affected by defense multiplier
+                    -- defense_mult is 1.0 at full power, 0.75 at low, 0.5 at critical
+                    local defense_mult = power_system:get_defense_multiplier(owner.house)
+                    decrement = defense_mult
+                else
+                    -- Mobile units: Only affected at critical power (< 50%)
+                    -- Reference: Original C&C - units still function at low power
+                    -- but at critical power, everything slows down
+                    local power_level = power_system:get_power_level(owner.house)
+                    if power_level == "critical" then
+                        decrement = 0.5  -- 50% fire rate at critical power
+                    end
+                end
             end
         end
+
         combat.rearm_timer = math.max(0, combat.rearm_timer - decrement)
     end
 
@@ -657,6 +672,24 @@ function CombatSystem:apply_damage(target, damage, warhead, attacker)
     -- Apply armor modifier using warhead data from JSON
     local modifier = self:get_damage_modifier(warhead, armor)
     local final_damage = math.floor(damage * modifier)
+
+    -- Prone infantry take 50% damage
+    -- Reference: INFANTRY.CPP line 400 - "Prone infantry take only half damage"
+    if target:has("infantry") then
+        local infantry = target:get("infantry")
+        if infantry.prone and final_damage > 0 then
+            final_damage = math.max(1, math.floor(final_damage / 2))
+        end
+
+        -- Increase fear when taking damage (triggers prone behavior)
+        -- Reference: INFANTRY.CPP lines 542-551
+        if self.world then
+            local ai_system = self.world:get_system("ai")
+            if ai_system and ai_system.increase_infantry_fear then
+                ai_system:increase_infantry_fear(target, attacker, damage)
+            end
+        end
+    end
 
     -- Apply damage
     health.hp = health.hp - final_damage

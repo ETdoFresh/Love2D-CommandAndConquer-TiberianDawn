@@ -58,6 +58,13 @@ function Radar.new()
     self.sweep_angle = 0
     self.sweep_speed = math.pi  -- Radians per second
 
+    -- Low power flickering effect
+    -- Reference: Original C&C - radar flickered at low power before going offline
+    self.flicker_timer = 0
+    self.flicker_rate = 0.15    -- Seconds between flickers at low power
+    self.flicker_state = true   -- On/off for flicker effect
+    self.is_low_power = false   -- Power between 50-100% (still active but flickering)
+
     -- World reference for entity queries
     self.world = nil
 
@@ -91,8 +98,13 @@ function Radar:update(dt)
     -- Check power status
     if self.power_system then
         self.has_power = self.power_system:is_radar_active(self.house)
+
+        -- Check for low power (50-100%) - still active but flickering
+        local power_level = self.power_system:get_power_level(self.house)
+        self.is_low_power = (power_level == "low")
     else
         self.has_power = true  -- Assume power OK if no system
+        self.is_low_power = false
     end
 
     -- Radar is active if we have both comm center and power
@@ -103,6 +115,18 @@ function Radar:update(dt)
         self.sweep_angle = self.sweep_angle + self.sweep_speed * dt
         if self.sweep_angle > math.pi * 2 then
             self.sweep_angle = self.sweep_angle - math.pi * 2
+        end
+
+        -- Update low power flicker effect
+        -- Reference: Original C&C - radar flickered/glitched at low power
+        if self.is_low_power then
+            self.flicker_timer = self.flicker_timer + dt
+            if self.flicker_timer >= self.flicker_rate then
+                self.flicker_timer = self.flicker_timer - self.flicker_rate
+                self.flicker_state = not self.flicker_state
+            end
+        else
+            self.flicker_state = true  -- Always on when full power
         end
     end
 
@@ -188,20 +212,34 @@ function Radar:draw(camera_x, camera_y, viewport_w, viewport_h)
     love.graphics.rectangle("line", x - 1, y - 1, self.size + 2, self.size + 2)
 
     if self.is_active then
+        -- Apply low power flicker effect
+        -- Reference: Original C&C - radar flickered and had scan lines at low power
+        local alpha = 1.0
+        if self.is_low_power and not self.flicker_state then
+            alpha = 0.3  -- Dim during flicker
+        end
+
         -- Draw minimap
         if self.minimap_canvas then
-            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.setColor(1, 1, 1, alpha)
             love.graphics.draw(self.minimap_canvas, x, y)
         end
 
         -- Draw entities (buildings and units)
-        self:draw_entities()
+        if alpha > 0.5 then
+            self:draw_entities()
+        end
 
         -- Draw viewport indicator
         self:draw_viewport(camera_x, camera_y, viewport_w, viewport_h)
 
         -- Draw radar sweep line for visual effect
         self:draw_sweep()
+
+        -- Draw low power scan line effect
+        if self.is_low_power then
+            self:draw_power_interference()
+        end
     else
         -- Radar is offline - show static or dark screen
         love.graphics.setColor(self.colors.offline)
@@ -313,6 +351,30 @@ function Radar:draw_static()
         local sh = math.random(1, 4)
         love.graphics.rectangle("fill", sx, sy, sw, sh)
     end
+end
+
+-- Draw power interference effect (scan lines and static at low power)
+-- Reference: Original C&C - radar had interference patterns at low power
+function Radar:draw_power_interference()
+    -- Horizontal scan lines
+    love.graphics.setColor(0, 0.5, 0, 0.2)
+    local time = love.timer.getTime()
+    local scan_offset = (time * 50) % self.size
+
+    -- Draw moving scan line
+    love.graphics.rectangle("fill", self.x, self.y + scan_offset, self.size, 2)
+
+    -- Random interference spots
+    love.graphics.setColor(0, 0.8, 0, 0.3)
+    for i = 1, 5 do
+        local sx = self.x + math.random(0, self.size)
+        local sy = self.y + math.random(0, self.size)
+        love.graphics.rectangle("fill", sx, sy, math.random(2, 8), 1)
+    end
+
+    -- "LOW POWER" text overlay
+    love.graphics.setColor(1, 0.5, 0, 0.8)
+    love.graphics.printf("LOW POWER", self.x, self.y + 5, self.size, "center")
 end
 
 function Radar:mousepressed(mx, my, button)

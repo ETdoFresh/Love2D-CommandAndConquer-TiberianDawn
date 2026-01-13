@@ -118,6 +118,12 @@ end
 function AISystem:update(dt, entities)
     for _, entity in ipairs(entities) do
         self:process_entity(dt, entity)
+
+        -- Update infantry fear and prone state
+        -- Reference: INFANTRY.CPP - Infantry::AI() handles fear every tick
+        if entity:has("infantry") then
+            self:update_infantry_fear(entity, dt)
+        end
     end
 end
 
@@ -886,6 +892,133 @@ function AISystem:get_mission_name(entity)
     end
     local mission_type = entity:get("mission").mission_type
     return self.MISSION_NAMES[mission_type] or "Unknown"
+end
+
+-- Fear level constants (from INFANTRY.H)
+AISystem.FEAR_ANXIOUS = 10    -- Something makes them scared
+AISystem.FEAR_SCARED = 100    -- Scared enough to take cover
+AISystem.FEAR_PANIC = 200     -- Run away! Run away!
+AISystem.FEAR_MAXIMUM = 255   -- Maximum fear
+
+-- Fear decay rate (fear decreases over time when not being shot at)
+AISystem.FEAR_DECAY_RATE = 1  -- per tick
+
+-- Update infantry fear and prone state
+-- Reference: INFANTRY.CPP - Infantry::AI() fear handling
+-- When fear >= FEAR_ANXIOUS and not moving, infantry will go prone
+-- Prone infantry take 50% damage and move at 50% speed (crawling)
+function AISystem:update_infantry_fear(entity, dt)
+    if not entity:has("infantry") then return end
+
+    local infantry = entity:get("infantry")
+    local mobile = entity:has("mobile") and entity:get("mobile")
+    local is_moving = mobile and mobile.path and #mobile.path > 0
+
+    -- Decay fear over time
+    if infantry.fear > 0 then
+        infantry.fear = math.max(0, infantry.fear - self.FEAR_DECAY_RATE)
+    end
+
+    -- Handle prone state based on fear
+    if infantry.prone then
+        -- Get up if fear drops below anxious and not stationary
+        if infantry.fear < self.FEAR_ANXIOUS then
+            self:infantry_get_up(entity)
+        end
+    else
+        -- Go prone if scared and not moving (unless fraidy cat)
+        -- Reference: IsProne logic in INFANTRY.CPP line 1094
+        if infantry.fear >= self.FEAR_ANXIOUS and not is_moving and not infantry.is_fraidy_cat then
+            self:infantry_go_prone(entity)
+        end
+    end
+
+    -- Fraidy cats (civilians) run when scared instead of going prone
+    if infantry.is_fraidy_cat and infantry.fear > self.FEAR_ANXIOUS and not is_moving then
+        self:order_scatter(entity)
+    end
+end
+
+-- Make infantry go prone (lie down)
+-- Reference: INFANTRY.CPP - Do_Action(DO_LIE_DOWN)
+function AISystem:infantry_go_prone(entity)
+    if not entity:has("infantry") then return end
+
+    local infantry = entity:get("infantry")
+    if infantry.prone then return end  -- Already prone
+
+    -- Civilians with no crawl animation can't go prone
+    if infantry.is_fraidy_cat and not infantry.is_crawling then
+        return
+    end
+
+    infantry.prone = true
+
+    -- Reduce movement speed when prone (crawling)
+    if entity:has("mobile") then
+        local mobile = entity:get("mobile")
+        mobile.speed_modifier = (mobile.speed_modifier or 1.0) * 0.5
+    end
+
+    -- Emit event for animation system
+    Events.emit("INFANTRY_PRONE", entity, true)
+end
+
+-- Make infantry get up from prone position
+-- Reference: INFANTRY.CPP - Do_Action(DO_GET_UP)
+function AISystem:infantry_get_up(entity)
+    if not entity:has("infantry") then return end
+
+    local infantry = entity:get("infantry")
+    if not infantry.prone then return end  -- Not prone
+
+    infantry.prone = false
+
+    -- Restore movement speed
+    if entity:has("mobile") then
+        local mobile = entity:get("mobile")
+        mobile.speed_modifier = (mobile.speed_modifier or 0.5) * 2.0
+    end
+
+    -- Emit event for animation system
+    Events.emit("INFANTRY_PRONE", entity, false)
+end
+
+-- Increase infantry fear when taking damage or seeing combat
+-- Reference: INFANTRY.CPP - Take_Damage() lines 542-551
+function AISystem:increase_infantry_fear(entity, damage_source, damage_amount)
+    if not entity:has("infantry") then return end
+
+    local infantry = entity:get("infantry")
+
+    -- Calculate fear increase based on damage
+    local fear_increase = self.FEAR_ANXIOUS
+
+    -- More fear from nearby explosions
+    if damage_amount and damage_amount > 20 then
+        fear_increase = self.FEAR_SCARED
+    end
+
+    -- Max out fear if damage is lethal-level
+    if damage_amount and damage_amount > 50 then
+        fear_increase = self.FEAR_PANIC
+    end
+
+    infantry.fear = math.min(infantry.fear + fear_increase, self.FEAR_MAXIMUM)
+end
+
+-- Force infantry to get up (when ordered to move by player)
+-- Reference: INFANTRY.CPP line 929 - double-clicking destination forces get up
+function AISystem:force_infantry_get_up(entity)
+    if not entity:has("infantry") then return end
+
+    local infantry = entity:get("infantry")
+
+    -- Only get up if not a fraidy cat (they run scared)
+    if not infantry.is_fraidy_cat and infantry.prone then
+        self:infantry_get_up(entity)
+        infantry.fear = 0  -- Reset fear when ordered to move
+    end
 end
 
 return AISystem

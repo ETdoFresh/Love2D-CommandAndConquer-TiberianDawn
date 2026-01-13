@@ -208,19 +208,26 @@ function Component.register_all()
     })
 
     -- Infantry: Infantry-specific properties
+    -- Reference: INFANTRY.H - fear levels: FEAR_ANXIOUS=10, FEAR_SCARED=100, FEAR_PANIC=200, FEAR_MAXIMUM=255
     Component.register("infantry", {
         infantry_type = nil,    -- Infantry type name
         sub_position = 0,       -- Position within cell (0-4: center, NW, NE, SW, SE)
-        prone = false,          -- Is prone
+        prone = false,          -- Is prone (crawling)
+        fear = 0,               -- Fear level (0=brave, 10=anxious, 100=scared, 200=panic, 255=max)
         can_capture = false,    -- Can capture buildings
-        immune_tiberium = false -- Immune to Tiberium damage (Chem Warriors)
+        immune_tiberium = false,-- Immune to Tiberium damage (Chem Warriors)
+        is_fraidy_cat = false,  -- Civilian-type that runs when scared (no prone animation)
+        is_crawling = false,    -- Has crawl animation (most infantry do, civilians don't)
+        crushable = true        -- Can be crushed by vehicles (all infantry default true)
     })
 
     -- Vehicle: Vehicle-specific properties
+    -- Reference: UDATA.CPP - IsCrusher flag for tanks/heavy vehicles
     Component.register("vehicle", {
         vehicle_type = nil,     -- Vehicle type name
         rotating = false,       -- Is rotating in place
-        crushing = false        -- Is crushing infantry
+        crushing = false,       -- Is currently crushing infantry
+        crusher = false         -- Can crush infantry (tanks, mammoths, MCVs, harvesters)
     })
 
     -- Aircraft: Aircraft-specific properties
