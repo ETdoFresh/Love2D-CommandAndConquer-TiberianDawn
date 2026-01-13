@@ -1,0 +1,944 @@
+--[[
+    FootClass - Mobile units base class
+
+    Port of FOOT.H/CPP from the original C&C source.
+
+    This class extends TechnoClass to provide mobility for:
+    - Infantry
+    - Vehicles (Units)
+    - Aircraft
+
+    FootClass provides:
+    - Navigation/destination handling (NavCom)
+    - Path storage and following
+    - Team membership
+    - Group assignment
+    - Movement flags and state
+
+    Reference: temp/CnC_Remastered_Collection/TIBERIANDAWN/FOOT.H
+]]
+
+local Class = require("src.objects.class")
+local TechnoClass = require("src.objects.techno")
+local Target = require("src.core.target")
+local Coord = require("src.core.coord")
+
+-- Create FootClass extending TechnoClass
+local FootClass = Class.extend(TechnoClass, "FootClass")
+
+--============================================================================
+-- Constants
+--============================================================================
+
+-- Path constants
+FootClass.CONQUER_PATH_MAX = 24  -- Maximum path length
+FootClass.PATH_DELAY = 15        -- Delay before retry after failure
+FootClass.PATH_RETRY = 10        -- Number of retry attempts
+
+-- Facing types (for path)
+FootClass.FACING = {
+    NONE = -1,
+    N = 0,
+    NE = 1,
+    E = 2,
+    SE = 3,
+    S = 4,
+    SW = 5,
+    W = 6,
+    NW = 7,
+}
+
+-- Move result types
+FootClass.MOVE = {
+    OK = 0,             -- Can move to cell
+    CLOAK = 1,          -- Can move but need to uncloak
+    MOVING = 2,         -- Cell is occupied by moving unit
+    DESTROYABLE = 3,    -- Cell has destroyable object blocking
+    TEMP = 4,           -- Temporary blockage
+    NO = 5,             -- Cannot move to cell
+}
+
+-- Group number range (player-assignable groups 1-9, plus 0 for no group)
+FootClass.GROUP_NONE = 255
+
+--============================================================================
+-- Constructor
+--============================================================================
+
+function FootClass:init(house)
+    -- Call parent constructor
+    TechnoClass.init(self, house)
+
+    --[[
+        If this unit has officially joined the team's group, then this flag is
+        true. A newly assigned unit to a team is not considered part of the
+        team until it actually reaches the location where the team is. By
+        using this flag, it allows a team to continue to intelligently attack
+        a target without falling back to regroup the moment a distant member
+        joins.
+    ]]
+    self.IsInitiated = false
+
+    --[[
+        When the player gives this object a navigation target AND that target
+        does not result in any movement of the unit, then a beep should be
+        sounded. This typically occurs when selecting an invalid location for
+        movement. This flag is cleared if any movement was able to be performed.
+        It never gets set for computer controlled units.
+    ]]
+    self.IsNewNavCom = false
+
+    --[[
+        There are certain cases where a unit should perform a full scan rather than
+        the more efficient "ring scan". This situation occurs when a unit first
+        appears on the map or when it finishes a multiple cell movement track.
+    ]]
+    self.IsPlanningToLook = false
+
+    --[[
+        Certain units have the ability to metamorphize into a building. When this
+        operation begins, certain processes must occur. During these operations,
+        this flag will be true. This ensures that any necessary special case code
+        gets properly executed for this unit.
+    ]]
+    self.IsDeploying = false
+
+    --[[
+        This flag tells the system that the unit is doing a firing animation.
+        This is critical to the firing logic.
+    ]]
+    self.IsFiring = false
+
+    --[[
+        This unit could be either rotating its body or rotating its turret. During
+        the process of rotation, this flag is set. By examining this flag,
+        unnecessary logic can be avoided.
+    ]]
+    self.IsRotating = false
+
+    --[[
+        If this object is current driving to a short range destination, this flag
+        is true. A short range destination is either the next cell or the end of
+        the current "curvy" track. An object that is driving is not allowed to do
+        anything else until it reaches its destination. The exception is when
+        infantry wish to head to a different destination, they are allowed to
+        start immediately.
+    ]]
+    self.IsDriving = false
+
+    --[[
+        If this object is unloading from a hover transport, then this flag will be
+        set to true. This handles the unusual case of an object disembarking from
+        the hover lander yet not necessarily tethered but still located in an
+        overlapping position. This flag will be cleared automatically when the
+        object moves to the center of a cell.
+    ]]
+    self.IsUnloading = false
+
+    --[[
+        This is the "throttle setting" of the unit. It is a fractional value with
+        0 = stop and 255 = full speed.
+    ]]
+    self.Speed = 255
+
+    --[[
+        This is the desired destination of the unit. The unit will attempt to head
+        toward this target (avoiding intervening obstacles).
+    ]]
+    self.NavCom = Target.TARGET_NONE
+    self.SuspendedNavCom = Target.TARGET_NONE
+
+    --[[
+        This points to the team that "owns" this object. This pointer is used to
+        quickly process the team when this object is the source of the change. An
+        example would be if this object were to be destroyed, it would inform the
+        team of this fact by using this pointer.
+    ]]
+    self.Team = nil
+
+    --[[
+        If this object is part of a pseudo-team that the player is managing, then
+        this will be set to the team number (0 - 9). If it is not part of any
+        pseudo-team, then the number will be -1 (GROUP_NONE).
+    ]]
+    self.Group = FootClass.GROUP_NONE
+
+    --[[
+        This points to the next member in the team that this object is part of.
+        This is used to quickly process each team member when the team class is
+        the source of the change. An example would be if the team decided that
+        everyone is going to move to a new location, it would inform each of the
+        objects by chaining through this pointer.
+    ]]
+    self.Member = nil
+
+    --[[
+        Since all objects derived from this class move according to a path list.
+        This is the path list. It specifies, as a simple list of facings, the
+        path that the object should follow in order to reach its destination.
+        This path list is limited in size, so it might require several generations
+        of path lists before the ultimate destination is reached. The game logic
+        handles regenerating the path list as necessary.
+    ]]
+    self.Path = {}
+    for i = 1, FootClass.CONQUER_PATH_MAX do
+        self.Path[i] = FootClass.FACING.NONE
+    end
+
+    --[[
+        When there is a complete findpath failure, this timer is initialized so
+        that a findpath won't be calculated until this timer expires.
+    ]]
+    self.PathDelay = 0
+    self.TryTryAgain = FootClass.PATH_RETRY
+
+    --[[
+        If the object has recently attacked a base, then this timer will not
+        have expired yet. It is used so a building does not keep calling
+        for help from the same attacker.
+    ]]
+    self.BaseAttackTimer = 0
+
+    --[[
+        This is the coordinate that the unit is heading to as an immediate
+        destination. This coordinate is never further than one cell (or track)
+        from the unit's location. When this coordinate is reached, then the next
+        location in the path list becomes the next HeadTo coordinate.
+    ]]
+    self.HeadToCoord = 0
+end
+
+--============================================================================
+-- Query Functions
+--============================================================================
+
+--[[
+    Get the coordinate this unit is immediately heading to.
+]]
+function FootClass:Head_To_Coord()
+    return self.HeadToCoord
+end
+
+--[[
+    Get the sort Y coordinate for rendering.
+    Moving units use their center coord for sorting.
+]]
+function FootClass:Sort_Y()
+    local coord = self:Center_Coord()
+    return Coord.Coord_Y(coord)
+end
+
+--[[
+    Get the likely coordinate (where unit will be).
+    Used for targeting prediction.
+]]
+function FootClass:Likely_Coord()
+    if self.HeadToCoord ~= 0 then
+        return self.HeadToCoord
+    end
+    return self:Center_Coord()
+end
+
+--[[
+    Check if unit can be demolished (sold back).
+]]
+function FootClass:Can_Demolish()
+    -- Units can only be sold if near a repair bay
+    -- Simplified: check if not moving
+    return not self.IsDriving
+end
+
+--============================================================================
+-- Navigation
+--============================================================================
+
+--[[
+    Assign a movement destination.
+
+    @param target - TARGET to move to
+]]
+function FootClass:Assign_Destination(target)
+    target = target or Target.TARGET_NONE
+
+    -- If this is a new destination from the player
+    if self.IsOwnedByPlayer and target ~= self.NavCom then
+        self.IsNewNavCom = true
+    end
+
+    self.NavCom = target
+
+    -- Clear path when destination changes
+    if target ~= Target.TARGET_NONE then
+        self:Clear_Path()
+        self.PathDelay = 0
+    end
+end
+
+--[[
+    Clear the current path.
+]]
+function FootClass:Clear_Path()
+    for i = 1, FootClass.CONQUER_PATH_MAX do
+        self.Path[i] = FootClass.FACING.NONE
+    end
+end
+
+--[[
+    Get the next facing from the path.
+]]
+function FootClass:Get_Next_Path_Facing()
+    local facing = self.Path[1]
+    if facing ~= FootClass.FACING.NONE then
+        -- Shift path entries down
+        for i = 1, FootClass.CONQUER_PATH_MAX - 1 do
+            self.Path[i] = self.Path[i + 1]
+        end
+        self.Path[FootClass.CONQUER_PATH_MAX] = FootClass.FACING.NONE
+    end
+    return facing
+end
+
+--[[
+    Calculate a basic path to the destination.
+    Returns true if path was successfully calculated.
+]]
+function FootClass:Basic_Path()
+    if not Target.Is_Valid(self.NavCom) then
+        return false
+    end
+
+    -- Get destination coordinate
+    local dest_coord
+    local obj = Target.As_Object(self.NavCom)
+    if obj then
+        dest_coord = obj:Center_Coord()
+    else
+        dest_coord = Target.As_Coord(self.NavCom)
+    end
+
+    if dest_coord == 0 then
+        return false
+    end
+
+    -- Get current position
+    local src_coord = self:Center_Coord()
+    local src_cell = Coord.Coord_Cell(src_coord)
+    local dest_cell = Coord.Coord_Cell(dest_coord)
+
+    -- If already at destination
+    if src_cell == dest_cell then
+        return true
+    end
+
+    -- Simple straight-line path for now
+    -- Full pathfinding will be in findpath.lua
+    local dx = Coord.Cell_X(dest_cell) - Coord.Cell_X(src_cell)
+    local dy = Coord.Cell_Y(dest_cell) - Coord.Cell_Y(src_cell)
+
+    local facing = FootClass.FACING.NONE
+
+    if dx > 0 and dy < 0 then
+        facing = FootClass.FACING.NE
+    elseif dx > 0 and dy > 0 then
+        facing = FootClass.FACING.SE
+    elseif dx < 0 and dy < 0 then
+        facing = FootClass.FACING.NW
+    elseif dx < 0 and dy > 0 then
+        facing = FootClass.FACING.SW
+    elseif dx > 0 then
+        facing = FootClass.FACING.E
+    elseif dx < 0 then
+        facing = FootClass.FACING.W
+    elseif dy > 0 then
+        facing = FootClass.FACING.S
+    elseif dy < 0 then
+        facing = FootClass.FACING.N
+    end
+
+    if facing ~= FootClass.FACING.NONE then
+        self.Path[1] = facing
+        return true
+    end
+
+    return false
+end
+
+--============================================================================
+-- Driver Control
+--============================================================================
+
+--[[
+    Start driving toward a coordinate.
+
+    @param headto - COORDINATE to drive to
+    @return true if successfully started driving
+]]
+function FootClass:Start_Driver(headto)
+    if self.IsDriving then
+        return false  -- Already driving
+    end
+
+    self.HeadToCoord = headto
+    self.IsDriving = true
+
+    -- Clear the "new navcom" flag since we're moving
+    self.IsNewNavCom = false
+
+    return true
+end
+
+--[[
+    Stop driving.
+
+    @return true if successfully stopped
+]]
+function FootClass:Stop_Driver()
+    self.IsDriving = false
+    self.HeadToCoord = 0
+
+    return true
+end
+
+--[[
+    Check if this unit can enter a cell.
+
+    @param cell - CELL to check
+    @param facing - Direction entering from
+    @return MoveType (OK, NO, etc.)
+]]
+function FootClass:Can_Enter_Cell(cell, facing)
+    -- Simplified implementation
+    -- Full implementation would check occupancy, terrain, etc.
+
+    if cell < 0 then
+        return FootClass.MOVE.NO
+    end
+
+    -- Check map bounds (64x64 map)
+    local x = Coord.Cell_X(cell)
+    local y = Coord.Cell_Y(cell)
+    if x < 0 or x >= 64 or y < 0 or y >= 64 then
+        return FootClass.MOVE.NO
+    end
+
+    return FootClass.MOVE.OK
+end
+
+--[[
+    Set the speed of this unit.
+
+    @param speed - Speed value (0-255)
+]]
+function FootClass:Set_Speed(speed)
+    self.Speed = math.max(0, math.min(255, speed))
+end
+
+--============================================================================
+-- Mission Implementations
+--============================================================================
+
+--[[
+    Mission_Move - Move to destination.
+]]
+function FootClass:Mission_Move()
+    if not Target.Is_Valid(self.NavCom) then
+        self:Enter_Idle_Mode()
+        return 15  -- Check again in 1 second
+    end
+
+    -- Try to calculate path if needed
+    if self.Path[1] == FootClass.FACING.NONE then
+        if self.PathDelay > 0 then
+            self.PathDelay = self.PathDelay - 1
+            return 1
+        end
+
+        if not self:Basic_Path() then
+            -- Path failed
+            self.TryTryAgain = self.TryTryAgain - 1
+            if self.TryTryAgain <= 0 then
+                -- Give up
+                self.NavCom = Target.TARGET_NONE
+                self:Enter_Idle_Mode()
+            else
+                self.PathDelay = FootClass.PATH_DELAY
+            end
+            return 15
+        end
+
+        self.TryTryAgain = FootClass.PATH_RETRY
+    end
+
+    -- Follow path
+    -- (simplified - full implementation would handle movement ticks)
+
+    return 1
+end
+
+--[[
+    Mission_Attack - Attack target.
+]]
+function FootClass:Mission_Attack()
+    if not Target.Is_Valid(self.TarCom) then
+        self:Enter_Idle_Mode()
+        return 15
+    end
+
+    -- Check if in range
+    if self:In_Range(self.TarCom, 0) then
+        -- Fire at target
+        self:Fire_At(self.TarCom, 0)
+        return self:Rearm_Delay(false)
+    else
+        -- Move toward target
+        self:Approach_Target()
+        return 1
+    end
+end
+
+--[[
+    Mission_Guard - Guard current position.
+]]
+function FootClass:Mission_Guard()
+    -- Look for threats
+    local threat = self:Greatest_Threat(0)  -- THREAT_NORMAL
+    if Target.Is_Valid(threat) then
+        self:Assign_Target(threat)
+        self:Assign_Mission(self.MISSION.ATTACK)
+    end
+
+    return 15  -- Check every second
+end
+
+--[[
+    Mission_Guard_Area - Guard an area.
+]]
+function FootClass:Mission_Guard_Area()
+    -- Similar to guard but returns to archive position
+    return self:Mission_Guard()
+end
+
+--[[
+    Mission_Hunt - Hunt down enemies.
+]]
+function FootClass:Mission_Hunt()
+    -- Look for any valid target
+    local threat = self:Greatest_Threat(0)  -- THREAT_NORMAL
+    if Target.Is_Valid(threat) then
+        self:Assign_Target(threat)
+        self:Assign_Mission(self.MISSION.ATTACK)
+    end
+
+    return 15
+end
+
+--[[
+    Mission_Capture - Capture target (for engineers).
+]]
+function FootClass:Mission_Capture()
+    -- Override in InfantryClass
+    self:Enter_Idle_Mode()
+    return 15
+end
+
+--[[
+    Mission_Enter - Enter target (transport/building).
+]]
+function FootClass:Mission_Enter()
+    -- Move to target and enter it
+    if not Target.Is_Valid(self.NavCom) then
+        self:Enter_Idle_Mode()
+        return 15
+    end
+
+    return self:Mission_Move()
+end
+
+--[[
+    Approach the current target.
+]]
+function FootClass:Approach_Target()
+    if not Target.Is_Valid(self.TarCom) then
+        return
+    end
+
+    -- Set destination to target
+    self:Assign_Destination(self.TarCom)
+end
+
+--============================================================================
+-- Override Mission
+--============================================================================
+
+--[[
+    Override the current mission.
+
+    @param mission - New mission
+    @param tarcom - New attack target
+    @param navcom - New navigation target
+]]
+function FootClass:Override_Mission(mission, tarcom, navcom)
+    -- Suspend current navcom
+    self.SuspendedNavCom = self.NavCom
+
+    -- Set new navcom
+    if navcom then
+        self.NavCom = navcom
+    end
+
+    -- Call parent override
+    TechnoClass.Override_Mission(self, mission, tarcom, navcom)
+end
+
+--[[
+    Restore the previous mission.
+]]
+function FootClass:Restore_Mission()
+    -- Restore suspended navcom
+    self.NavCom = self.SuspendedNavCom
+    self.SuspendedNavCom = Target.TARGET_NONE
+
+    -- Call parent restore
+    return TechnoClass.Restore_Mission(self)
+end
+
+--[[
+    Assign a new mission.
+]]
+function FootClass:Assign_Mission(order)
+    TechnoClass.Assign_Mission(self, order)
+
+    -- Clear path when mission changes
+    self:Clear_Path()
+end
+
+--============================================================================
+-- Combat
+--============================================================================
+
+--[[
+    Called when unit is stunned.
+]]
+function FootClass:Stun()
+    TechnoClass.Stun(self)
+
+    -- Stop movement
+    self:Stop_Driver()
+    self.NavCom = Target.TARGET_NONE
+end
+
+--[[
+    Take damage.
+]]
+function FootClass:Take_Damage(damage, distance, warhead, source)
+    local result = TechnoClass.Take_Damage(self, damage, distance, warhead, source)
+
+    -- Scatter if taking significant damage
+    if damage > 0 and source then
+        self:Scatter(source:Center_Coord(), false, false)
+    end
+
+    return result
+end
+
+--[[
+    Death announcement.
+    Override in derived classes.
+]]
+function FootClass:Death_Announcement(source)
+    -- Override in derived classes
+end
+
+--[[
+    Scatter from a threat.
+
+    @param source - COORDINATE to scatter from
+    @param forced - Force scatter even if not appropriate
+    @param nokidding - Really force it
+]]
+function FootClass:Scatter(source, forced, nokidding)
+    if not forced and self.IsDriving then
+        return  -- Don't interrupt movement
+    end
+
+    -- Pick a random direction away from source
+    -- Simplified implementation
+end
+
+--============================================================================
+-- Team Support
+--============================================================================
+
+--[[
+    Detach from team and other references.
+]]
+function FootClass:Detach(target, all)
+    if self.Team and self.Team == target then
+        self.Team = nil
+    end
+
+    -- Clear NavCom if it matches
+    if self.NavCom == target then
+        self.NavCom = Target.TARGET_NONE
+    end
+
+    if self.SuspendedNavCom == target then
+        self.SuspendedNavCom = Target.TARGET_NONE
+    end
+
+    TechnoClass.Detach(self, target, all)
+end
+
+--[[
+    Detach from all references.
+]]
+function FootClass:Detach_All(all)
+    if self.Team then
+        -- Would notify team here
+        self.Team = nil
+    end
+    self.Member = nil
+
+    TechnoClass.Detach(self, nil, all)
+end
+
+--============================================================================
+-- Sell Support
+--============================================================================
+
+--[[
+    Sell back this unit.
+
+    @param control - 0=cancel, 1=immediate sell
+]]
+function FootClass:Sell_Back(control)
+    if control > 0 and self.House then
+        -- Give credits
+        local refund = self:Refund_Amount()
+        -- self.House:Credits = self.House:Credits + refund
+
+        -- Remove from map
+        self:Limbo()
+    end
+end
+
+--[[
+    Offload a bail of tiberium (for harvesters).
+]]
+function FootClass:Offload_Tiberium_Bail()
+    -- Override in UnitClass
+    return 0
+end
+
+--============================================================================
+-- Map Operations
+--============================================================================
+
+--[[
+    Limbo (remove from map).
+]]
+function FootClass:Limbo()
+    -- Stop any movement
+    self:Stop_Driver()
+
+    -- Leave team
+    if self.Team then
+        -- Would notify team here
+        self.Team = nil
+    end
+
+    return TechnoClass.Limbo(self)
+end
+
+--[[
+    Unlimbo (place on map).
+]]
+function FootClass:Unlimbo(coord, dir)
+    self.IsPlanningToLook = true
+    return TechnoClass.Unlimbo(self, coord, dir)
+end
+
+--[[
+    Mark for redraw.
+]]
+function FootClass:Mark(mark)
+    return TechnoClass.Mark(self, mark)
+end
+
+--============================================================================
+-- Per-Cell Processing
+--============================================================================
+
+--[[
+    Called when unit enters the center of a cell.
+
+    @param center - true if at cell center
+]]
+function FootClass:Per_Cell_Process(center)
+    if center then
+        -- Clear unloading flag when at cell center
+        self.IsUnloading = false
+
+        -- Planning to look?
+        if self.IsPlanningToLook then
+            self.IsPlanningToLook = false
+            -- Would do visibility scan here
+        end
+    end
+end
+
+--============================================================================
+-- User Interaction
+--============================================================================
+
+--[[
+    Handle click with action on an object.
+
+    @param action - ActionType
+    @param object - Target ObjectClass
+]]
+function FootClass:Active_Click_With(action, object)
+    -- Default: assign as target or destination based on action
+    if action then
+        if object then
+            local target = object:As_Target()
+            self:Assign_Target(target)
+            self:Assign_Destination(target)
+        end
+    end
+end
+
+--============================================================================
+-- Radio Communication
+--============================================================================
+
+--[[
+    Receive a radio message.
+]]
+function FootClass:Receive_Message(from, message, param)
+    local RADIO = self.RADIO
+
+    -- Handle special messages
+    if message == RADIO.HOLD_STILL then
+        -- Transport is telling us to wait
+        self.IsTethered = true
+        return RADIO.ROGER
+    end
+
+    if message == RADIO.OVER_OUT then
+        -- Contact broken
+        self.IsTethered = false
+    end
+
+    return TechnoClass.Receive_Message(self, from, message, param)
+end
+
+--============================================================================
+-- File I/O (Save/Load)
+--============================================================================
+
+function FootClass:Code_Pointers()
+    local data = TechnoClass.Code_Pointers(self)
+
+    -- Flags
+    data.IsInitiated = self.IsInitiated
+    data.IsNewNavCom = self.IsNewNavCom
+    data.IsPlanningToLook = self.IsPlanningToLook
+    data.IsDeploying = self.IsDeploying
+    data.IsFiring = self.IsFiring
+    data.IsRotating = self.IsRotating
+    data.IsDriving = self.IsDriving
+    data.IsUnloading = self.IsUnloading
+
+    -- Movement state
+    data.Speed = self.Speed
+    data.NavCom = self.NavCom
+    data.SuspendedNavCom = self.SuspendedNavCom
+    data.Group = self.Group
+    data.HeadToCoord = self.HeadToCoord
+
+    -- Path
+    data.Path = {}
+    for i = 1, FootClass.CONQUER_PATH_MAX do
+        data.Path[i] = self.Path[i]
+    end
+
+    data.PathDelay = self.PathDelay
+    data.TryTryAgain = self.TryTryAgain
+    data.BaseAttackTimer = self.BaseAttackTimer
+
+    -- Team encoded as TARGET
+    if self.Team then
+        data.Team = self.Team:As_Target()
+    end
+
+    return data
+end
+
+function FootClass:Decode_Pointers(data, heap_lookup)
+    TechnoClass.Decode_Pointers(self, data, heap_lookup)
+
+    if data then
+        -- Flags
+        self.IsInitiated = data.IsInitiated or false
+        self.IsNewNavCom = data.IsNewNavCom or false
+        self.IsPlanningToLook = data.IsPlanningToLook or false
+        self.IsDeploying = data.IsDeploying or false
+        self.IsFiring = data.IsFiring or false
+        self.IsRotating = data.IsRotating or false
+        self.IsDriving = data.IsDriving or false
+        self.IsUnloading = data.IsUnloading or false
+
+        -- Movement state
+        self.Speed = data.Speed or 255
+        self.NavCom = data.NavCom or Target.TARGET_NONE
+        self.SuspendedNavCom = data.SuspendedNavCom or Target.TARGET_NONE
+        self.Group = data.Group or FootClass.GROUP_NONE
+        self.HeadToCoord = data.HeadToCoord or 0
+
+        -- Path
+        if data.Path then
+            for i = 1, FootClass.CONQUER_PATH_MAX do
+                self.Path[i] = data.Path[i] or FootClass.FACING.NONE
+            end
+        end
+
+        self.PathDelay = data.PathDelay or 0
+        self.TryTryAgain = data.TryTryAgain or FootClass.PATH_RETRY
+        self.BaseAttackTimer = data.BaseAttackTimer or 0
+
+        -- Team (resolve later)
+        self._decode_team = data.Team
+    end
+end
+
+--============================================================================
+-- Debug Support
+--============================================================================
+
+function FootClass:Debug_Dump()
+    TechnoClass.Debug_Dump(self)
+
+    print(string.format("FootClass: NavCom=%s Speed=%d Group=%d",
+        Target.Target_As_String(self.NavCom),
+        self.Speed,
+        self.Group))
+
+    print(string.format("  Flags: Initiated=%s Driving=%s Rotating=%s Firing=%s",
+        tostring(self.IsInitiated),
+        tostring(self.IsDriving),
+        tostring(self.IsRotating),
+        tostring(self.IsFiring)))
+
+    -- Print path
+    local path_str = "Path: "
+    for i = 1, FootClass.CONQUER_PATH_MAX do
+        if self.Path[i] == FootClass.FACING.NONE then
+            break
+        end
+        path_str = path_str .. self.Path[i] .. " "
+    end
+    print("  " .. path_str)
+end
+
+return FootClass

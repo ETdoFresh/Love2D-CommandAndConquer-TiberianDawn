@@ -228,6 +228,13 @@ function IPC:process_command(command)
         response.tests = test_result.tests
         response.message = test_result.message
 
+    elseif cmd == "test_techno" then
+        -- Test the TechnoClass and FootClass implementation
+        local test_result = self:test_techno_classes()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
     elseif cmd == "help" then
         response.commands = {
             "input <key> - Simulate key press",
@@ -243,6 +250,7 @@ function IPC:process_command(command)
             "eval <lua> - Execute Lua code",
             "test_classes - Test the class hierarchy",
             "test_display - Test the display hierarchy",
+            "test_techno - Test TechnoClass and FootClass",
             "help - Show this help"
         }
 
@@ -884,6 +892,336 @@ function IPC:test_display_hierarchy()
 
     if not ok7 then
         add_test("RadarClass", false, tostring(err7))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test the TechnoClass and FootClass implementation (Phase 2)
+function IPC:test_techno_classes()
+    local result = { success = true, tests = {} }
+
+    local function add_test(name, passed, detail)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            detail = detail
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: Load all mixin modules
+    local ok1, err1 = pcall(function()
+        local FlasherClass = require("src.objects.mixins.flasher")
+        local StageClass = require("src.objects.mixins.stage")
+        local CargoClass = require("src.objects.mixins.cargo")
+        local DoorClass = require("src.objects.mixins.door")
+        local CrewClass = require("src.objects.mixins.crew")
+
+        assert(FlasherClass ~= nil, "FlasherClass should load")
+        assert(StageClass ~= nil, "StageClass should load")
+        assert(CargoClass ~= nil, "CargoClass should load")
+        assert(DoorClass ~= nil, "DoorClass should load")
+        assert(CrewClass ~= nil, "CrewClass should load")
+
+        add_test("Mixin modules", true, "All mixin modules loaded")
+    end)
+
+    if not ok1 then
+        add_test("Mixin modules", false, tostring(err1))
+        return result
+    end
+
+    -- Test 2: Load TechnoClass and FootClass
+    local ok2, err2 = pcall(function()
+        local TechnoClass = require("src.objects.techno")
+        local FootClass = require("src.objects.foot")
+
+        assert(TechnoClass ~= nil, "TechnoClass should load")
+        assert(FootClass ~= nil, "FootClass should load")
+
+        add_test("TechnoClass/FootClass loading", true, "Main classes loaded")
+    end)
+
+    if not ok2 then
+        add_test("TechnoClass/FootClass loading", false, tostring(err2))
+        return result
+    end
+
+    -- Test 3: FlasherClass mixin
+    local FlasherClass = require("src.objects.mixins.flasher")
+    local ok3, err3 = pcall(function()
+        local TechnoClass = require("src.objects.techno")
+        local techno = TechnoClass:new()
+
+        -- Should have flasher methods from mixin
+        assert(techno.FlashCount ~= nil, "Should have FlashCount")
+        assert(techno.IsBlushing ~= nil, "Should have IsBlushing")
+
+        -- Test flash
+        techno:Start_Flash(7)
+        assert(techno.FlashCount == 7, "Flash count should be 7")
+
+        -- Process flash - FlashCount goes 7 -> 6
+        techno:Process()
+        assert(techno.FlashCount == 6, "Flash count should decrement")
+        assert(techno.IsBlushing == false, "Should not be blushing (6 is even)")
+
+        -- FlashCount goes 6 -> 5
+        techno:Process()
+        assert(techno.FlashCount == 5, "Flash count should be 5")
+        assert(techno.IsBlushing == true, "Should be blushing (5 is odd)")
+
+        techno:Stop_Flash()
+        assert(techno.FlashCount == 0, "Flash should be stopped")
+
+        add_test("FlasherClass mixin", true, "Flasher behavior works")
+    end)
+
+    if not ok3 then
+        add_test("FlasherClass mixin", false, tostring(err3))
+    end
+
+    -- Test 4: StageClass mixin
+    local ok4, err4 = pcall(function()
+        local TechnoClass = require("src.objects.techno")
+        local techno = TechnoClass:new()
+
+        -- Should have stage methods
+        assert(techno:Fetch_Stage() == 0, "Stage should start at 0")
+
+        techno:Set_Stage(5)
+        assert(techno:Fetch_Stage() == 5, "Stage should be 5")
+
+        techno:Set_Rate(3)
+        assert(techno:Fetch_Rate() == 3, "Rate should be 3")
+
+        -- Process graphics logic
+        techno.StageTimer = 1  -- About to expire
+        local changed = techno:Graphic_Logic()
+        assert(changed == true, "Should signal stage change")
+        assert(techno:Fetch_Stage() == 6, "Stage should increment")
+
+        add_test("StageClass mixin", true, "Stage animation works")
+    end)
+
+    if not ok4 then
+        add_test("StageClass mixin", false, tostring(err4))
+    end
+
+    -- Test 5: CargoClass mixin
+    local ok5, err5 = pcall(function()
+        local TechnoClass = require("src.objects.techno")
+        local techno = TechnoClass:new()
+
+        assert(techno:How_Many() == 0, "Should start empty")
+
+        -- Create mock cargo objects
+        local cargo1 = { Member = nil }
+        local cargo2 = { Member = nil }
+
+        techno:Attach(cargo1)
+        assert(techno:How_Many() == 1, "Should have 1")
+        assert(techno:Is_Something_Attached() == true, "Should have cargo")
+
+        techno:Attach(cargo2)
+        assert(techno:How_Many() == 2, "Should have 2")
+
+        local detached = techno:Detach_Object()
+        assert(detached == cargo2, "Should detach last attached (cargo2)")
+        assert(techno:How_Many() == 1, "Should have 1 left")
+
+        techno:Clear_Cargo()
+        assert(techno:How_Many() == 0, "Should be empty")
+
+        add_test("CargoClass mixin", true, "Cargo management works")
+    end)
+
+    if not ok5 then
+        add_test("CargoClass mixin", false, tostring(err5))
+    end
+
+    -- Test 6: DoorClass mixin
+    local DoorClass = require("src.objects.mixins.door")
+    local ok6, err6 = pcall(function()
+        local TechnoClass = require("src.objects.techno")
+        local techno = TechnoClass:new()
+
+        assert(techno:Is_Door_Closed() == true, "Should start closed")
+
+        -- Open door
+        techno:Open_Door(2, 4)  -- rate=2, stages=4
+        assert(techno:Is_Door_Opening() == true, "Should be opening")
+
+        -- Process door animation
+        for i = 1, 10 do
+            techno:AI_Door()
+        end
+        assert(techno:Is_Door_Open() == true, "Should be fully open")
+
+        -- Close door
+        techno:Close_Door(2, 4)
+        assert(techno:Is_Door_Closing() == true, "Should be closing")
+
+        for i = 1, 10 do
+            techno:AI_Door()
+        end
+        assert(techno:Is_Door_Closed() == true, "Should be fully closed")
+
+        add_test("DoorClass mixin", true, "Door animation works")
+    end)
+
+    if not ok6 then
+        add_test("DoorClass mixin", false, tostring(err6))
+    end
+
+    -- Test 7: CrewClass mixin
+    local ok7, err7 = pcall(function()
+        local TechnoClass = require("src.objects.techno")
+        local techno = TechnoClass:new()
+
+        assert(techno:Get_Kills() == 0, "Should start with 0 kills")
+        assert(techno:Get_Rank_Name() == "Rookie", "Should be Rookie")
+
+        -- Add kills
+        techno:Made_A_Kill()
+        techno:Made_A_Kill()
+        techno:Made_A_Kill()
+        assert(techno:Get_Kills() == 3, "Should have 3 kills")
+        assert(techno:Is_Veteran() == true, "Should be Veteran")
+
+        -- More kills for elite
+        for i = 1, 7 do
+            techno:Made_A_Kill()
+        end
+        assert(techno:Get_Kills() == 10, "Should have 10 kills")
+        assert(techno:Is_Elite() == true, "Should be Elite")
+        assert(techno:Get_Rank_Name() == "Elite", "Should show Elite")
+
+        add_test("CrewClass mixin", true, "Kill tracking and ranks work")
+    end)
+
+    if not ok7 then
+        add_test("CrewClass mixin", false, tostring(err7))
+    end
+
+    -- Test 8: TechnoClass flags and state
+    local Target = require("src.core.target")
+    local ok8, err8 = pcall(function()
+        local TechnoClass = require("src.objects.techno")
+        local techno = TechnoClass:new()
+
+        -- Test initial flags
+        assert(techno.IsTickedOff == false, "Should not be ticked off")
+        assert(techno.IsCloakable == false, "Should not be cloakable")
+        assert(techno.IsLeader == false, "Should not be leader")
+        assert(techno.Ammo == -1, "Should have unlimited ammo")
+        assert(techno.Arm == 0, "Should not be rearming")
+
+        -- Test cloak state
+        assert(techno.Cloak == TechnoClass.CLOAK.UNCLOAKED, "Should be uncloaked")
+
+        -- Test target assignment
+        techno:Assign_Target(Target.Build(Target.RTTI.UNIT, 5))
+        assert(Target.Is_Valid(techno.TarCom), "TarCom should be valid")
+
+        add_test("TechnoClass state", true, "TechnoClass flags and state work")
+    end)
+
+    if not ok8 then
+        add_test("TechnoClass state", false, tostring(err8))
+    end
+
+    -- Test 9: FootClass movement state
+    local ok9, err9 = pcall(function()
+        local FootClass = require("src.objects.foot")
+        local Coord = require("src.core.coord")
+        local foot = FootClass:new()
+
+        -- Initial movement state
+        assert(foot.IsDriving == false, "Should not be driving")
+        assert(foot.IsRotating == false, "Should not be rotating")
+        assert(foot.Speed == 255, "Should have full speed")
+        assert(foot.Group == FootClass.GROUP_NONE, "Should have no group")
+
+        -- Path should be empty
+        assert(foot.Path[1] == FootClass.FACING.NONE, "Path should be empty")
+
+        -- Test destination assignment
+        local dest = Target.Build(Target.RTTI.CELL, 100)
+        foot:Assign_Destination(dest)
+        assert(foot.NavCom == dest, "NavCom should be set")
+        assert(foot.IsNewNavCom == false, "IsNewNavCom should be false (not player owned)")
+
+        -- Test player-owned navcom
+        foot.IsOwnedByPlayer = true
+        local dest2 = Target.Build(Target.RTTI.CELL, 200)
+        foot:Assign_Destination(dest2)
+        assert(foot.IsNewNavCom == true, "IsNewNavCom should be true")
+
+        -- Test speed setting
+        foot:Set_Speed(128)
+        assert(foot.Speed == 128, "Speed should be 128")
+
+        add_test("FootClass movement", true, "FootClass movement state works")
+    end)
+
+    if not ok9 then
+        add_test("FootClass movement", false, tostring(err9))
+    end
+
+    -- Test 10: FootClass inheritance from TechnoClass
+    local ok10, err10 = pcall(function()
+        local FootClass = require("src.objects.foot")
+        local foot = FootClass:new()
+
+        -- Should have TechnoClass properties
+        assert(foot.Cloak ~= nil, "Should have Cloak from TechnoClass")
+        assert(foot.TarCom ~= nil, "Should have TarCom from TechnoClass")
+        assert(foot.Ammo ~= nil, "Should have Ammo from TechnoClass")
+
+        -- Should have all mixins
+        assert(foot.FlashCount ~= nil, "Should have FlasherClass mixin")
+        assert(foot.Stage ~= nil, "Should have StageClass mixin")
+        assert(foot.CargoQuantity ~= nil, "Should have CargoClass mixin")
+        assert(foot.DoorState ~= nil, "Should have DoorClass mixin")
+        assert(foot.Kills ~= nil, "Should have CrewClass mixin")
+
+        -- Should have RadioClass properties
+        assert(foot.Radio ~= nil or foot.Radio == nil, "Should have Radio from RadioClass")
+        assert(foot.LastMessage ~= nil, "Should have LastMessage")
+
+        -- Should have MissionClass properties
+        assert(foot.Mission ~= nil, "Should have Mission")
+
+        -- Should have ObjectClass properties
+        assert(foot.Strength ~= nil, "Should have Strength")
+        assert(foot.IsInLimbo ~= nil, "Should have IsInLimbo")
+
+        -- Should have AbstractClass properties
+        assert(foot.Coord ~= nil, "Should have Coord")
+        assert(foot.IsActive ~= nil, "Should have IsActive")
+
+        add_test("FootClass inheritance", true, "Full inheritance chain works")
+    end)
+
+    if not ok10 then
+        add_test("FootClass inheritance", false, tostring(err10))
     end
 
     -- Summary
