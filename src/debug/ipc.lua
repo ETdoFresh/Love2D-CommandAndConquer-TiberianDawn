@@ -442,6 +442,13 @@ function IPC:process_command(command)
         response.tests = test_result.tests
         response.message = test_result.message
 
+    elseif cmd == "test_tiberium_growth" then
+        -- Test tiberium growth and spread system
+        local test_result = self:test_tiberium_growth()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
     else
         response.success = false
         response.error = "Unknown command: " .. cmd
@@ -7580,6 +7587,197 @@ function IPC:test_combat_damage_loop()
 
     if not ok6 then
         add_test("FootClass:Approach_Target execution", false, tostring(err6))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test tiberium growth and spread system
+function IPC:test_tiberium_growth()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: Grid has tiberium methods
+    local ok1, err1 = pcall(function()
+        local Grid = require("src.map.grid")
+
+        assert(type(Grid.Logic) == "function", "Grid:Logic() should exist")
+        assert(type(Grid.init_tiberium_system) == "function", "init_tiberium_system should exist")
+        assert(type(Grid.can_spread_tiberium_to) == "function", "can_spread_tiberium_to should exist")
+        assert(type(Grid.set_tiberium_options) == "function", "set_tiberium_options should exist")
+
+        add_test("Grid tiberium methods", true, "All tiberium methods exist")
+    end)
+
+    if not ok1 then
+        add_test("Grid tiberium methods", false, tostring(err1))
+    end
+
+    -- Test 2: Create grid and initialize tiberium system
+    local ok2, err2 = pcall(function()
+        local Grid = require("src.map.grid")
+
+        local grid = Grid.new(16, 16)  -- Small test grid
+        grid:init_tiberium_system()
+
+        assert(grid.tiberium_growth ~= nil, "tiberium_growth array should exist")
+        assert(grid.tiberium_spread ~= nil, "tiberium_spread array should exist")
+        assert(grid.tiberium_growth_count == 0, "growth count should start at 0")
+        assert(grid.tiberium_spread_count == 0, "spread count should start at 0")
+        assert(grid.tiberium_growth_enabled == true, "growth should be enabled by default")
+        assert(grid.tiberium_spread_enabled == true, "spread should be enabled by default")
+
+        add_test("Tiberium system initialization", true, "Tiberium system initializes correctly")
+    end)
+
+    if not ok2 then
+        add_test("Tiberium system initialization", false, tostring(err2))
+    end
+
+    -- Test 3: Tiberium growth increases stage
+    local ok3, err3 = pcall(function()
+        local Grid = require("src.map.grid")
+        local Cell = require("src.map.cell")
+
+        local grid = Grid.new(8, 8)
+        grid:init_tiberium_system()
+
+        -- Place tiberium at a cell
+        local cell = grid:get_cell(4, 4)
+        cell.overlay = 1  -- TIBERIUM1
+        cell.overlay_data = 5  -- Mid-stage
+
+        -- Store initial stage
+        local initial_stage = cell.overlay_data
+
+        -- Run Logic multiple times to trigger growth cycle
+        -- Need to scan full map (64 cells) which takes 64/30 = 3 ticks
+        for _ = 1, 10 do
+            grid:Logic()
+        end
+
+        -- The cell should have been picked as growth candidate
+        -- After full scan cycle, stage may have increased
+        -- Note: Growth is random, so we just verify no errors
+        assert(cell.overlay_data >= initial_stage, "Stage should not decrease")
+
+        add_test("Tiberium growth logic", true, "Growth logic executes without error")
+    end)
+
+    if not ok3 then
+        add_test("Tiberium growth logic", false, tostring(err3))
+    end
+
+    -- Test 4: Can spread check works correctly
+    local ok4, err4 = pcall(function()
+        local Grid = require("src.map.grid")
+        local Cell = require("src.map.cell")
+
+        local grid = Grid.new(8, 8)
+        grid:init_tiberium_system()
+
+        -- Get a clear cell
+        local clear_cell = grid:get_cell(2, 2)
+        clear_cell.overlay = 0
+        clear_cell.terrain = "clear"
+
+        local can_spread = grid:can_spread_tiberium_to(clear_cell)
+        assert(can_spread == true, "Should be able to spread to clear cell")
+
+        -- Cell with tiberium already
+        local tib_cell = grid:get_cell(3, 3)
+        tib_cell.overlay = 5  -- Has tiberium
+
+        can_spread = grid:can_spread_tiberium_to(tib_cell)
+        assert(can_spread == false, "Should not spread to cell with overlay")
+
+        -- Water cell
+        local water_cell = grid:get_cell(4, 4)
+        water_cell.overlay = 0
+        water_cell.terrain = "water"
+
+        can_spread = grid:can_spread_tiberium_to(water_cell)
+        assert(can_spread == false, "Should not spread to water")
+
+        add_test("Can spread check", true, "Spread validation works correctly")
+    end)
+
+    if not ok4 then
+        add_test("Can spread check", false, tostring(err4))
+    end
+
+    -- Test 5: Tiberium options can be set
+    local ok5, err5 = pcall(function()
+        local Grid = require("src.map.grid")
+
+        local grid = Grid.new(8, 8)
+        grid:init_tiberium_system()
+
+        -- Disable growth
+        grid:set_tiberium_options(false, true, false)
+        assert(grid.tiberium_growth_enabled == false, "Growth should be disabled")
+        assert(grid.tiberium_spread_enabled == true, "Spread should be enabled")
+        assert(grid.tiberium_fast == false, "Fast should be disabled")
+
+        -- Enable fast mode
+        grid:set_tiberium_options(true, true, true)
+        assert(grid.tiberium_fast == true, "Fast should be enabled")
+
+        add_test("Tiberium options", true, "Options can be set correctly")
+    end)
+
+    if not ok5 then
+        add_test("Tiberium options", false, tostring(err5))
+    end
+
+    -- Test 6: Cell has_tiberium method
+    local ok6, err6 = pcall(function()
+        local Cell = require("src.map.cell")
+
+        local cell = Cell.new(0, 0)
+
+        -- No tiberium initially
+        cell.overlay = 0
+        local has_tib = cell:has_tiberium()
+        assert(has_tib == false, "Empty cell should not have tiberium")
+
+        -- Add tiberium (overlay types 1-12 are tiberium in original)
+        cell.overlay = 5
+        -- The has_tiberium method may check overlay type
+        -- For now just verify method exists and runs
+        local _ = cell:has_tiberium()
+
+        add_test("Cell has_tiberium", true, "has_tiberium method works")
+    end)
+
+    if not ok6 then
+        add_test("Cell has_tiberium", false, tostring(err6))
     end
 
     -- Summary

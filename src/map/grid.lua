@@ -480,4 +480,224 @@ function Grid:remove_wall(x, y)
     return true
 end
 
+--============================================================================
+-- Tiberium Growth and Spread
+-- Reference: MapClass::Logic() from MAP.CPP
+--============================================================================
+
+-- Initialize tiberium tracking arrays
+function Grid:init_tiberium_system()
+    self.tiberium_growth = {}      -- Cells that can grow (stage < 12)
+    self.tiberium_spread = {}      -- Cells that can spread (stage > 6 or blossom tree)
+    self.tiberium_growth_count = 0
+    self.tiberium_spread_count = 0
+    self.tiberium_scan_index = 0
+    self.is_forward_scan = true
+    self.tiberium_growth_enabled = true
+    self.tiberium_spread_enabled = true
+    self.tiberium_fast = false     -- Double growth rate
+    self.max_tiberium_cells = 50   -- Match original limit
+end
+
+--[[
+    Logic - Handle tiberium growth and spread each game tick.
+    Port of MapClass::Logic() from MAP.CPP
+
+    This function:
+    1. Scans map cells to find tiberium growth/spread candidates
+    2. Randomly selects cells to grow (increase stage)
+    3. Randomly selects cells to spread to adjacent clear cells
+]]
+function Grid:Logic()
+    -- Early exit if both growth and spread disabled
+    if not self.tiberium_growth_enabled and not self.tiberium_spread_enabled then
+        return
+    end
+
+    -- Initialize if not yet done
+    if not self.tiberium_growth then
+        self:init_tiberium_system()
+    end
+
+    local total_cells = self.width * self.height
+
+    -- Scan 30 cells per tick to find growth/spread candidates
+    local subcount = 30
+    local index = self.tiberium_scan_index
+
+    while index < total_cells and subcount > 0 do
+        local cell_index = index
+        if not self.is_forward_scan then
+            cell_index = (total_cells - 1) - index
+        end
+
+        local cell = self.cells[cell_index]
+        if cell then
+            -- Check for growth candidate (tiberium stage < 12)
+            if self.tiberium_growth_enabled and cell:has_tiberium() then
+                local stage = cell.overlay_data or 0
+                if stage < 11 then  -- Stage 0-11, max is 12 (0-indexed as 11)
+                    if self.tiberium_growth_count < self.max_tiberium_cells then
+                        self.tiberium_growth_count = self.tiberium_growth_count + 1
+                        self.tiberium_growth[self.tiberium_growth_count] = cell_index
+                    else
+                        -- Replace random entry if full
+                        local pick = math.random(1, self.tiberium_growth_count)
+                        self.tiberium_growth[pick] = cell_index
+                    end
+                end
+            end
+
+            -- Check for spread candidate (heavy tiberium stage > 6 or blossom tree)
+            if self.tiberium_spread_enabled then
+                local can_spread = false
+                local spread_weight = 1
+
+                if cell:has_tiberium() then
+                    local stage = cell.overlay_data or 0
+                    if stage > 6 then
+                        can_spread = true
+                    end
+                end
+
+                -- Blossom trees spawn tiberium with higher priority
+                if cell.terrain_object and cell.terrain_object.is_tiberium_spawn then
+                    can_spread = true
+                    spread_weight = 3  -- Triple weight for blossom trees
+                end
+
+                if can_spread then
+                    for _ = 1, spread_weight do
+                        if self.tiberium_spread_count < self.max_tiberium_cells then
+                            self.tiberium_spread_count = self.tiberium_spread_count + 1
+                            self.tiberium_spread[self.tiberium_spread_count] = cell_index
+                        else
+                            local pick = math.random(1, self.tiberium_spread_count)
+                            self.tiberium_spread[pick] = cell_index
+                        end
+                    end
+                end
+            end
+        end
+
+        index = index + 1
+        subcount = subcount - 1
+    end
+
+    self.tiberium_scan_index = index
+
+    -- When scan completes, process growth and spread
+    if self.tiberium_scan_index >= total_cells then
+        self.tiberium_scan_index = 0
+        self.is_forward_scan = not self.is_forward_scan
+
+        local tries = self.tiberium_fast and 2 or 1
+
+        -- Process growth (increase tiberium stage)
+        if self.tiberium_growth_count > 0 then
+            for _ = 1, tries do
+                if self.tiberium_growth_count <= 0 then break end
+
+                local pick = math.random(1, self.tiberium_growth_count)
+                local cell_index = self.tiberium_growth[pick]
+                local cell = self.cells[cell_index]
+
+                if cell and cell:has_tiberium() then
+                    local stage = cell.overlay_data or 0
+                    if stage < 11 then
+                        cell.overlay_data = stage + 1
+                    end
+                end
+
+                -- Remove from list (swap with last)
+                self.tiberium_growth[pick] = self.tiberium_growth[self.tiberium_growth_count]
+                self.tiberium_growth_count = self.tiberium_growth_count - 1
+            end
+        end
+        self.tiberium_growth_count = 0
+
+        -- Process spread (create new tiberium in adjacent cells)
+        if self.tiberium_spread_count > 0 then
+            for _ = 1, tries do
+                if self.tiberium_spread_count <= 0 then break end
+
+                local pick = math.random(1, self.tiberium_spread_count)
+                local cell_index = self.tiberium_spread[pick]
+                local cell = self.cells[cell_index]
+
+                if cell then
+                    local x = cell_index % self.width
+                    local y = math.floor(cell_index / self.width)
+
+                    -- Try to spread to random adjacent cell
+                    local start_dir = math.random(0, 7)
+                    for dir_offset = 0, 7 do
+                        local dir = (start_dir + dir_offset) % 8
+                        local neighbor = self:get_adjacent(x, y, dir)
+
+                        if neighbor and self:can_spread_tiberium_to(neighbor) then
+                            -- Place new tiberium (random stage 1-12)
+                            local new_type = math.random(1, 12)  -- TIBERIUM1-12
+                            neighbor.overlay = new_type
+                            neighbor.overlay_data = 1  -- Start at stage 1
+                            break
+                        end
+                    end
+                end
+
+                -- Remove from list
+                self.tiberium_spread[pick] = self.tiberium_spread[self.tiberium_spread_count]
+                self.tiberium_spread_count = self.tiberium_spread_count - 1
+            end
+        end
+        self.tiberium_spread_count = 0
+    end
+end
+
+--[[
+    Check if tiberium can spread to a cell.
+    Cell must be:
+    - Clear (no overlay)
+    - Passable terrain (not water, rock, bridge)
+    - No building or unit
+]]
+function Grid:can_spread_tiberium_to(cell)
+    if not cell then return false end
+
+    -- Must have no overlay
+    if cell.overlay and cell.overlay > 0 then
+        return false
+    end
+
+    -- Must be clear terrain
+    if cell.terrain == "water" or cell.terrain == "rock" then
+        return false
+    end
+
+    -- No buildings
+    if cell:has_flag_set(Cell.FLAG.BUILDING) then
+        return false
+    end
+
+    -- Check for bridge templates (can't spread onto bridges)
+    local ttype = cell.template_type or 0
+    if ttype >= 0x0B and ttype <= 0x0E then  -- Bridge template range
+        return false
+    end
+
+    return true
+end
+
+--[[
+    Set tiberium growth/spread options.
+    @param growth - Enable tiberium growth
+    @param spread - Enable tiberium spread
+    @param fast - Enable fast (double) growth rate
+]]
+function Grid:set_tiberium_options(growth, spread, fast)
+    self.tiberium_growth_enabled = growth
+    self.tiberium_spread_enabled = spread
+    self.tiberium_fast = fast
+end
+
 return Grid
