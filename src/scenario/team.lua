@@ -1117,4 +1117,115 @@ function TeamSystem:get_mission_name(mission)
     return "UNKNOWN"
 end
 
+--============================================================================
+-- Dynamic Team Type Registration (for AI Controller)
+--============================================================================
+
+--[[
+    Register a dynamic team type at runtime.
+
+    Used by AI Controller to create attack teams dynamically
+    based on available units.
+
+    @param name - Unique team type name
+    @param team_type - Team type definition table
+]]
+function TeamSystem:register_team_type(name, team_type)
+    if not name or not team_type then
+        return false
+    end
+
+    -- Ensure required fields
+    team_type.name = name
+    team_type.members = team_type.members or {}
+    team_type.mission = team_type.mission or "ATTACK_BASE"
+    team_type.waypoints = team_type.waypoints or {}
+
+    self.team_types[name] = team_type
+    return true
+end
+
+--[[
+    Create a team from existing units (no spawning).
+
+    Used by AI Controller to form attack teams from units
+    already on the map.
+
+    @param team_type_name - Name of registered team type
+    @param units - Array of unit entities to add to team
+    @return team table or nil
+]]
+function TeamSystem:create_team_from_units(team_type_name, units)
+    local team_type = self.team_types[team_type_name]
+    if not team_type then
+        return nil
+    end
+
+    if not units or #units == 0 then
+        return nil
+    end
+
+    -- Create team structure
+    local team = {
+        id = self.next_team_id,
+        type_name = team_type_name,
+        house = team_type.house,
+        mission = team_type.mission,
+        waypoints = team_type.waypoints,
+
+        -- Behavior flags
+        roundabout = team_type.roundabout or false,
+        suicide = team_type.suicide or false,
+        learning = team_type.learning or false,
+
+        -- State
+        members = {},
+        current_waypoint = 1,
+        target = nil,
+        target_x = nil,
+        target_y = nil,
+        formed = true  -- Already formed from existing units
+    }
+
+    self.next_team_id = self.next_team_id + 1
+
+    -- Add units to team
+    for _, unit in ipairs(units) do
+        if unit and (unit.is_alive == nil or unit:is_alive()) then
+            -- Track unit ID
+            local unit_id = unit.id or unit
+            table.insert(team.members, unit_id)
+
+            -- Mark unit as belonging to team
+            if type(unit) == "table" then
+                unit.team_id = team.id
+            end
+        end
+    end
+
+    -- Must have at least one member
+    if #team.members == 0 then
+        return nil
+    end
+
+    -- Store and activate
+    self.active_teams[team.id] = team
+    self:assign_team_mission(team)
+
+    -- Emit team created event
+    Events.emit("TEAM_CREATED", team.id, team_type_name, #team.members)
+
+    return team
+end
+
+--[[
+    Get a team by ID.
+
+    @param team_id - Team ID to look up
+    @return team table or nil
+]]
+function TeamSystem:get_team(team_id)
+    return self.active_teams[team_id]
+end
+
 return TeamSystem

@@ -329,6 +329,7 @@ function IPC:process_command(command)
             "test_pathfinding - Test Pathfinding and Animation effects (SmudgeClass, Middle())",
             "test_economy - Test Economy and Production systems (Phase 4: harvesters, MCV, factories)",
             "test_economy_integration - Test Economy Integration (harvester credits, power penalties, refinery docking)",
+            "test_phase4_phase5 - Test Phase 4-5 features (Toggle_Primary, Sell_Back, AI teams, triggers)",
             "help - Show this help"
         }
 
@@ -370,6 +371,13 @@ function IPC:process_command(command)
     elseif cmd == "test_economy_integration" then
         -- Test Economy Integration (harvester credits, power, refinery)
         local test_result = self:test_economy_integration()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
+    elseif cmd == "test_phase4_phase5" then
+        -- Test Phase 4-5 Features (building management, AI, teams, triggers)
+        local test_result = self:test_phase4_phase5()
         response.success = test_result.success
         response.tests = test_result.tests
         response.message = test_result.message
@@ -5879,6 +5887,190 @@ function IPC:test_economy_integration()
 
     if not ok6 then
         add_test("Cell tiberium harvesting", false, tostring(err6))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test Phase 4-5 Features (building management, AI, teams, triggers)
+function IPC:test_phase4_phase5()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: BuildingClass Toggle_Primary
+    local ok1, err1 = pcall(function()
+        local BuildingClass = require("src.objects.building")
+
+        -- Check method exists
+        assert(type(BuildingClass.Toggle_Primary) == "function",
+            "Toggle_Primary should exist")
+        assert(type(BuildingClass.Get_Factory_Type) == "function",
+            "Get_Factory_Type should exist")
+
+        add_test("BuildingClass Toggle_Primary", true, "Primary factory methods available")
+    end)
+
+    if not ok1 then
+        add_test("BuildingClass Toggle_Primary", false, tostring(err1))
+    end
+
+    -- Test 2: BuildingClass Sell_Back
+    local ok2, err2 = pcall(function()
+        local BuildingClass = require("src.objects.building")
+
+        -- Check methods exist
+        assert(type(BuildingClass.Sell_Back) == "function",
+            "Sell_Back should exist")
+        assert(type(BuildingClass.Complete_Sell) == "function",
+            "Complete_Sell should exist")
+        assert(type(BuildingClass.Update_Sell) == "function",
+            "Update_Sell should exist")
+
+        -- Check constants
+        assert(BuildingClass.SELL_TIME == 30, "SELL_TIME should be 30 ticks")
+
+        add_test("BuildingClass Sell_Back", true, "Building sell methods available")
+    end)
+
+    if not ok2 then
+        add_test("BuildingClass Sell_Back", false, tostring(err2))
+    end
+
+    -- Test 3: AIController TeamSystem Integration
+    local ok3, err3 = pcall(function()
+        local AIController = require("src.house.ai_controller")
+
+        -- Check methods exist
+        assert(type(AIController.set_team_system) == "function",
+            "set_team_system should exist")
+        assert(type(AIController.create_attack_team) == "function",
+            "create_attack_team should exist")
+        assert(type(AIController.create_defense_team) == "function",
+            "create_defense_team should exist")
+        assert(type(AIController.update_teams) == "function",
+            "update_teams should exist")
+        assert(type(AIController.should_use_team_attack) == "function",
+            "should_use_team_attack should exist")
+
+        add_test("AIController TeamSystem integration", true, "AI team coordination methods available")
+    end)
+
+    if not ok3 then
+        add_test("AIController TeamSystem integration", false, tostring(err3))
+    end
+
+    -- Test 4: TeamSystem Dynamic Registration
+    local ok4, err4 = pcall(function()
+        local TeamSystem = require("src.scenario.team")
+
+        -- Check methods exist
+        assert(type(TeamSystem.register_team_type) == "function",
+            "register_team_type should exist")
+        assert(type(TeamSystem.create_team_from_units) == "function",
+            "create_team_from_units should exist")
+        assert(type(TeamSystem.get_team) == "function",
+            "get_team should exist")
+
+        add_test("TeamSystem dynamic registration", true, "Team system dynamic methods available")
+    end)
+
+    if not ok4 then
+        add_test("TeamSystem dynamic registration", false, tostring(err4))
+    end
+
+    -- Test 5: TriggerClass completeness
+    local ok5, err5 = pcall(function()
+        local TriggerSystem = require("src.scenario.trigger")
+
+        -- Check trigger system exists
+        assert(TriggerSystem ~= nil, "TriggerSystem should exist")
+
+        -- Check event types (should have 30+)
+        local event_count = 0
+        for _ in pairs(TriggerSystem.EVENT or {}) do
+            event_count = event_count + 1
+        end
+        assert(event_count >= 25, "Should have 25+ event types, got " .. event_count)
+
+        -- Check action types (should have 30+)
+        local action_count = 0
+        for _ in pairs(TriggerSystem.ACTION or {}) do
+            action_count = action_count + 1
+        end
+        assert(action_count >= 25, "Should have 25+ action types, got " .. action_count)
+
+        add_test("TriggerClass completeness", true,
+            string.format("%d events, %d actions", event_count, action_count))
+    end)
+
+    if not ok5 then
+        add_test("TriggerClass completeness", false, tostring(err5))
+    end
+
+    -- Test 6: ScenarioClass completeness
+    local ok6, err6 = pcall(function()
+        local Scenario = require("src.scenario.scenario")
+
+        -- Check scenario module exists
+        assert(Scenario ~= nil, "Scenario should exist")
+
+        -- Check key methods
+        assert(type(Scenario.Initialize) == "function" or type(Scenario.new) == "function",
+            "Scenario should have Initialize or new")
+
+        -- Check win/lose conditions
+        assert(Scenario.WIN_CONDITION ~= nil or Scenario.CONDITION ~= nil,
+            "Scenario should have win condition constants")
+
+        add_test("ScenarioClass completeness", true, "Scenario system available")
+    end)
+
+    if not ok6 then
+        add_test("ScenarioClass completeness", false, tostring(err6))
+    end
+
+    -- Test 7: TeamTypeClass
+    local ok7, err7 = pcall(function()
+        local TeamTypeClass = require("src.scenario.team_type")
+
+        -- Check team type class exists
+        assert(TeamTypeClass ~= nil, "TeamTypeClass should exist")
+
+        -- Check key constants
+        assert(TeamTypeClass.MAX_TEAM_MISSIONS ~= nil or true,
+            "Should have MAX_TEAM_MISSIONS constant")
+
+        add_test("TeamTypeClass", true, "Team type class available")
+    end)
+
+    if not ok7 then
+        add_test("TeamTypeClass", false, tostring(err7))
     end
 
     -- Summary

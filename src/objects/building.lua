@@ -151,6 +151,12 @@ function BuildingClass:init(type, house)
     self.IsCaptured = false
 
     --[[
+        Is this the primary factory for its type?
+        Primary factories receive production priority.
+    ]]
+    self.IsPrimary = false
+
+    --[[
         Is this building sold/selling?
     ]]
     self.IsSelling = false
@@ -774,6 +780,114 @@ function BuildingClass:Weapon_Range(which)
 end
 
 --============================================================================
+-- Primary Factory Management
+--============================================================================
+
+--[[
+    Toggle primary status for this building.
+
+    Reference: BuildingClass::Toggle_Primary from BUILDING.CPP
+
+    When clicked as primary, this building becomes the primary factory
+    for its type (infantry, vehicle, aircraft, or building). The primary
+    factory determines where units exit and gets production priority.
+
+    @return true if building can be toggled as primary
+]]
+function BuildingClass:Toggle_Primary()
+    -- Must have a house
+    if not self.House then
+        return false
+    end
+
+    -- Must be a production building
+    local type_class = self.Class
+    if not type_class then
+        return false
+    end
+
+    -- Determine what factory type this building is
+    local factory_type = nil
+
+    if type_class.IsFactory then
+        -- Check specific factory types
+        if type_class.IniName == "PYLE" or type_class.IniName == "HAND" then
+            -- Barracks / Hand of Nod - infantry
+            factory_type = "infantry"
+        elseif type_class.IniName == "WEAP" then
+            -- Weapons Factory - vehicles
+            factory_type = "vehicle"
+        elseif type_class.IniName == "AFLD" or type_class.IniName == "HPAD" then
+            -- Airfield / Helipad - aircraft
+            factory_type = "aircraft"
+        elseif type_class.IniName == "FACT" then
+            -- Construction Yard - buildings
+            factory_type = "building"
+        end
+    end
+
+    if not factory_type then
+        return false
+    end
+
+    -- Clear primary from all other buildings of same type
+    for _, building in ipairs(self.House.buildings or {}) do
+        if building ~= self and building.Class then
+            -- Check if same factory type
+            local other_type = building.Class.IniName
+            local is_same_type = false
+
+            if factory_type == "infantry" then
+                is_same_type = (other_type == "PYLE" or other_type == "HAND")
+            elseif factory_type == "vehicle" then
+                is_same_type = (other_type == "WEAP")
+            elseif factory_type == "aircraft" then
+                is_same_type = (other_type == "AFLD" or other_type == "HPAD")
+            elseif factory_type == "building" then
+                is_same_type = (other_type == "FACT")
+            end
+
+            if is_same_type then
+                building.IsPrimary = false
+            end
+        end
+    end
+
+    -- Set this building as primary
+    self.IsPrimary = true
+
+    -- Notify house of new primary factory
+    self.House:set_primary_factory(factory_type, self)
+
+    return true
+end
+
+--[[
+    Get the factory type for this building.
+
+    @return Factory type string ("infantry", "vehicle", "aircraft", "building") or nil
+]]
+function BuildingClass:Get_Factory_Type()
+    local type_class = self.Class
+    if not type_class or not type_class.IsFactory then
+        return nil
+    end
+
+    local ini_name = type_class.IniName
+    if ini_name == "PYLE" or ini_name == "HAND" then
+        return "infantry"
+    elseif ini_name == "WEAP" then
+        return "vehicle"
+    elseif ini_name == "AFLD" or ini_name == "HPAD" then
+        return "aircraft"
+    elseif ini_name == "FACT" then
+        return "building"
+    end
+
+    return nil
+end
+
+--============================================================================
 -- Mission Implementations
 --============================================================================
 
@@ -835,6 +949,126 @@ end
 function BuildingClass:Enter_Idle_Mode(initial)
     self:Set_State(BuildingClass.BSTATE.IDLE)
     self:Assign_Mission(self.MISSION.GUARD)
+end
+
+--============================================================================
+-- Selling Buildings
+--============================================================================
+
+-- Sell animation time in ticks
+BuildingClass.SELL_TIME = 30
+
+--[[
+    Sell this building back for credits.
+
+    Reference: BuildingClass::Sell_Back from BUILDING.CPP
+
+    Initiates the sell process which:
+    1. Starts the sell animation
+    2. Returns credits to the owning house (50% of cost)
+    3. May spawn survivors (infantry from crew)
+    4. Removes the building from the map
+
+    @param control - Control flags (1 = instant, 0 = animated)
+    @return true if sell was initiated
+]]
+function BuildingClass:Sell_Back(control)
+    -- Can't sell if already selling
+    if self.IsSelling then
+        return false
+    end
+
+    -- Must have a house to receive credits
+    if not self.House then
+        return false
+    end
+
+    -- Can't sell under construction buildings
+    if self.BuildProgress < 100 then
+        return false
+    end
+
+    -- Start selling
+    self.IsSelling = true
+
+    if control > 0 then
+        -- Instant sell (cheat or special case)
+        self:Complete_Sell()
+    else
+        -- Animated sell
+        self.SellTimer = BuildingClass.SELL_TIME
+        self:Set_State(BuildingClass.BSTATE.AUX1)  -- Sell animation state
+    end
+
+    return true
+end
+
+--[[
+    Complete the sell process.
+
+    Called when sell animation finishes or for instant sells.
+    Credits the house and removes the building.
+]]
+function BuildingClass:Complete_Sell()
+    if not self.House then
+        return
+    end
+
+    -- Calculate refund (50% of cost)
+    local refund = self:Refund_Amount()
+
+    -- Add stored tiberium value (for refineries/silos)
+    if self.TiberiumStored > 0 then
+        refund = refund + self.TiberiumStored
+    end
+
+    -- Credit the house
+    self.House:add_credits(refund)
+
+    -- Clear primary status if this was primary
+    if self.IsPrimary then
+        local factory_type = self:Get_Factory_Type()
+        if factory_type then
+            self.House:set_primary_factory(factory_type, nil)
+        end
+    end
+
+    -- Spawn survivors (crew) if applicable
+    if self.Class and self.Class.Crew and self.Class.Crew > 0 then
+        -- Would spawn infantry survivors here
+        -- self:Spawn_Survivors(self.Class.Crew)
+    end
+
+    -- Remove from house tracking
+    if self.House.remove_building then
+        self.House:remove_building(self)
+    end
+
+    -- Remove from map
+    self:Limbo()
+
+    -- Mark as destroyed
+    self.Strength = 0
+    self.IsActive = false
+end
+
+--[[
+    Update sell timer during AI processing.
+
+    @return true if still selling, false if complete
+]]
+function BuildingClass:Update_Sell()
+    if not self.IsSelling then
+        return false
+    end
+
+    self.SellTimer = self.SellTimer - 1
+    if self.SellTimer <= 0 then
+        self:Complete_Sell()
+        return false
+    end
+
+    return true
 end
 
 --============================================================================

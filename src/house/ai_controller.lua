@@ -961,4 +961,175 @@ function AIController:get_stats()
     }
 end
 
+--============================================================================
+-- TeamSystem Integration
+--============================================================================
+
+--[[
+    Set the team system reference for coordinated attacks.
+
+    @param team_system - TeamSystem instance for creating attack teams
+]]
+function AIController:set_team_system(team_system)
+    self.team_system = team_system
+end
+
+--[[
+    Create an attack team from current attack force.
+
+    Converts the accumulated attack_force into a proper TeamClass
+    with coordinated movement and attack behavior.
+
+    @param target_x, target_y - Target coordinates in leptons
+    @return team ID or nil if team creation failed
+]]
+function AIController:create_attack_team(target_x, target_y)
+    if not self.team_system then
+        return nil
+    end
+
+    -- Need minimum force for a team
+    if #self.attack_force < self.min_attack_force then
+        return nil
+    end
+
+    -- Generate team name
+    self.team_counter = self.team_counter + 1
+    local team_name = string.format("AI_Attack_%d", self.team_counter)
+
+    -- Build team composition from attack force
+    local composition = {}
+    local unit_counts = {}
+
+    for _, unit in ipairs(self.attack_force) do
+        if unit:is_alive() then
+            local unit_type = "E1"  -- Default to minigunner
+            if unit:has("unit_type") then
+                unit_type = unit:get("unit_type").type_name or unit_type
+            end
+
+            unit_counts[unit_type] = (unit_counts[unit_type] or 0) + 1
+        end
+    end
+
+    -- Convert to team member format
+    for unit_type, count in pairs(unit_counts) do
+        table.insert(composition, {
+            type = unit_type,
+            count = count
+        })
+    end
+
+    -- Register dynamic team type
+    local team_type = {
+        name = team_name,
+        house = self.house,
+        members = composition,
+        mission = "ATTACK_BASE",
+        waypoints = {},  -- Direct attack, no waypoints
+        roundabout = false,
+        suicide = false,
+        learning = true,  -- Can retreat if losing
+        autocreate = false,
+        prebuilt = false,
+        reinforcable = false
+    }
+
+    -- Register with team system
+    self.team_system:register_team_type(team_name, team_type)
+
+    -- Create the team using existing units
+    local team = self.team_system:create_team_from_units(team_name, self.attack_force)
+
+    if team then
+        -- Set attack target
+        team.target_x = target_x
+        team.target_y = target_y
+
+        -- Store in our team tracking
+        self.teams[team.id] = team
+
+        -- Clear attack force (now managed by team)
+        self.attack_force = {}
+
+        return team.id
+    end
+
+    return nil
+end
+
+--[[
+    Create a defense team from nearby units.
+
+    Recruits idle units near the base to defend against attackers.
+
+    @param threat_x, threat_y - Position of the threat
+    @return team ID or nil
+]]
+function AIController:create_defense_team(threat_x, threat_y)
+    if not self.team_system then
+        return nil
+    end
+
+    -- Gather nearby idle units
+    local defenders = {}
+    local base_x = (self.base_center_x or 32) * 256  -- Convert cells to leptons
+    local base_y = (self.base_center_y or 32) * 256
+
+    -- Would iterate through house's units and find idle ones near base
+    -- For now, emit event for game to handle
+    Events.emit("AI_GATHER_DEFENDERS", self.house, base_x, base_y, self.defense_radius * 256)
+
+    return nil  -- Defenders handled via event
+end
+
+--[[
+    Update all managed teams.
+
+    Called each AI tick to monitor team status and reassign
+    units from disbanded teams.
+]]
+function AIController:update_teams()
+    if not self.team_system then
+        return
+    end
+
+    local teams_to_remove = {}
+
+    for team_id, team in pairs(self.teams) do
+        -- Check if team still exists in team system
+        local team_data = self.team_system:get_team(team_id)
+
+        if not team_data then
+            -- Team disbanded, mark for removal
+            table.insert(teams_to_remove, team_id)
+        elseif team_data.formed == false then
+            -- Team lost too many members
+            table.insert(teams_to_remove, team_id)
+        end
+    end
+
+    -- Clean up disbanded teams
+    for _, team_id in ipairs(teams_to_remove) do
+        self.teams[team_id] = nil
+    end
+end
+
+--[[
+    Check if we should create an attack team instead of direct attack.
+
+    Returns true if TeamSystem is available and attack force is
+    large enough to warrant coordinated team behavior.
+
+    @return true if should use team-based attack
+]]
+function AIController:should_use_team_attack()
+    if not self.team_system then
+        return false
+    end
+
+    -- Use teams for larger attacks
+    return #self.attack_force >= 8
+end
+
 return AIController
