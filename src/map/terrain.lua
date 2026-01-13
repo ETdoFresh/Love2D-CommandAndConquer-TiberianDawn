@@ -19,7 +19,8 @@ Terrain.TYPE = {
     RIVER = 5,
     CLIFF = 6,
     SHORE = 7,
-    TIBERIUM = 8
+    TIBERIUM = 8,
+    BRIDGE = 9      -- Bridge over water/river (passable)
 }
 
 -- Land types (affects unit movement)
@@ -32,7 +33,8 @@ Terrain.LAND = {
     TIBERIUM = 5,   -- Tiberium field
     BEACH = 6,      -- Beach/shore
     ROUGH = 7,      -- Rough terrain
-    RIVER = 8       -- River (impassable for most)
+    RIVER = 8,      -- River (impassable for most)
+    BRIDGE = 9      -- Bridge (passable over water)
 }
 
 -- Movement costs per terrain type
@@ -45,7 +47,8 @@ Terrain.SPEED_MODIFIER = {
     [Terrain.TYPE.RIVER] = 0,       -- Impassable
     [Terrain.TYPE.CLIFF] = 0,       -- Impassable
     [Terrain.TYPE.SHORE] = 0.8,     -- Slightly slower
-    [Terrain.TYPE.TIBERIUM] = 1.0   -- Normal speed (but damages infantry)
+    [Terrain.TYPE.TIBERIUM] = 1.0,  -- Normal speed (but damages infantry)
+    [Terrain.TYPE.BRIDGE] = 1.0     -- Normal speed on bridge
 }
 
 function Terrain.new()

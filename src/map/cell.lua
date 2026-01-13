@@ -75,8 +75,13 @@ function Cell.new(x, y)
 end
 
 -- Check if cell is passable for a locomotor type
-function Cell:is_passable(locomotor)
-    -- Buildings block everything
+function Cell:is_passable(locomotor, terrain_type)
+    -- Aircraft can fly over anything
+    if locomotor == "fly" then
+        return true
+    end
+
+    -- Buildings block everything on ground
     if self:has_flag_set(Cell.FLAG.BUILDING) then
         return false
     end
@@ -87,8 +92,26 @@ function Cell:is_passable(locomotor)
     end
 
     -- Vehicles block other ground units
-    if locomotor ~= "fly" and self:has_flag_set(Cell.FLAG.VEHICLE) then
+    if self:has_flag_set(Cell.FLAG.VEHICLE) then
         return false
+    end
+
+    -- Check if this cell has a passable bridge over impassable terrain
+    -- Bridges allow ground units to cross water/river/cliff
+    if self:has_bridge() and self:bridge_is_passable() then
+        return true
+    end
+
+    -- Check terrain type (if provided)
+    -- Water, river, cliff are impassable without a bridge
+    if terrain_type then
+        local Terrain = require("src.map.terrain")
+        if terrain_type == Terrain.TYPE.WATER or
+           terrain_type == Terrain.TYPE.RIVER or
+           terrain_type == Terrain.TYPE.CLIFF or
+           terrain_type == Terrain.TYPE.ROCK then
+            return false
+        end
     end
 
     return true
@@ -207,7 +230,32 @@ end
 function Cell:place_wall(wall_type, health)
     self.overlay = wall_type
     self.overlay_data = health or 100
+    self.wall_frame = 0  -- Will be calculated by update_wall_connections
     self:set_flag(Cell.FLAG.WALL)
+end
+
+-- Wall neighbor bitmask (from original C&C - walls connect to adjacent walls)
+-- Bit 0 (1) = North neighbor
+-- Bit 1 (2) = East neighbor
+-- Bit 2 (4) = South neighbor
+-- Bit 3 (8) = West neighbor
+-- Frame index = bitmask value (0-15)
+Cell.WALL_NEIGHBOR = {
+    NORTH = 1,
+    EAST = 2,
+    SOUTH = 4,
+    WEST = 8
+}
+
+-- Get wall sprite frame based on neighbor connections
+-- Returns frame index 0-15 based on which neighbors have walls
+function Cell:get_wall_frame()
+    return self.wall_frame or 0
+end
+
+-- Set wall frame directly
+function Cell:set_wall_frame(frame)
+    self.wall_frame = frame
 end
 
 -- Get tiberium value
@@ -446,6 +494,109 @@ function Cell:deserialize(data)
     self.flags = data.flags or 0
     self.is_mapped = data.is_mapped or {}
     self.waypoint = data.waypoint
+    self.is_bridge = data.is_bridge or false
+    self.bridge_health = data.bridge_health or 0
+end
+
+-- Bridge overlay types (from original C&C)
+-- Bridges use overlay indices 18-23
+Cell.OVERLAY_BRIDGE = {
+    BRIDGE_START = 18,   -- First bridge overlay type
+    BRIDGE_END = 23,     -- Last bridge overlay type
+    WOOD_H = 18,         -- Wooden bridge horizontal
+    WOOD_V = 19,         -- Wooden bridge vertical
+    CONCRETE_H = 20,     -- Concrete bridge horizontal
+    CONCRETE_V = 21,     -- Concrete bridge vertical
+    DAMAGED_H = 22,      -- Damaged bridge horizontal
+    DAMAGED_V = 23       -- Damaged bridge vertical
+}
+
+-- Bridge health values (from original C&C)
+Cell.BRIDGE_HEALTH = {
+    WOOD = 200,
+    CONCRETE = 400
+}
+
+-- Check if cell has a bridge
+function Cell:has_bridge()
+    return self.is_bridge == true or
+           (self.overlay >= Cell.OVERLAY_BRIDGE.BRIDGE_START and
+            self.overlay <= Cell.OVERLAY_BRIDGE.BRIDGE_END)
+end
+
+-- Place a bridge on this cell
+function Cell:place_bridge(bridge_type, health)
+    bridge_type = bridge_type or Cell.OVERLAY_BRIDGE.WOOD_H
+    self.overlay = bridge_type
+    self.is_bridge = true
+
+    -- Determine health based on bridge type
+    if bridge_type == Cell.OVERLAY_BRIDGE.CONCRETE_H or
+       bridge_type == Cell.OVERLAY_BRIDGE.CONCRETE_V then
+        self.bridge_health = health or Cell.BRIDGE_HEALTH.CONCRETE
+    else
+        self.bridge_health = health or Cell.BRIDGE_HEALTH.WOOD
+    end
+
+    return true
+end
+
+-- Get bridge health
+function Cell:get_bridge_health()
+    if not self:has_bridge() then
+        return 0
+    end
+    return self.bridge_health or 0
+end
+
+-- Damage bridge - returns true if destroyed
+function Cell:damage_bridge(damage)
+    if not self:has_bridge() then
+        return false
+    end
+
+    self.bridge_health = (self.bridge_health or 0) - damage
+
+    -- Check if bridge is damaged (show damaged sprite)
+    if self.bridge_health <= 100 and self.bridge_health > 0 then
+        -- Switch to damaged bridge sprite
+        if self.overlay == Cell.OVERLAY_BRIDGE.WOOD_H or
+           self.overlay == Cell.OVERLAY_BRIDGE.CONCRETE_H then
+            self.overlay = Cell.OVERLAY_BRIDGE.DAMAGED_H
+        elseif self.overlay == Cell.OVERLAY_BRIDGE.WOOD_V or
+               self.overlay == Cell.OVERLAY_BRIDGE.CONCRETE_V then
+            self.overlay = Cell.OVERLAY_BRIDGE.DAMAGED_V
+        end
+    end
+
+    -- Check if bridge is destroyed
+    if self.bridge_health <= 0 then
+        self:destroy_bridge()
+        return true
+    end
+
+    return false
+end
+
+-- Destroy bridge completely
+function Cell:destroy_bridge()
+    if not self:has_bridge() then
+        return false
+    end
+
+    self.overlay = -1
+    self.is_bridge = false
+    self.bridge_health = 0
+
+    -- Add debris/crater at former bridge location
+    self:add_crater(2)
+
+    return true
+end
+
+-- Check if bridge allows passage (intact or damaged but not destroyed)
+function Cell:bridge_is_passable()
+    return self:has_bridge() and self.bridge_health > 0
 end
 
 return Cell

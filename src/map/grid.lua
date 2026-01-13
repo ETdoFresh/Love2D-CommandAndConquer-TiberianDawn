@@ -386,6 +386,98 @@ function Grid:deserialize(data)
             cell:deserialize(cell_data)
         end
     end
+
+    -- Recalculate wall connections after loading
+    self:update_all_wall_connections()
+end
+
+-- Update wall connection frame for a single cell based on neighbors
+-- Reference: Original C&C uses 4-bit bitmask for wall sprite selection
+function Grid:update_wall_connections(x, y)
+    local cell = self:get_cell(x, y)
+    if not cell or not cell:has_wall() then
+        return
+    end
+
+    local wall_type = cell.overlay
+    local frame = 0
+
+    -- Check north neighbor
+    local north = self:get_cell(x, y - 1)
+    if north and north:has_wall() and north.overlay == wall_type then
+        frame = frame + Cell.WALL_NEIGHBOR.NORTH  -- +1
+    end
+
+    -- Check east neighbor
+    local east = self:get_cell(x + 1, y)
+    if east and east:has_wall() and east.overlay == wall_type then
+        frame = frame + Cell.WALL_NEIGHBOR.EAST   -- +2
+    end
+
+    -- Check south neighbor
+    local south = self:get_cell(x, y + 1)
+    if south and south:has_wall() and south.overlay == wall_type then
+        frame = frame + Cell.WALL_NEIGHBOR.SOUTH  -- +4
+    end
+
+    -- Check west neighbor
+    local west = self:get_cell(x - 1, y)
+    if west and west:has_wall() and west.overlay == wall_type then
+        frame = frame + Cell.WALL_NEIGHBOR.WEST   -- +8
+    end
+
+    cell:set_wall_frame(frame)
+end
+
+-- Update wall connections for a cell and all its neighbors
+-- Call this when a wall is placed or destroyed
+function Grid:update_wall_connections_area(x, y)
+    -- Update center cell
+    self:update_wall_connections(x, y)
+
+    -- Update all 4 neighbors (they may need to update connections)
+    self:update_wall_connections(x, y - 1)  -- North
+    self:update_wall_connections(x + 1, y)  -- East
+    self:update_wall_connections(x, y + 1)  -- South
+    self:update_wall_connections(x - 1, y)  -- West
+end
+
+-- Update all wall connections on the map (call after loading scenario)
+function Grid:update_all_wall_connections()
+    for y = 0, self.height - 1 do
+        for x = 0, self.width - 1 do
+            local cell = self:get_cell(x, y)
+            if cell and cell:has_wall() then
+                self:update_wall_connections(x, y)
+            end
+        end
+    end
+end
+
+-- Place a wall and update connections
+function Grid:place_wall(x, y, wall_type, health)
+    local cell = self:get_cell(x, y)
+    if not cell then
+        return false
+    end
+
+    cell:place_wall(wall_type, health)
+    self:update_wall_connections_area(x, y)
+
+    return true
+end
+
+-- Remove a wall and update connections
+function Grid:remove_wall(x, y)
+    local cell = self:get_cell(x, y)
+    if not cell or not cell:has_wall() then
+        return false
+    end
+
+    cell:destroy_wall()
+    self:update_wall_connections_area(x, y)
+
+    return true
 end
 
 return Grid

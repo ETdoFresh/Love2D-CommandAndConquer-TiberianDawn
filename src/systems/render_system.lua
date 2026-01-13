@@ -159,6 +159,26 @@ function RenderSystem:draw_entity(entity)
     px = px + (renderable.offset_x or 0)
     py = py + (renderable.offset_y or 0)
 
+    -- Aircraft altitude handling - draw shadow and offset sprite
+    -- Reference: Original C&C draws shadow at ground level, sprite at altitude
+    local altitude = 0
+    local is_aircraft = entity:has("aircraft")
+    if is_aircraft then
+        local aircraft = entity:get("aircraft")
+        altitude = aircraft.altitude or 0
+
+        -- Add visual jitter for helicopters
+        altitude = altitude + (aircraft.visual_altitude_offset or 0)
+
+        -- Draw shadow at ground level if airborne
+        if altitude > 0 then
+            self:draw_aircraft_shadow(entity, px, py)
+        end
+
+        -- Offset sprite position by altitude (sprite drawn higher)
+        py = py - altitude
+    end
+
     -- Apply color/tint
     local color = renderable.color or {1, 1, 1, 1}
     love.graphics.setColor(unpack(color))
@@ -208,6 +228,45 @@ function RenderSystem:draw_entity(entity)
     end
 
     -- Reset color
+    love.graphics.setColor(1, 1, 1, 1)
+end
+
+-- Draw aircraft shadow on ground
+-- Reference: Original C&C draws shadow offset south by altitude
+function RenderSystem:draw_aircraft_shadow(entity, ground_x, ground_y)
+    local renderable = entity:get("renderable")
+    local aircraft = entity:get("aircraft")
+    local altitude = aircraft.altitude or 0
+
+    -- Shadow offset: south by altitude amount (original behavior)
+    local shadow_x = ground_x
+    local shadow_y = ground_y + altitude
+
+    -- Draw shadow using sprite if available
+    local sprite_name = renderable.sprite
+    if sprite_name and type(sprite_name) == "string" and self.sprite_loader then
+        local frame = renderable.frame or 0
+        local sheet = self.sprite_loader:get_sheet(sprite_name)
+        local quad = self.sprite_loader:get_quad(sprite_name, frame)
+        local meta = self.sprite_loader:get_metadata(sprite_name)
+
+        if sheet and quad and meta then
+            local ox = meta.frame_width / 2
+            local oy = meta.frame_height / 2
+
+            -- Draw dark translucent shadow
+            love.graphics.setColor(0, 0, 0, 0.4)
+            love.graphics.draw(sheet, quad, shadow_x, shadow_y, 0, 1, 1, ox, oy)
+            love.graphics.setColor(1, 1, 1, 1)
+            return
+        end
+    end
+
+    -- Fallback: draw simple oval shadow
+    local shadow_w = (renderable.scale_x or 1) * Constants.CELL_PIXEL_W * 0.6
+    local shadow_h = (renderable.scale_y or 1) * Constants.CELL_PIXEL_H * 0.3
+    love.graphics.setColor(0, 0, 0, 0.3)
+    love.graphics.ellipse("fill", shadow_x, shadow_y, shadow_w, shadow_h)
     love.graphics.setColor(1, 1, 1, 1)
 end
 

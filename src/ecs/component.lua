@@ -224,12 +224,18 @@ function Component.register_all()
     })
 
     -- Aircraft: Aircraft-specific properties
+    -- Reference: AIRCRAFT.H - FLIGHT_LEVEL = 24 pixels altitude
     Component.register("aircraft", {
-        aircraft_type = nil,    -- Aircraft type name
-        altitude = 0,           -- Current altitude
-        max_altitude = 0,       -- Max flight altitude
-        landed = true,          -- On ground
-        helipad = nil           -- Assigned helipad
+        aircraft_type = nil,        -- Aircraft type name
+        altitude = 0,               -- Current altitude in pixels (0 = landed, 24 = cruise)
+        max_altitude = 24,          -- Max flight altitude (FLIGHT_LEVEL)
+        landed = true,              -- On ground at helipad
+        helipad = nil,              -- Assigned helipad entity ID
+        is_landing = false,         -- Currently descending to land
+        is_taking_off = false,      -- Currently ascending from helipad
+        is_homing = false,          -- Adjusting heading toward target
+        is_hovering = false,        -- Helicopter hovering to position
+        visual_altitude_offset = 0  -- Jitter offset for helicopter bob effect
     })
 
     -- Cargo: Can carry other units
