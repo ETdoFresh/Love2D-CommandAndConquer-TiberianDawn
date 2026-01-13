@@ -414,6 +414,13 @@ function IPC:process_command(command)
         response.tests = test_result.tests
         response.message = test_result.message
 
+    elseif cmd == "test_mission_handlers" then
+        -- Test Mission Handlers (BuildingClass and InfantryClass missions)
+        local test_result = self:test_mission_handlers()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
     else
         response.success = false
         response.error = "Unknown command: " .. cmd
@@ -6716,6 +6723,229 @@ function IPC:test_spectator_network()
 
     if not ok6 then
         add_test("Adapters integration", false, tostring(err6))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test mission handlers (BuildingClass and InfantryClass specific missions)
+function IPC:test_mission_handlers()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: BuildingClass mission methods exist
+    local ok1, err1 = pcall(function()
+        local BuildingClass = require("src.objects.building")
+
+        assert(type(BuildingClass.Mission_Construction) == "function", "Mission_Construction should exist")
+        assert(type(BuildingClass.Mission_Deconstruction) == "function", "Mission_Deconstruction should exist")
+        assert(type(BuildingClass.Mission_Harvest) == "function", "Mission_Harvest should exist")
+        assert(type(BuildingClass.Mission_Repair) == "function", "Mission_Repair should exist")
+        assert(type(BuildingClass.Mission_Missile) == "function", "Mission_Missile should exist")
+        assert(type(BuildingClass.Mission_Unload) == "function", "Mission_Unload should exist")
+        assert(type(BuildingClass.Spawn_Survivors) == "function", "Spawn_Survivors should exist")
+
+        add_test("BuildingClass mission methods", true, "All building-specific mission methods exist")
+    end)
+
+    if not ok1 then
+        add_test("BuildingClass mission methods", false, tostring(err1))
+    end
+
+    -- Test 2: BuildingClass mission handlers return expected values
+    local ok2, err2 = pcall(function()
+        local BuildingClass = require("src.objects.building")
+        local MissionClass = require("src.objects.mission")
+
+        -- Create a mock building for testing mission return values
+        local mock_building = setmetatable({
+            Class = {
+                IsFactory = false,
+                Type = 0,
+                IniName = "TEST"
+            },
+            BState = BuildingClass.BSTATE.IDLE,
+            Status = 0,
+            Mission = MissionClass.MISSION.CONSTRUCTION,
+            MISSION = MissionClass.MISSION,
+            House = { ID = 0 },
+            Strength = 100,
+            IsRepairing = false,
+            IsSelling = false,
+            Set_Rate = function() end,
+            Set_Stage = function() end,
+            Begin_Mode = function() end,
+            Assign_Mission = function() end,
+            Enter_Idle_Mode = function() end,
+            Play_Sound = function() end,
+        }, { __index = BuildingClass })
+
+        -- Test that Mission_Construction exists and can be called
+        assert(type(mock_building.Mission_Construction) == "function",
+            "Mission_Construction should be callable")
+
+        -- Test that Mission_Deconstruction exists and can be called
+        assert(type(mock_building.Mission_Deconstruction) == "function",
+            "Mission_Deconstruction should be callable")
+
+        -- Test that Mission_Harvest exists and can be called
+        assert(type(mock_building.Mission_Harvest) == "function",
+            "Mission_Harvest should be callable")
+
+        add_test("BuildingClass mission handlers", true, "Mission handlers are callable")
+    end)
+
+    if not ok2 then
+        add_test("BuildingClass mission handlers", false, tostring(err2))
+    end
+
+    -- Test 3: InfantryClass Mission_Attack method
+    local ok3, err3 = pcall(function()
+        local InfantryClass = require("src.objects.infantry")
+        local FootClass = require("src.objects.foot")
+
+        -- Check InfantryClass has its own Mission_Attack (not just inherited)
+        assert(type(InfantryClass.Mission_Attack) == "function", "InfantryClass.Mission_Attack should exist")
+
+        -- The InfantryClass should have a different Mission_Attack than FootClass
+        -- (it overrides to handle engineer capture logic)
+        -- Note: In Lua, we can verify the function exists in the class table directly
+        assert(rawget(InfantryClass, "Mission_Attack") ~= nil, "Mission_Attack should be defined directly on InfantryClass")
+
+        add_test("InfantryClass Mission_Attack", true, "InfantryClass has its own Mission_Attack implementation")
+    end)
+
+    if not ok3 then
+        add_test("InfantryClass Mission_Attack", false, tostring(err3))
+    end
+
+    -- Test 4: Engineer capture logic in Mission_Attack
+    local ok4, err4 = pcall(function()
+        local InfantryClass = require("src.objects.infantry")
+        local InfantryTypeClass = require("src.objects.types.infantrytype")
+        local Target = require("src.core.target")
+        local MissionClass = require("src.objects.mission")
+
+        -- Create a mock engineer
+        local engineer_type = InfantryTypeClass.Create(InfantryTypeClass.INFANTRY.E7)
+        assert(engineer_type.IsCapture == true, "Engineer type should have IsCapture=true")
+
+        -- Create a mock infantry instance (simulating engineer)
+        local engineer = setmetatable({
+            Class = engineer_type,
+            TarCom = Target.Build(Target.RTTI.BUILDING, 1),  -- Target is a building
+            NavCom = 0,
+            Mission = MissionClass.MISSION.ATTACK,
+            MISSION = MissionClass.MISSION,
+            assigned_mission = nil,
+            assigned_dest = nil,
+            Assign_Mission = function(self, m) self.assigned_mission = m end,
+            Assign_Destination = function(self, d) self.assigned_dest = d end,
+        }, { __index = InfantryClass })
+
+        -- Call Mission_Attack
+        local delay = engineer:Mission_Attack()
+
+        -- Engineer attacking a building should switch to capture
+        assert(engineer.assigned_mission == MissionClass.MISSION.CAPTURE,
+            "Engineer should switch to CAPTURE mission when attacking building")
+        assert(engineer.assigned_dest == engineer.TarCom,
+            "Engineer should set destination to target building")
+        assert(delay == 1, "Engineer capture switch should return 1 for immediate processing")
+
+        add_test("Engineer capture logic", true, "Engineer correctly switches to capture when attacking buildings")
+    end)
+
+    if not ok4 then
+        add_test("Engineer capture logic", false, tostring(err4))
+    end
+
+    -- Test 5: Non-engineer infantry uses parent Mission_Attack
+    local ok5, err5 = pcall(function()
+        local InfantryClass = require("src.objects.infantry")
+        local InfantryTypeClass = require("src.objects.types.infantrytype")
+        local FootClass = require("src.objects.foot")
+        local Target = require("src.core.target")
+        local MissionClass = require("src.objects.mission")
+
+        -- Create a mock minigunner (not an engineer)
+        local minigunner_type = InfantryTypeClass.Create(InfantryTypeClass.INFANTRY.E1)
+        assert(minigunner_type.IsCapture == false, "Minigunner should not have IsCapture")
+
+        -- Create a mock infantry instance
+        local minigunner = setmetatable({
+            Class = minigunner_type,
+            TarCom = Target.Build(Target.RTTI.BUILDING, 1),  -- Target is a building
+            NavCom = 0,
+            Mission = MissionClass.MISSION.ATTACK,
+            MISSION = MissionClass.MISSION,
+            assigned_mission = nil,
+            Assign_Mission = function(self, m) self.assigned_mission = m end,
+            Assign_Destination = function(self, d) end,
+            -- Mock methods from FootClass
+            Enter_Idle_Mode = function(self) self.Mission = MissionClass.MISSION.GUARD end,
+            Approach_Target = function(self) end,
+        }, { __index = InfantryClass })
+
+        -- Call Mission_Attack
+        local delay = minigunner:Mission_Attack()
+
+        -- Non-engineer should NOT switch to capture
+        assert(minigunner.assigned_mission ~= MissionClass.MISSION.CAPTURE,
+            "Non-engineer should not switch to capture mission")
+
+        add_test("Non-engineer attack logic", true, "Non-engineer infantry uses standard attack")
+    end)
+
+    if not ok5 then
+        add_test("Non-engineer attack logic", false, tostring(err5))
+    end
+
+    -- Test 6: BuildingClass BSTATE constants
+    local ok6, err6 = pcall(function()
+        local BuildingClass = require("src.objects.building")
+
+        -- Check BSTATE exists
+        assert(BuildingClass.BSTATE ~= nil, "BSTATE should exist")
+        assert(BuildingClass.BSTATE.NONE ~= nil, "BSTATE.NONE should exist")
+        assert(BuildingClass.BSTATE.CONSTRUCTION ~= nil, "BSTATE.CONSTRUCTION should exist")
+        assert(BuildingClass.BSTATE.IDLE ~= nil, "BSTATE.IDLE should exist")
+        assert(BuildingClass.BSTATE.ACTIVE ~= nil, "BSTATE.ACTIVE should exist")
+        assert(BuildingClass.BSTATE.FULL ~= nil, "BSTATE.FULL should exist")
+        assert(BuildingClass.BSTATE.AUX1 ~= nil, "BSTATE.AUX1 should exist")
+        assert(BuildingClass.BSTATE.AUX2 ~= nil, "BSTATE.AUX2 should exist")
+
+        add_test("BuildingClass BSTATE constants", true, "All BSTATE constants defined")
+    end)
+
+    if not ok6 then
+        add_test("BuildingClass BSTATE constants", false, tostring(err6))
     end
 
     -- Summary

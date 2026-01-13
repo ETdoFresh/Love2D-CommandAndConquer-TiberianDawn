@@ -535,6 +535,32 @@ end
 --============================================================================
 
 --[[
+    Attack mission - infantry-specific attack behavior.
+    Port of InfantryClass::Mission_Attack from INFANTRY.CPP
+
+    Special case: Engineers (E7) will capture buildings instead of attacking them.
+    All other infantry use the standard FootClass attack behavior.
+]]
+function InfantryClass:Mission_Attack()
+    -- Check if we're an engineer attacking a building
+    if self.Class and self.Class.IsCapture then
+        -- Check if target is a building
+        if Target.Is_Valid(self.TarCom) then
+            local target_rtti = Target.Get_RTTI(self.TarCom)
+            if target_rtti == Target.RTTI.BUILDING then
+                -- Engineer attacking building - switch to capture mission
+                self:Assign_Destination(self.TarCom)
+                self:Assign_Mission(self.MISSION.CAPTURE)
+                return 1  -- Immediate return (process next tick)
+            end
+        end
+    end
+
+    -- Not an engineer or not targeting building - use standard attack
+    return FootClass.Mission_Attack(self)
+end
+
+--[[
     Guard mission - infantry look around while guarding.
 ]]
 function InfantryClass:Mission_Guard()

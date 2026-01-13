@@ -939,6 +939,536 @@ function BuildingClass:Mission_Attack()
     return self:Rearm_Delay(false)
 end
 
+--[[
+    Mission_Construction - Handles building construction state machine.
+    Port of BuildingClass::Mission_Construction from BUILDING.CPP
+
+    States:
+    - INITIAL: Start construction animation, notify construction yard
+    - DURING: Wait for construction to complete, then go idle
+]]
+function BuildingClass:Mission_Construction()
+    local STATUS = {
+        INITIAL = 0,
+        DURING = 1
+    }
+
+    if not self._construction_status then
+        self._construction_status = STATUS.INITIAL
+    end
+
+    if self._construction_status == STATUS.INITIAL then
+        -- Start construction mode
+        self:Begin_Mode(BuildingClass.BSTATE.CONSTRUCTION)
+        self:Transmit_Message(self.RADIO.BUILDING)
+
+        -- Play construction sound for player
+        if self:Is_Owned_By_Player() then
+            -- Sound_Effect(VOC_CONSTRUCTION, self.Coord)
+        end
+
+        self._construction_status = STATUS.DURING
+
+    elseif self._construction_status == STATUS.DURING then
+        if self.IsReadyToCommence then
+            -- Construction complete - notify construction yard
+            self:Transmit_Message(self.RADIO.COMPLETE)
+            self:Transmit_Message(self.RADIO.OVER_OUT)
+
+            -- Go to idle state
+            self:Begin_Mode(BuildingClass.BSTATE.IDLE)
+
+            -- Grand opening (enable building features)
+            if self.Class and self.Class.Type ~= BuildingClass.BUILDING.FACT then
+                self:Grand_Opening()
+            end
+
+            self:Assign_Mission(self.MISSION.GUARD)
+
+            -- Reset facing to building's default
+            if self.Class and self.Class.StartFace then
+                self.PrimaryFacing = self.Class.StartFace
+            end
+
+            self._construction_status = nil
+        end
+    end
+
+    return 1
+end
+
+--[[
+    Mission_Deconstruction - Handles building sell/demolition state machine.
+    Port of BuildingClass::Mission_Deconstruction from BUILDING.CPP
+
+    States:
+    - INITIAL: Tell units to run away, special repair bay handling
+    - HOLDING: Wait for units to clear, spawn crew
+    - DURING: Play sell animation, refund and delete
+]]
+function BuildingClass:Mission_Deconstruction()
+    local STATUS = {
+        INITIAL = 0,
+        HOLDING = 1,
+        DURING = 2
+    }
+
+    if not self._deconstruction_status then
+        self._deconstruction_status = STATUS.INITIAL
+    end
+
+    -- Always force repair off
+    self.IsRepairing = false
+
+    if self._deconstruction_status == STATUS.INITIAL then
+        -- Special case: repair bay can sell what's on it
+        if self.Class and self.Class.Type == BuildingClass.BUILDING.FIX then
+            if self:In_Radio_Contact() then
+                local contact = self:Contact_With_Whom()
+                if contact and self:Transmit_Message(self.RADIO.NEED_TO_MOVE) == self.RADIO.ROGER then
+                    self:Transmit_Message(self.RADIO.OVER_OUT)
+                    if contact.Sell_Back then
+                        contact:Sell_Back(1)
+                    end
+                    self.IsReadyToCommence = true
+                    self:Assign_Mission(self.MISSION.GUARD)
+                    self._deconstruction_status = nil
+                    return 1
+                end
+            end
+        end
+
+        -- Tell any tethered units to run away
+        self.IsReadyToCommence = false
+        self:Transmit_Message(self.RADIO.RUN_AWAY)
+        self._deconstruction_status = STATUS.HOLDING
+
+    elseif self._deconstruction_status == STATUS.HOLDING then
+        if not self.IsTethered then
+            -- Spawn crew (survivors)
+            self:Spawn_Survivors()
+
+            -- Play sell sound
+            -- Sound_Effect(VOC_CASHTURN, self.Coord)
+
+            self:Transmit_Message(self.RADIO.OVER_OUT)
+            self._deconstruction_status = STATUS.DURING
+            self:Begin_Mode(BuildingClass.BSTATE.CONSTRUCTION)
+            self.IsReadyToCommence = false
+            self.IsSurvivorless = true
+        else
+            self:Transmit_Message(self.RADIO.RUN_AWAY)
+        end
+
+    elseif self._deconstruction_status == STATUS.DURING then
+        if self.IsReadyToCommence then
+            -- Special case: Construction yard can revert to MCV
+            local is_const_yard = self.Class and self.Class.Type == BuildingClass.BUILDING.FACT
+            local can_revert = self.ArchiveTarget and Target.Is_Valid(self.ArchiveTarget)
+
+            if is_const_yard and can_revert and self.House and self.House.IsHuman then
+                -- Would spawn MCV here
+                -- For now, just refund
+                if self.House and self.House.Refund_Money then
+                    self.House:Refund_Money(self:Refund_Amount())
+                end
+            else
+                -- Normal sell: refund and delete
+                self.WhoLastHurtMe = nil
+                self:Record_The_Kill(nil)
+
+                if self.House and self.House.Refund_Money then
+                    self.House:Refund_Money(self:Refund_Amount())
+                end
+
+                self:Limbo()
+
+                if self.House and self.House.Check_Pertinent_Structures then
+                    self.House:Check_Pertinent_Structures()
+                end
+
+                self:Delete_This()
+            end
+
+            if self.House then
+                self.House.IsRecalcNeeded = true
+            end
+
+            self._deconstruction_status = nil
+        end
+    end
+
+    return 1
+end
+
+--[[
+    Mission_Harvest - Handles refinery tiberium processing.
+    Port of BuildingClass::Mission_Harvest from BUILDING.CPP
+
+    States:
+    - INITIAL: Start docking animation
+    - WAIT_FOR_DOCK: Wait for harvester to dock
+    - MIDDLE: Offload tiberium bails one at a time
+    - WAIT_FOR_UNDOCK: Undocking animation
+    - EXITING: Release harvester
+]]
+function BuildingClass:Mission_Harvest()
+    local STATUS = {
+        INITIAL = 0,
+        WAIT_FOR_DOCK = 1,
+        MIDDLE = 2,
+        WAIT_FOR_UNDOCK = 3,
+        EXITING = 4
+    }
+
+    if not self._harvest_status then
+        self._harvest_status = STATUS.INITIAL
+    end
+
+    if self._harvest_status == STATUS.INITIAL then
+        self:Begin_Mode(BuildingClass.BSTATE.ACTIVE)
+        self._harvest_status = STATUS.WAIT_FOR_DOCK
+
+    elseif self._harvest_status == STATUS.WAIT_FOR_DOCK then
+        if self.IsReadyToCommence then
+            self.IsReadyToCommence = false
+            self._harvest_status = STATUS.MIDDLE
+            self:Begin_Mode(BuildingClass.BSTATE.AUX1)
+        end
+
+    elseif self._harvest_status == STATUS.MIDDLE then
+        if self.IsReadyToCommence then
+            self.IsReadyToCommence = false
+
+            -- Get attached harvester
+            local techno = self:Attached_Object()
+            if techno then
+                -- Offload one bail of tiberium
+                local bail = 0
+                if techno.Offload_Tiberium_Bail then
+                    bail = techno:Offload_Tiberium_Bail()
+                end
+
+                if bail > 0 then
+                    -- Add to house credits
+                    if self.House and self.House.Harvested then
+                        self.House:Harvested(bail)
+                    end
+
+                    -- If harvester still has tiberium, keep offloading
+                    if techno.Tiberium_Load and techno:Tiberium_Load() > 0 then
+                        return 1
+                    end
+                end
+            end
+
+            self:Begin_Mode(BuildingClass.BSTATE.AUX2)
+            self._harvest_status = STATUS.WAIT_FOR_UNDOCK
+        end
+
+    elseif self._harvest_status == STATUS.WAIT_FOR_UNDOCK then
+        if self.IsReadyToCommence then
+            -- Detach harvester and go back to idle
+            local harvester = self:Detach_Object()
+            if harvester then
+                self:Exit_Object(harvester)
+            end
+            self:Assign_Mission(self.MISSION.GUARD)
+            self._harvest_status = nil
+        end
+    end
+
+    return 1
+end
+
+--[[
+    Mission_Repair - Handles repair facility and construction yard repair mode.
+    Port of BuildingClass::Mission_Repair from BUILDING.CPP
+
+    For Construction Yard: Animates while constructing
+    For Repair Facility: Repairs docked vehicles
+    For Helipad: Rearms/repairs aircraft
+]]
+function BuildingClass:Mission_Repair()
+    local STATUS = {
+        INITIAL = 0,
+        IDLE = 1,
+        DURING = 2
+    }
+
+    if not self._repair_status then
+        self._repair_status = STATUS.INITIAL
+    end
+
+    -- Construction Yard repair (building mode)
+    if self.Class and self.Class.Type == BuildingClass.BUILDING.FACT then
+        if self._repair_status == STATUS.INITIAL then
+            self:Begin_Mode(BuildingClass.BSTATE.ACTIVE)
+            self._repair_status = STATUS.DURING
+
+        elseif self._repair_status == STATUS.DURING then
+            if not self:In_Radio_Contact() then
+                self:Assign_Mission(self.MISSION.GUARD)
+                self._repair_status = nil
+            end
+        end
+        return 1
+    end
+
+    -- Repair Facility
+    if self.Class and self.Class.Type == BuildingClass.BUILDING.FIX then
+        if self._repair_status == STATUS.INITIAL then
+            if not self:In_Radio_Contact() then
+                self:Begin_Mode(BuildingClass.BSTATE.IDLE)
+                self:Assign_Mission(self.MISSION.GUARD)
+                self._repair_status = nil
+                return 1
+            end
+
+            self.IsReadyToCommence = false
+            if self:Transmit_Message(self.RADIO.NEED_TO_MOVE) == self.RADIO.ROGER then
+                local contact = self:Contact_With_Whom()
+                if contact and self:Distance(contact) < 16 then
+                    self._repair_status = STATUS.IDLE
+                    return 4  -- TICKS_PER_SECOND / 4
+                end
+            end
+
+        elseif self._repair_status == STATUS.IDLE then
+            if not self:In_Radio_Contact() then
+                self:Assign_Mission(self.MISSION.GUARD)
+                self._repair_status = nil
+                return 1
+            end
+
+            if self:Transmit_Message(self.RADIO.NEED_TO_MOVE) == self.RADIO.ROGER then
+                local contact = self:Contact_With_Whom()
+                if contact then
+                    local health_ratio = contact:Health_Ratio()
+                    if health_ratio < 1.0 and self:Transmit_Message(self.RADIO.REPAIR) == self.RADIO.ROGER then
+                        -- Start repairing
+                        if self:Is_Owned_By_Player() then
+                            -- Speak(VOX_REPAIRING)
+                        end
+                        self._repair_status = STATUS.DURING
+                        self:Begin_Mode(BuildingClass.BSTATE.ACTIVE)
+                        self.IsReadyToCommence = false
+                    elseif not self.House or not self.House.IsHuman then
+                        self:Transmit_Message(self.RADIO.RUN_AWAY)
+                    end
+                end
+            end
+
+        elseif self._repair_status == STATUS.DURING then
+            if not self:In_Radio_Contact() then
+                self:Begin_Mode(BuildingClass.BSTATE.IDLE)
+                self._repair_status = STATUS.IDLE
+                return 1
+            end
+
+            if self.IsReadyToCommence and self:Transmit_Message(self.RADIO.NEED_TO_MOVE) == self.RADIO.ROGER then
+                self.IsReadyToCommence = false
+                if self:Transmit_Message(self.RADIO.REPAIR) ~= self.RADIO.ROGER then
+                    -- Repair complete or out of money
+                    self:Begin_Mode(BuildingClass.BSTATE.IDLE)
+                    self._repair_status = STATUS.IDLE
+                end
+            end
+        end
+
+        return 8  -- TICKS_PER_SECOND / 2
+    end
+
+    -- Helipad
+    if self.Class and self.Class.Type == BuildingClass.BUILDING.HPAD then
+        if self._repair_status == STATUS.INITIAL then
+            if self:Transmit_Message(self.RADIO.NEED_TO_MOVE) == self.RADIO.ROGER then
+                if self:Transmit_Message(self.RADIO.PREPARED) == self.RADIO.NEGATIVE then
+                    self:Begin_Mode(BuildingClass.BSTATE.ACTIVE)
+                    local contact = self:Contact_With_Whom()
+                    if contact then
+                        contact:Assign_Mission(self.MISSION.SLEEP)
+                    end
+                    self._repair_status = STATUS.DURING
+                    return 1
+                end
+            end
+            self:Assign_Mission(self.MISSION.GUARD)
+            self._repair_status = nil
+
+        elseif self._repair_status == STATUS.DURING then
+            if self.IsReadyToCommence then
+                if not self:In_Radio_Contact() or self:Transmit_Message(self.RADIO.NEED_TO_MOVE) == self.RADIO.NEGATIVE then
+                    self:Assign_Mission(self.MISSION.GUARD)
+                    self._repair_status = nil
+                    return 1
+                end
+
+                if self:Transmit_Message(self.RADIO.PREPARED) == self.RADIO.ROGER then
+                    local contact = self:Contact_With_Whom()
+                    if contact then
+                        contact:Assign_Mission(self.MISSION.GUARD)
+                    end
+                    self:Assign_Mission(self.MISSION.GUARD)
+                    self._repair_status = nil
+                    return 1
+                end
+
+                if self:Transmit_Message(self.RADIO.RELOAD) ~= self.RADIO.ROGER then
+                    self:Assign_Mission(self.MISSION.GUARD)
+                    local contact = self:Contact_With_Whom()
+                    if contact then
+                        contact:Assign_Mission(self.MISSION.GUARD)
+                    end
+                    self._repair_status = nil
+                    return 1
+                else
+                    self.IsReadyToCommence = false
+                    return 30  -- Reload time based on power
+                end
+            end
+        end
+
+        return 3
+    end
+
+    return 15
+end
+
+--[[
+    Mission_Missile - Handles Temple of Nod nuclear missile launch.
+    Port of BuildingClass::Mission_Missile from BUILDING.CPP
+
+    States:
+    - INITIAL: Start door opening animation
+    - DOOR_OPENING: Wait for door to fully open
+    - LAUNCH_UP: Launch missile upward with smoke
+    - LAUNCH_DOWN: After delay, spawn incoming nuke at target
+    - DONE_LAUNCH: Clean up and return to guard
+]]
+function BuildingClass:Mission_Missile()
+    local STATUS = {
+        INITIAL = 0,
+        DOOR_OPENING = 1,
+        LAUNCH_UP = 2,
+        LAUNCH_DOWN = 3,
+        DONE_LAUNCH = 4
+    }
+
+    if not self._missile_status then
+        self._missile_status = STATUS.INITIAL
+    end
+
+    -- Only Temple of Nod launches missiles
+    if not self.Class or self.Class.Type ~= BuildingClass.BUILDING.TMPL then
+        self:Assign_Mission(self.MISSION.GUARD)
+        self._missile_status = nil
+        return 15
+    end
+
+    if self._missile_status == STATUS.INITIAL then
+        self.IsReadyToCommence = false
+        self:Begin_Mode(BuildingClass.BSTATE.ACTIVE)
+        self._missile_status = STATUS.DOOR_OPENING
+        return 1
+
+    elseif self._missile_status == STATUS.DOOR_OPENING then
+        if self.IsReadyToCommence then
+            self:Begin_Mode(BuildingClass.BSTATE.IDLE)
+            -- Would spawn door opening animation here
+            self._missile_status = STATUS.LAUNCH_UP
+            return 14
+        end
+        return 1
+
+    elseif self._missile_status == STATUS.LAUNCH_UP then
+        -- Launch missile upward
+        -- Would spawn BULLET_NUKE_UP here
+        -- Sound_Effect(VOC_NUKE_FIRE)
+        -- Speak(VOX_NUKE_LAUNCHED)
+
+        self._missile_status = STATUS.LAUNCH_DOWN
+        return 120  -- 8 * TICKS_PER_SECOND
+
+    elseif self._missile_status == STATUS.LAUNCH_DOWN then
+        -- Spawn incoming nuke at target
+        if self.House and self.House.NukeDest then
+            -- Would spawn BULLET_NUKE_DOWN at NukeDest here
+            -- Speak(VOX_INCOMING_NUKE)
+        end
+
+        self._missile_status = STATUS.DONE_LAUNCH
+        return 1
+
+    elseif self._missile_status == STATUS.DONE_LAUNCH then
+        -- Mission complete, reset
+        self.HasFired = true
+        self:Assign_Mission(self.MISSION.GUARD)
+        self._missile_status = nil
+    end
+
+    return 1
+end
+
+--[[
+    Mission_Unload - Handles Weapons Factory and Helipad unit delivery.
+    Port of BuildingClass::Mission_Unload from BUILDING.CPP
+
+    Exits a completed unit from the factory.
+]]
+function BuildingClass:Mission_Unload()
+    local STATUS = {
+        INITIAL = 0,
+        DURING = 1
+    }
+
+    if not self._unload_status then
+        self._unload_status = STATUS.INITIAL
+    end
+
+    if self._unload_status == STATUS.INITIAL then
+        -- Start active animation
+        self:Begin_Mode(BuildingClass.BSTATE.ACTIVE)
+        self._unload_status = STATUS.DURING
+
+    elseif self._unload_status == STATUS.DURING then
+        if self.IsReadyToCommence then
+            -- Get the produced object
+            local object = self:Attached_Object()
+            if object then
+                -- Exit the object
+                self:Exit_Object(self:Detach_Object())
+            end
+
+            -- Return to idle
+            self:Assign_Mission(self.MISSION.GUARD)
+            self._unload_status = nil
+        end
+    end
+
+    return 1
+end
+
+--[[
+    Spawn survivors when building is sold or destroyed.
+    Called from Mission_Deconstruction.
+]]
+function BuildingClass:Spawn_Survivors()
+    if self.IsSurvivorless then return end
+    if not self.Class then return end
+
+    -- Calculate number of survivors based on building cost
+    local divisor = 200
+    if self.IsCaptured then divisor = divisor * 2 end
+
+    local raw_cost = self.Class.Cost or 1000
+    local count = math.floor((raw_cost + divisor - 1) / divisor)
+    count = math.max(1, math.min(5, count))
+
+    -- Would spawn infantry here based on Crew_Type()
+    -- For now, just log that survivors would spawn
+end
+
 --============================================================================
 -- Idle Mode
 --============================================================================
