@@ -291,6 +291,13 @@ function IPC:process_command(command)
         response.tests = test_result.tests
         response.message = test_result.message
 
+    elseif cmd == "test_phase6" then
+        -- Test Phase 6 integration (network events)
+        local test_result = self:test_phase6_integration()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
     elseif cmd == "help" then
         response.commands = {
             "input <key> - Simulate key press",
@@ -315,6 +322,7 @@ function IPC:process_command(command)
             "test_phase3 - Test Phase 3 integration (pathfinding, combat)",
             "test_phase4 - Test Phase 4 integration (economy, production, overlays)",
             "test_phase5 - Test Phase 5 integration (teams, triggers, scenarios)",
+            "test_phase6 - Test Phase 6 integration (network events)",
             "help - Show this help"
         }
 
@@ -4233,6 +4241,372 @@ function IPC:test_phase5_integration()
 
     if not ok16 then
         add_test("TeamTypeClass validation", false, tostring(err16))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test Phase 6 integration (network events)
+function IPC:test_phase6_integration()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: EventClass loading
+    local ok1, err1 = pcall(function()
+        local EventClass = require("src.network.event")
+
+        -- Test constants
+        assert(EventClass.TYPE.EMPTY == 0, "EMPTY should be 0")
+        assert(EventClass.TYPE.MEGAMISSION == 2, "MEGAMISSION should be 2")
+        assert(EventClass.TYPE.DEPLOY == 6, "DEPLOY should be 6")
+        assert(EventClass.TYPE.PRODUCE == 10, "PRODUCE should be 10")
+        assert(EventClass.TYPE.FRAMESYNC == 20, "FRAMESYNC should be 20")
+        assert(EventClass.TYPE.LAST_EVENT == 27, "LAST_EVENT should be 27")
+
+        add_test("EventClass constants", true, "Event type constants loaded correctly")
+    end)
+
+    if not ok1 then
+        add_test("EventClass constants", false, tostring(err1))
+    end
+
+    -- Test 2: EventClass creation
+    local ok2, err2 = pcall(function()
+        local EventClass = require("src.network.event")
+
+        local event = EventClass.new(EventClass.TYPE.DEPLOY)
+        assert(event ~= nil, "Event should be created")
+        assert(event.Type == EventClass.TYPE.DEPLOY, "Type should be DEPLOY")
+        assert(event.Frame == 0, "Frame should be 0")
+        assert(event.ID == 0, "ID should be 0")
+        assert(event.IsExecuted == false, "Should not be executed")
+
+        add_test("EventClass creation", true, "EventClass creates correctly")
+    end)
+
+    if not ok2 then
+        add_test("EventClass creation", false, tostring(err2))
+    end
+
+    -- Test 3: EventClass.Target factory
+    local ok3, err3 = pcall(function()
+        local EventClass = require("src.network.event")
+
+        local event = EventClass.Target(EventClass.TYPE.REPAIR, 0x12345678)
+        assert(event.Type == EventClass.TYPE.REPAIR, "Type should be REPAIR")
+        assert(event.Data.Whom == 0x12345678, "Whom should match target")
+
+        local event2 = EventClass.Target(EventClass.TYPE.SELL, 0xAABBCCDD)
+        assert(event2.Type == EventClass.TYPE.SELL, "Type should be SELL")
+        assert(event2.Data.Whom == 0xAABBCCDD, "Whom should match target")
+
+        add_test("EventClass.Target factory", true, "Target factory works correctly")
+    end)
+
+    if not ok3 then
+        add_test("EventClass.Target factory", false, tostring(err3))
+    end
+
+    -- Test 4: EventClass.MegaMission factory
+    local ok4, err4 = pcall(function()
+        local EventClass = require("src.network.event")
+
+        local event = EventClass.MegaMission(0x1111, 5, 0x2222, 0x3333)
+        assert(event.Type == EventClass.TYPE.MEGAMISSION, "Type should be MEGAMISSION")
+        assert(event.Data.Whom == 0x1111, "Whom should match")
+        assert(event.Data.Mission == 5, "Mission should match")
+        assert(event.Data.Target == 0x2222, "Target should match")
+        assert(event.Data.Destination == 0x3333, "Destination should match")
+
+        add_test("EventClass.MegaMission factory", true, "MegaMission factory works correctly")
+    end)
+
+    if not ok4 then
+        add_test("EventClass.MegaMission factory", false, tostring(err4))
+    end
+
+    -- Test 5: EventClass.Production factory
+    local ok5, err5 = pcall(function()
+        local EventClass = require("src.network.event")
+
+        local event = EventClass.Production(EventClass.TYPE.PRODUCE, 3, 5)
+        assert(event.Type == EventClass.TYPE.PRODUCE, "Type should be PRODUCE")
+        assert(event.Data.RTTIType == 3, "RTTIType should match")
+        assert(event.Data.TypeID == 5, "TypeID should match")
+
+        add_test("EventClass.Production factory", true, "Production factory works correctly")
+    end)
+
+    if not ok5 then
+        add_test("EventClass.Production factory", false, tostring(err5))
+    end
+
+    -- Test 6: EventClass.Place factory
+    local ok6, err6 = pcall(function()
+        local EventClass = require("src.network.event")
+
+        local event = EventClass.Place(7, 0x1234)
+        assert(event.Type == EventClass.TYPE.PLACE, "Type should be PLACE")
+        assert(event.Data.RTTIType == 7, "RTTIType should match")
+        assert(event.Data.Cell == 0x1234, "Cell should match")
+
+        add_test("EventClass.Place factory", true, "Place factory works correctly")
+    end)
+
+    if not ok6 then
+        add_test("EventClass.Place factory", false, tostring(err6))
+    end
+
+    -- Test 7: EventClass.SpecialPlace factory
+    local ok7, err7 = pcall(function()
+        local EventClass = require("src.network.event")
+
+        local event = EventClass.SpecialPlace(2, 0x5678)
+        assert(event.Type == EventClass.TYPE.SPECIAL_PLACE, "Type should be SPECIAL_PLACE")
+        assert(event.Data.SpecialID == 2, "SpecialID should match")
+        assert(event.Data.Cell == 0x5678, "Cell should match")
+
+        add_test("EventClass.SpecialPlace factory", true, "SpecialPlace factory works correctly")
+    end)
+
+    if not ok7 then
+        add_test("EventClass.SpecialPlace factory", false, tostring(err7))
+    end
+
+    -- Test 8: EventClass.FrameSync factory
+    local ok8, err8 = pcall(function()
+        local EventClass = require("src.network.event")
+
+        local event = EventClass.FrameSync(0xDEADBEEF, 100, 3)
+        assert(event.Type == EventClass.TYPE.FRAMESYNC, "Type should be FRAMESYNC")
+        assert(event.Data.CRC == 0xDEADBEEF, "CRC should match")
+        assert(event.Data.CommandCount == 100, "CommandCount should match")
+        assert(event.Data.Delay == 3, "Delay should match")
+
+        add_test("EventClass.FrameSync factory", true, "FrameSync factory works correctly")
+    end)
+
+    if not ok8 then
+        add_test("EventClass.FrameSync factory", false, tostring(err8))
+    end
+
+    -- Test 9: EventClass.Message factory
+    local ok9, err9 = pcall(function()
+        local EventClass = require("src.network.event")
+
+        local event = EventClass.Message("Hello World!")
+        assert(event.Type == EventClass.TYPE.MESSAGE, "Type should be MESSAGE")
+        assert(event.Data.Message == "Hello World!", "Message should match")
+
+        -- Test truncation
+        local long_msg = string.rep("X", 50)
+        local event2 = EventClass.Message(long_msg)
+        assert(#event2.Data.Message == 40, "Message should be truncated to 40 chars")
+
+        add_test("EventClass.Message factory", true, "Message factory works correctly")
+    end)
+
+    if not ok9 then
+        add_test("EventClass.Message factory", false, tostring(err9))
+    end
+
+    -- Test 10: Event type names
+    local ok10, err10 = pcall(function()
+        local EventClass = require("src.network.event")
+
+        local event = EventClass.new(EventClass.TYPE.MEGAMISSION)
+        assert(event:Get_Type_Name() == "MEGAMISSION", "Type name should be MEGAMISSION")
+
+        local event2 = EventClass.new(EventClass.TYPE.FRAMESYNC)
+        assert(event2:Get_Type_Name() == "FRAMESYNC", "Type name should be FRAMESYNC")
+
+        add_test("EventClass type names", true, "Type name lookup works")
+    end)
+
+    if not ok10 then
+        add_test("EventClass type names", false, tostring(err10))
+    end
+
+    -- Test 11: Event data sizes
+    local ok11, err11 = pcall(function()
+        local EventClass = require("src.network.event")
+
+        local event1 = EventClass.new(EventClass.TYPE.EMPTY)
+        assert(event1:Get_Data_Size() == 0, "EMPTY should have 0 data size")
+
+        local event2 = EventClass.new(EventClass.TYPE.MEGAMISSION)
+        assert(event2:Get_Data_Size() == 13, "MEGAMISSION should have 13 data size")
+
+        local event3 = EventClass.new(EventClass.TYPE.MESSAGE)
+        assert(event3:Get_Data_Size() == 40, "MESSAGE should have 40 data size")
+
+        add_test("EventClass data sizes", true, "Data size lookup works")
+    end)
+
+    if not ok11 then
+        add_test("EventClass data sizes", false, tostring(err11))
+    end
+
+    -- Test 12: Event encoding (simple event)
+    local ok12, err12 = pcall(function()
+        local EventClass = require("src.network.event")
+
+        local event = EventClass.new(EventClass.TYPE.EXIT)
+        event.Frame = 100
+        event.ID = 2
+        event.MPlayerID = 0x35
+
+        local encoded = event:Encode()
+        assert(encoded ~= nil, "Encoding should succeed")
+        assert(#encoded == 7, string.format("EXIT event should be 7 bytes, got %d", #encoded))
+
+        add_test("EventClass encoding (simple)", true, "Simple event encoding works")
+    end)
+
+    if not ok12 then
+        add_test("EventClass encoding (simple)", false, tostring(err12))
+    end
+
+    -- Test 13: Event encoding/decoding roundtrip
+    local ok13, err13 = pcall(function()
+        local EventClass = require("src.network.event")
+
+        -- Test MegaMission roundtrip
+        local original = EventClass.MegaMission(0x12345678, 5, 0xAABBCCDD, 0x11223344)
+        original.Frame = 12345
+        original.ID = 3
+        original.MPlayerID = 0x42
+
+        local encoded = original:Encode()
+        assert(encoded ~= nil, "Encoding should succeed")
+
+        local decoded, bytes = EventClass.Decode(encoded)
+        assert(decoded ~= nil, "Decoding should succeed")
+        assert(decoded.Type == original.Type, "Type should match")
+        assert(decoded.Frame == original.Frame, "Frame should match")
+        assert(decoded.ID == original.ID, "ID should match")
+        assert(decoded.MPlayerID == original.MPlayerID, "MPlayerID should match")
+        assert(decoded.Data.Whom == original.Data.Whom, "Whom should match")
+        assert(decoded.Data.Mission == original.Data.Mission, "Mission should match")
+        assert(decoded.Data.Target == original.Data.Target, "Target should match")
+        assert(decoded.Data.Destination == original.Data.Destination, "Destination should match")
+
+        add_test("EventClass encoding/decoding roundtrip", true, "Roundtrip encoding works")
+    end)
+
+    if not ok13 then
+        add_test("EventClass encoding/decoding roundtrip", false, tostring(err13))
+    end
+
+    -- Test 14: EventQueue creation
+    local ok14, err14 = pcall(function()
+        local EventClass = require("src.network.event")
+
+        local queue = EventClass.Queue.new()
+        assert(queue ~= nil, "Queue should be created")
+        assert(queue.current_frame == 0, "Current frame should be 0")
+        assert(#queue.events == 0, "Events should be empty")
+
+        add_test("EventQueue creation", true, "EventQueue creates correctly")
+    end)
+
+    if not ok14 then
+        add_test("EventQueue creation", false, tostring(err14))
+    end
+
+    -- Test 15: EventQueue Add and Get_Events_For_Frame
+    local ok15, err15 = pcall(function()
+        local EventClass = require("src.network.event")
+
+        local queue = EventClass.Queue.new()
+
+        -- Add events for different frames
+        local event1 = EventClass.new(EventClass.TYPE.DEPLOY)
+        event1.Frame = 10
+        queue:Add(event1)
+
+        local event2 = EventClass.new(EventClass.TYPE.REPAIR)
+        event2.Frame = 10
+        queue:Add(event2)
+
+        local event3 = EventClass.new(EventClass.TYPE.SELL)
+        event3.Frame = 15
+        queue:Add(event3)
+
+        -- Get events for frame 10
+        local frame10_events = queue:Get_Events_For_Frame(10)
+        assert(#frame10_events == 2, "Should have 2 events for frame 10")
+
+        -- Get events for frame 15
+        local frame15_events = queue:Get_Events_For_Frame(15)
+        assert(#frame15_events == 1, "Should have 1 event for frame 15")
+
+        -- Get events for frame 20 (none)
+        local frame20_events = queue:Get_Events_For_Frame(20)
+        assert(#frame20_events == 0, "Should have 0 events for frame 20")
+
+        add_test("EventQueue Add and Get", true, "EventQueue Add/Get works correctly")
+    end)
+
+    if not ok15 then
+        add_test("EventQueue Add and Get", false, tostring(err15))
+    end
+
+    -- Test 16: EventQueue Pending_Count and Cleanup
+    local ok16, err16 = pcall(function()
+        local EventClass = require("src.network.event")
+
+        local queue = EventClass.Queue.new()
+
+        local event1 = EventClass.new(EventClass.TYPE.DEPLOY)
+        event1.Frame = 5
+        queue:Add(event1)
+
+        local event2 = EventClass.new(EventClass.TYPE.REPAIR)
+        event2.Frame = 10
+        queue:Add(event2)
+
+        assert(queue:Pending_Count() == 2, "Should have 2 pending events")
+
+        -- Execute frame 5
+        queue:Execute_Frame(5, {})
+        assert(queue:Pending_Count() == 1, "Should have 1 pending event after execute")
+
+        -- Cleanup events before frame 8
+        queue:Cleanup(8)
+        assert(#queue.events == 1, "Should have 1 event after cleanup")
+
+        add_test("EventQueue Pending_Count and Cleanup", true, "Pending count and cleanup work")
+    end)
+
+    if not ok16 then
+        add_test("EventQueue Pending_Count and Cleanup", false, tostring(err16))
     end
 
     -- Summary
