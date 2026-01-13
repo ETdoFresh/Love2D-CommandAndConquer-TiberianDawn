@@ -256,6 +256,13 @@ function IPC:process_command(command)
         response.tests = test_result.tests
         response.message = test_result.message
 
+    elseif cmd == "test_specific_types" then
+        -- Test the specific type classes (InfantryTypeClass, UnitTypeClass, AircraftTypeClass, BuildingTypeClass)
+        local test_result = self:test_specific_types()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
     elseif cmd == "help" then
         response.commands = {
             "input <key> - Simulate key press",
@@ -275,6 +282,7 @@ function IPC:process_command(command)
             "test_drive - Test DriveClass, TurretClass, TarComClass, FlyClass",
             "test_types - Test AbstractTypeClass, ObjectTypeClass, TechnoTypeClass",
             "test_concrete - Test InfantryClass, UnitClass, AircraftClass, BuildingClass",
+            "test_specific_types - Test InfantryTypeClass, UnitTypeClass, AircraftTypeClass, BuildingTypeClass",
             "help - Show this help"
         }
 
@@ -2364,6 +2372,353 @@ function IPC:test_concrete_classes()
 
     if not ok16 then
         add_test("BuildingClass repair system", false, tostring(err16))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test the specific type classes (InfantryTypeClass, UnitTypeClass, AircraftTypeClass, BuildingTypeClass)
+function IPC:test_specific_types()
+    local result = { success = true, tests = {} }
+
+    local function add_test(name, passed, detail)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            detail = detail
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: Load all type class modules
+    local ok1, err1 = pcall(function()
+        local InfantryTypeClass = require("src.objects.types.infantrytype")
+        local UnitTypeClass = require("src.objects.types.unittype")
+        local AircraftTypeClass = require("src.objects.types.aircrafttype")
+        local BuildingTypeClass = require("src.objects.types.buildingtype")
+
+        assert(InfantryTypeClass ~= nil, "InfantryTypeClass should load")
+        assert(UnitTypeClass ~= nil, "UnitTypeClass should load")
+        assert(AircraftTypeClass ~= nil, "AircraftTypeClass should load")
+        assert(BuildingTypeClass ~= nil, "BuildingTypeClass should load")
+
+        add_test("Type class modules", true, "All type class modules loaded")
+    end)
+
+    if not ok1 then
+        add_test("Type class modules", false, tostring(err1))
+        return result
+    end
+
+    -- Test 2: InfantryTypeClass basic creation
+    local InfantryTypeClass = require("src.objects.types.infantrytype")
+    local ok2, err2 = pcall(function()
+        local infType = InfantryTypeClass:new("TEST", "Test Infantry")
+        assert(infType.IniName == "TEST", "Should have correct IniName")
+        assert(infType.Name == "Test Infantry", "Should have correct Name")
+        assert(infType.Type == InfantryTypeClass.INFANTRY.NONE, "Should default to NONE")
+        assert(infType.IsFemale == false, "Should default to male")
+        assert(infType.IsCrawling == true, "Should default to crawling")
+        assert(infType.IsCapture == false, "Should default to no capture")
+        assert(infType.IsFraidyCat == false, "Should default to not afraid")
+
+        add_test("InfantryTypeClass creation", true, "Basic creation works")
+    end)
+
+    if not ok2 then
+        add_test("InfantryTypeClass creation", false, tostring(err2))
+    end
+
+    -- Test 3: InfantryTypeClass factory method
+    local ok3, err3 = pcall(function()
+        local minigunner = InfantryTypeClass.Create(InfantryTypeClass.INFANTRY.E1)
+        assert(minigunner.Type == InfantryTypeClass.INFANTRY.E1, "Should be E1 type")
+        assert(minigunner.Cost == 100, "E1 should cost 100")
+        assert(minigunner.MaxStrength == 50, "E1 should have 50 health")
+
+        local engineer = InfantryTypeClass.Create(InfantryTypeClass.INFANTRY.E7)
+        assert(engineer.IsCapture == true, "Engineer should capture")
+        assert(engineer.Cost == 500, "Engineer should cost 500")
+
+        local commando = InfantryTypeClass.Create(InfantryTypeClass.INFANTRY.RAMBO)
+        assert(commando.IsLeader == true, "Commando should be leader")
+        assert(commando.Cost == 1000, "Commando should cost 1000")
+
+        add_test("InfantryTypeClass factory", true, "Factory creates correct types")
+    end)
+
+    if not ok3 then
+        add_test("InfantryTypeClass factory", false, tostring(err3))
+    end
+
+    -- Test 4: InfantryTypeClass DoType animation control
+    local ok4, err4 = pcall(function()
+        local infType = InfantryTypeClass:new("TEST", "Test")
+        infType:Set_Do_Control(InfantryTypeClass.DO.WALK, 10, 8, 4)
+
+        local control = infType:Get_Do_Control(InfantryTypeClass.DO.WALK)
+        assert(control.Frame == 10, "Walk frame should be 10")
+        assert(control.Count == 8, "Walk count should be 8")
+        assert(control.Jump == 4, "Walk jump should be 4")
+
+        local frame = infType:Get_Action_Frame(InfantryTypeClass.DO.WALK, 3)
+        assert(frame == 10 + (3 * 4), "Action frame should be 22")
+
+        local count = infType:Get_Action_Count(InfantryTypeClass.DO.WALK)
+        assert(count == 8, "Action count should be 8")
+
+        add_test("InfantryTypeClass animation", true, "DoType animation works")
+    end)
+
+    if not ok4 then
+        add_test("InfantryTypeClass animation", false, tostring(err4))
+    end
+
+    -- Test 5: UnitTypeClass basic creation
+    local UnitTypeClass = require("src.objects.types.unittype")
+    local ok5, err5 = pcall(function()
+        local unitType = UnitTypeClass:new("TEST", "Test Vehicle")
+        assert(unitType.Type == UnitTypeClass.UNIT.NONE, "Should default to NONE")
+        assert(unitType.SpeedType == UnitTypeClass.SPEED.TRACKED, "Should default to TRACKED")
+        assert(unitType.IsCrusher == false, "Should default to no crush")
+        assert(unitType.IsHarvester == false, "Should default to no harvest")
+        assert(unitType.IsDeployable == false, "Should default to no deploy")
+
+        add_test("UnitTypeClass creation", true, "Basic creation works")
+    end)
+
+    if not ok5 then
+        add_test("UnitTypeClass creation", false, tostring(err5))
+    end
+
+    -- Test 6: UnitTypeClass factory method
+    local ok6, err6 = pcall(function()
+        local mammoth = UnitTypeClass.Create(UnitTypeClass.UNIT.HTANK)
+        assert(mammoth.Type == UnitTypeClass.UNIT.HTANK, "Should be HTANK")
+        assert(mammoth.Cost == 1500, "Mammoth should cost 1500")
+        assert(mammoth.IsCrusher == true, "Mammoth should crush")
+        assert(mammoth.IsTwoShooter == true, "Mammoth has dual weapons")
+
+        local harvester = UnitTypeClass.Create(UnitTypeClass.UNIT.HARVESTER)
+        assert(harvester.IsHarvester == true, "Should be harvester")
+        assert(harvester.Cost == 1400, "Harvester should cost 1400")
+
+        local mcv = UnitTypeClass.Create(UnitTypeClass.UNIT.MCV)
+        assert(mcv.IsDeployable == true, "MCV should deploy")
+        assert(mcv.Cost == 5000, "MCV should cost 5000")
+
+        add_test("UnitTypeClass factory", true, "Factory creates correct types")
+    end)
+
+    if not ok6 then
+        add_test("UnitTypeClass factory", false, tostring(err6))
+    end
+
+    -- Test 7: UnitTypeClass query functions
+    local ok7, err7 = pcall(function()
+        local buggy = UnitTypeClass.Create(UnitTypeClass.UNIT.BUGGY)
+        assert(buggy:Is_Wheeled() == true, "Buggy should be wheeled")
+        assert(buggy:Is_Tracked() == false, "Buggy should not be tracked")
+        assert(buggy:Can_Crush() == false, "Buggy should not crush")
+
+        local tank = UnitTypeClass.Create(UnitTypeClass.UNIT.MTANK)
+        assert(tank:Is_Tracked() == true, "Tank should be tracked")
+        assert(tank:Can_Crush() == true, "Tank should crush")
+
+        add_test("UnitTypeClass queries", true, "Query functions work")
+    end)
+
+    if not ok7 then
+        add_test("UnitTypeClass queries", false, tostring(err7))
+    end
+
+    -- Test 8: AircraftTypeClass basic creation
+    local AircraftTypeClass = require("src.objects.types.aircrafttype")
+    local ok8, err8 = pcall(function()
+        local airType = AircraftTypeClass:new("TEST", "Test Aircraft")
+        assert(airType.Type == AircraftTypeClass.AIRCRAFT.NONE, "Should default to NONE")
+        assert(airType.IsFixedWing == false, "Should default to rotorcraft")
+        assert(airType.IsRotorEquipped == true, "Should default to rotor")
+        assert(airType.IsLandable == true, "Should default to landable")
+        assert(airType.IsVTOL == true, "Should default to VTOL")
+
+        add_test("AircraftTypeClass creation", true, "Basic creation works")
+    end)
+
+    if not ok8 then
+        add_test("AircraftTypeClass creation", false, tostring(err8))
+    end
+
+    -- Test 9: AircraftTypeClass factory method
+    local ok9, err9 = pcall(function()
+        local transport = AircraftTypeClass.Create(AircraftTypeClass.AIRCRAFT.TRANSPORT)
+        assert(transport.IsTransportAircraft == true, "Should be transport")
+        assert(transport.IsRotorEquipped == true, "Chinook has rotor")
+        assert(transport.Cost == 1500, "Transport should cost 1500")
+
+        local a10 = AircraftTypeClass.Create(AircraftTypeClass.AIRCRAFT.A10)
+        assert(a10.IsFixedWing == true, "A-10 is fixed wing")
+        assert(a10.IsLandable == false, "A-10 cannot land")
+        assert(a10.IsBuildable == false, "A-10 is not buildable")
+
+        local apache = AircraftTypeClass.Create(AircraftTypeClass.AIRCRAFT.HELICOPTER)
+        assert(apache.MaxAmmo == 15, "Apache has 15 ammo")
+        assert(apache.Cost == 1200, "Apache should cost 1200")
+
+        add_test("AircraftTypeClass factory", true, "Factory creates correct types")
+    end)
+
+    if not ok9 then
+        add_test("AircraftTypeClass factory", false, tostring(err9))
+    end
+
+    -- Test 10: AircraftTypeClass query functions
+    local ok10, err10 = pcall(function()
+        local a10 = AircraftTypeClass.Create(AircraftTypeClass.AIRCRAFT.A10)
+        assert(a10:Is_Fixed_Wing() == true, "A-10 is fixed wing")
+        assert(a10:Is_Rotor_Equipped() == false, "A-10 has no rotor")
+        assert(a10:Can_Land() == false, "A-10 cannot land")
+        assert(a10:Is_VTOL() == false, "A-10 is not VTOL")
+
+        local heli = AircraftTypeClass.Create(AircraftTypeClass.AIRCRAFT.HELICOPTER)
+        assert(heli:Is_Fixed_Wing() == false, "Heli is not fixed wing")
+        assert(heli:Can_Land() == true, "Heli can land")
+
+        add_test("AircraftTypeClass queries", true, "Query functions work")
+    end)
+
+    if not ok10 then
+        add_test("AircraftTypeClass queries", false, tostring(err10))
+    end
+
+    -- Test 11: BuildingTypeClass basic creation
+    local BuildingTypeClass = require("src.objects.types.buildingtype")
+    local ok11, err11 = pcall(function()
+        local bldType = BuildingTypeClass:new("TEST", "Test Building")
+        assert(bldType.Type == BuildingTypeClass.STRUCT.NONE, "Should default to NONE")
+        assert(bldType.SizeWidth == 1, "Should default to 1 wide")
+        assert(bldType.SizeHeight == 1, "Should default to 1 tall")
+        assert(bldType.PowerOutput == 0, "Should default to 0 power output")
+        assert(bldType.PowerDrain == 0, "Should default to 0 power drain")
+        assert(bldType.FactoryType == BuildingTypeClass.FACTORY.NONE, "Should default to no factory")
+
+        add_test("BuildingTypeClass creation", true, "Basic creation works")
+    end)
+
+    if not ok11 then
+        add_test("BuildingTypeClass creation", false, tostring(err11))
+    end
+
+    -- Test 12: BuildingTypeClass factory method - power buildings
+    local ok12, err12 = pcall(function()
+        local powerPlant = BuildingTypeClass.Create(BuildingTypeClass.STRUCT.POWER)
+        assert(powerPlant.PowerOutput == 100, "Power plant should output 100")
+        assert(powerPlant.Cost == 300, "Power plant should cost 300")
+
+        local advPower = BuildingTypeClass.Create(BuildingTypeClass.STRUCT.ADVANCED_POWER)
+        assert(advPower.PowerOutput == 200, "Adv power should output 200")
+        assert(advPower.Cost == 700, "Adv power should cost 700")
+
+        add_test("BuildingTypeClass power buildings", true, "Power buildings work")
+    end)
+
+    if not ok12 then
+        add_test("BuildingTypeClass power buildings", false, tostring(err12))
+    end
+
+    -- Test 13: BuildingTypeClass factory method - factories
+    local ok13, err13 = pcall(function()
+        local barracks = BuildingTypeClass.Create(BuildingTypeClass.STRUCT.BARRACKS)
+        assert(barracks.FactoryType == BuildingTypeClass.FACTORY.INFANTRY, "Barracks builds infantry")
+        assert(barracks:Can_Build_Infantry() == true, "Should build infantry")
+
+        local weap = BuildingTypeClass.Create(BuildingTypeClass.STRUCT.WEAP)
+        assert(weap.FactoryType == BuildingTypeClass.FACTORY.UNIT, "Weap builds units")
+        assert(weap:Can_Build_Units() == true, "Should build units")
+
+        local helipad = BuildingTypeClass.Create(BuildingTypeClass.STRUCT.HELIPAD)
+        assert(helipad.FactoryType == BuildingTypeClass.FACTORY.AIRCRAFT, "Helipad builds aircraft")
+        assert(helipad.IsHelipad == true, "Should be helipad")
+
+        local conyard = BuildingTypeClass.Create(BuildingTypeClass.STRUCT.CONST)
+        assert(conyard.FactoryType == BuildingTypeClass.FACTORY.BUILDING, "CY builds buildings")
+        assert(conyard:Can_Build_Buildings() == true, "Should build buildings")
+
+        add_test("BuildingTypeClass factories", true, "Factory buildings work")
+    end)
+
+    if not ok13 then
+        add_test("BuildingTypeClass factories", false, tostring(err13))
+    end
+
+    -- Test 14: BuildingTypeClass size and foundation
+    local ok14, err14 = pcall(function()
+        local conyard = BuildingTypeClass.Create(BuildingTypeClass.STRUCT.CONST)
+        local w, h = conyard:Get_Size()
+        assert(w == 3 and h == 3, "CY should be 3x3")
+
+        local foundation = conyard:Get_Foundation()
+        assert(#foundation == 9, "CY should have 9 foundation cells")
+
+        local refinery = BuildingTypeClass.Create(BuildingTypeClass.STRUCT.REFINERY)
+        w, h = refinery:Get_Size()
+        assert(w == 3 and h == 2, "Refinery should be 3x2")
+
+        add_test("BuildingTypeClass size", true, "Size and foundation work")
+    end)
+
+    if not ok14 then
+        add_test("BuildingTypeClass size", false, tostring(err14))
+    end
+
+    -- Test 15: BuildingTypeClass defense buildings
+    local ok15, err15 = pcall(function()
+        local gtower = BuildingTypeClass.Create(BuildingTypeClass.STRUCT.GTWR)
+        assert(gtower.IsBaseDefense == true, "Guard tower is defense")
+        assert(gtower.IsCapturable == false, "Defense cannot be captured")
+
+        local obelisk = BuildingTypeClass.Create(BuildingTypeClass.STRUCT.OBELISK)
+        assert(obelisk.IsBaseDefense == true, "Obelisk is defense")
+        assert(obelisk.PowerDrain == 150, "Obelisk drains 150 power")
+
+        local turret = BuildingTypeClass.Create(BuildingTypeClass.STRUCT.TURRET)
+        assert(turret.IsTurretEquipped == true, "Gun turret has turret")
+
+        add_test("BuildingTypeClass defenses", true, "Defense buildings work")
+    end)
+
+    if not ok15 then
+        add_test("BuildingTypeClass defenses", false, tostring(err15))
+    end
+
+    -- Test 16: BuildingTypeClass storage
+    local ok16, err16 = pcall(function()
+        local refinery = BuildingTypeClass.Create(BuildingTypeClass.STRUCT.REFINERY)
+        assert(refinery.TiberiumCapacity == 1000, "Refinery stores 1000")
+
+        local silo = BuildingTypeClass.Create(BuildingTypeClass.STRUCT.STORAGE)
+        assert(silo.TiberiumCapacity == 1500, "Silo stores 1500")
+
+        add_test("BuildingTypeClass storage", true, "Storage buildings work")
+    end)
+
+    if not ok16 then
+        add_test("BuildingTypeClass storage", false, tostring(err16))
     end
 
     -- Summary
