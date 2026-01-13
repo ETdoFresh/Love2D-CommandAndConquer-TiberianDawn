@@ -494,8 +494,16 @@ function Game:init_systems()
         end
     end
 
+    -- Link cloak system to render system for stealth effects
+    -- Reference: Original C&C - cloaked units shimmer for owner, invisible to enemies
+    if self.cloak_system and self.render_system then
+        self.render_system:set_cloak_system(self.cloak_system)
+        self.render_system:set_viewer_house(self.player_house)
+    end
+
     if self.audio_system then
         self.audio_system.world = self.world
+        self.audio_system:set_player_house(self.player_house)
     end
 
     -- Initialize sidebar with system references
@@ -814,6 +822,12 @@ function Game:draw()
 
         -- Draw special weapon targeting cursor
         self:draw_targeting_cursor()
+
+        -- Draw sell/repair mode cursor overlay
+        self:draw_action_mode_cursor()
+
+        -- Draw command hints (Deploy for MCV, etc.)
+        self:draw_command_hints()
 
         -- Draw pause overlay
         if self.state == Game.STATE.PAUSED then
@@ -2319,6 +2333,109 @@ function Game:draw_targeting_cursor()
     love.graphics.printf("Right-click to fire | ESC to cancel", mx - 100, my + pixel_radius + 30, 200, "center")
 end
 
+-- Draw sell/repair mode cursor overlay
+-- Reference: Original C&C shows special cursor in sell/repair modes
+function Game:draw_action_mode_cursor()
+    if not self.sidebar then return end
+
+    local mx, my = love.mouse.getPosition()
+
+    -- Sell mode cursor
+    if self.sidebar:is_sell_mode() then
+        -- Draw sell indicator at cursor
+        love.graphics.setColor(1, 0.8, 0.2, 0.9)
+        love.graphics.setLineWidth(2)
+
+        -- Dollar sign shaped cursor indicator
+        love.graphics.circle("line", mx, my, 15)
+        love.graphics.setColor(1, 0.8, 0.2, 1)
+        love.graphics.printf("$", mx - 10, my - 8, 20, "center")
+
+        -- Mode label
+        love.graphics.setColor(1, 0.8, 0.2, 0.8)
+        love.graphics.printf("SELL MODE - Click building to sell", mx - 100, my + 20, 200, "center")
+        love.graphics.setColor(0.8, 0.8, 0.8, 0.7)
+        love.graphics.printf("Right-click or ESC to cancel", mx - 100, my + 35, 200, "center")
+
+    -- Repair mode cursor
+    elseif self.sidebar:is_repair_mode() then
+        -- Draw repair indicator at cursor
+        love.graphics.setColor(0.4, 0.7, 1, 0.9)
+        love.graphics.setLineWidth(2)
+
+        -- Wrench shaped cursor indicator
+        love.graphics.circle("line", mx, my, 15)
+        love.graphics.setColor(0.4, 0.7, 1, 1)
+        love.graphics.printf("R", mx - 10, my - 8, 20, "center")
+
+        -- Mode label
+        love.graphics.setColor(0.4, 0.7, 1, 0.8)
+        love.graphics.printf("REPAIR MODE - Click building to repair", mx - 100, my + 20, 200, "center")
+        love.graphics.setColor(0.8, 0.8, 0.8, 0.7)
+        love.graphics.printf("Right-click or ESC to cancel", mx - 100, my + 35, 200, "center")
+    end
+end
+
+-- Draw command hints for selected units (Deploy for MCV, etc.)
+-- Reference: Original C&C showed contextual commands for selected units
+function Game:draw_command_hints()
+    if not self.selection_system then return end
+
+    local selected = self.selection_system:get_selected_entities()
+    if #selected == 0 then return end
+
+    -- Check if any selected unit is deployable (MCV)
+    local has_deployable = false
+    local can_deploy = false
+    local deploy_error = nil
+
+    for _, entity in ipairs(selected) do
+        if entity:has("deployable") and entity:has("owner") then
+            local owner = entity:get("owner")
+            if owner.house == self.player_house then
+                has_deployable = true
+                -- Check if can deploy at current location
+                if self.production_system then
+                    can_deploy, deploy_error = self.production_system:can_deploy(entity, self.grid)
+                end
+                break
+            end
+        end
+    end
+
+    if has_deployable then
+        -- Draw deploy hint in corner of screen
+        local hint_x = 10
+        local hint_y = love.graphics.getHeight() - 60
+
+        -- Background
+        love.graphics.setColor(0, 0, 0, 0.7)
+        love.graphics.rectangle("fill", hint_x, hint_y, 200, 50, 5, 5)
+
+        -- Border
+        if can_deploy then
+            love.graphics.setColor(0.2, 0.8, 0.2, 1)
+        else
+            love.graphics.setColor(0.8, 0.2, 0.2, 1)
+        end
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", hint_x, hint_y, 200, 50, 5, 5)
+
+        -- Text
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.printf("MCV SELECTED", hint_x, hint_y + 5, 200, "center")
+
+        if can_deploy then
+            love.graphics.setColor(0.2, 1, 0.2, 1)
+            love.graphics.printf("Press D to Deploy", hint_x, hint_y + 25, 200, "center")
+        else
+            love.graphics.setColor(1, 0.5, 0.5, 1)
+            local msg = deploy_error or "Cannot deploy here"
+            love.graphics.printf(msg, hint_x, hint_y + 25, 200, "center")
+        end
+    end
+end
+
 -- Input handling
 function Game:keypressed(key)
     if self.state == Game.STATE.MENU then
@@ -2515,6 +2632,12 @@ function Game:handle_playing_input(key)
         -- Cancel special weapon targeting first
         if self.special_weapons and self.special_weapons.targeting then
             self.special_weapons:cancel_targeting()
+            return
+        end
+
+        -- Cancel sell/repair modes
+        if self.sidebar and (self.sidebar:is_sell_mode() or self.sidebar:is_repair_mode()) then
+            self.sidebar:cancel_modes()
             return
         end
 
@@ -2962,8 +3085,142 @@ function Game:mousepressed(x, y, button)
             return
         end
 
+        -- Check sell/repair modes from sidebar
+        -- Reference: Original C&C - click building in sell mode to sell, repair mode to repair
+        if button == 1 and self.sidebar then
+            if self.sidebar:is_sell_mode() then
+                local handled = self:handle_sell_mode_click(x, y)
+                if handled then
+                    return
+                end
+            elseif self.sidebar:is_repair_mode() then
+                local handled = self:handle_repair_mode_click(x, y)
+                if handled then
+                    return
+                end
+            end
+        elseif button == 2 and self.sidebar then
+            -- Right click cancels sell/repair mode
+            if self.sidebar:is_sell_mode() or self.sidebar:is_repair_mode() then
+                self.sidebar:cancel_modes()
+                return
+            end
+        end
+
         self.selection_system:on_mouse_pressed(x, y, button, self.render_system)
     end
+end
+
+-- Handle click in sell mode - sell the clicked building
+-- Reference: Original C&C - selling refunds 50% of building cost
+function Game:handle_sell_mode_click(x, y)
+    -- Convert screen to world coordinates
+    local world_x, world_y = self.render_system:screen_to_world(x, y)
+
+    -- Convert to cell coordinates
+    local cell_x = math.floor(world_x / Constants.CELL_SIZE)
+    local cell_y = math.floor(world_y / Constants.CELL_SIZE)
+
+    -- Find building at this cell
+    local building = self:find_building_at_cell(cell_x, cell_y)
+
+    if building and building:has("owner") then
+        local owner = building:get("owner")
+
+        -- Can only sell own buildings
+        if owner.house == self.player_house then
+            -- Sell the building
+            if self.production_system then
+                local success, refund = self.production_system:sell_building(building, self.grid)
+                if success then
+                    Events.emit("EVA_SPEECH", "structure sold", self.player_house)
+                    -- Cancel sell mode after successful sale (like original)
+                    self.sidebar:cancel_modes()
+                    return true
+                end
+            end
+        else
+            -- Can't sell enemy buildings
+            Events.emit("UI_MESSAGE", "Cannot sell enemy buildings")
+        end
+    end
+
+    return false
+end
+
+-- Handle click in repair mode - start repairing the clicked building
+-- Reference: Original C&C - repair costs credits over time to restore health
+function Game:handle_repair_mode_click(x, y)
+    -- Convert screen to world coordinates
+    local world_x, world_y = self.render_system:screen_to_world(x, y)
+
+    -- Convert to cell coordinates
+    local cell_x = math.floor(world_x / Constants.CELL_SIZE)
+    local cell_y = math.floor(world_y / Constants.CELL_SIZE)
+
+    -- Find building at this cell
+    local building = self:find_building_at_cell(cell_x, cell_y)
+
+    if building and building:has("owner") and building:has("health") then
+        local owner = building:get("owner")
+        local health = building:get("health")
+
+        -- Can only repair own buildings
+        if owner.house == self.player_house then
+            -- Check if building needs repair
+            if health.hp < health.max_hp then
+                -- Toggle repair state
+                if building.repairing then
+                    -- Stop repairing
+                    if self.production_system then
+                        self.production_system:stop_repair(building)
+                    end
+                    building.repairing = false
+                    Events.emit("EVA_SPEECH", "repair stopped", self.player_house)
+                else
+                    -- Start repairing
+                    if self.production_system then
+                        self.production_system:start_repair(building)
+                    end
+                    building.repairing = true
+                    Events.emit("EVA_SPEECH", "repairing", self.player_house)
+                end
+                return true
+            else
+                Events.emit("UI_MESSAGE", "Building at full health")
+            end
+        else
+            Events.emit("UI_MESSAGE", "Cannot repair enemy buildings")
+        end
+    end
+
+    return false
+end
+
+-- Find a building at the given cell coordinates
+function Game:find_building_at_cell(cell_x, cell_y)
+    local buildings = self.world:get_entities_with("building", "transform")
+
+    for _, building in ipairs(buildings) do
+        local transform = building:get("transform")
+        local building_comp = building:get("building")
+
+        -- Get building's cell position
+        local bx = math.floor(transform.x / Constants.LEPTON_PER_CELL)
+        local by = math.floor(transform.y / Constants.LEPTON_PER_CELL)
+
+        -- Get building size (default 1x1)
+        local size_x = building_comp.size_x or 1
+        local size_y = building_comp.size_y or 1
+
+        -- Check if clicked cell is within building footprint
+        if cell_x >= bx and cell_x < bx + size_x and
+           cell_y >= by and cell_y < by + size_y then
+            return building
+        end
+    end
+
+    return nil
 end
 
 function Game:mousemoved(x, y, dx, dy)

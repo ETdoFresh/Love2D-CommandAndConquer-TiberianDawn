@@ -36,12 +36,28 @@ function RenderSystem.new()
     -- Reference to fog system for visibility checks
     self.fog_system = nil
 
+    -- Reference to cloak system for stealth effects
+    self.cloak_system = nil
+
+    -- Viewer house (for cloaking visibility)
+    self.viewer_house = nil
+
     return self
 end
 
 -- Set fog system reference for visibility filtering
 function RenderSystem:set_fog_system(fog_system)
     self.fog_system = fog_system
+end
+
+-- Set cloak system reference for stealth rendering
+function RenderSystem:set_cloak_system(cloak_system)
+    self.cloak_system = cloak_system
+end
+
+-- Set viewer house (for cloak visibility determination)
+function RenderSystem:set_viewer_house(house)
+    self.viewer_house = house
 end
 
 function RenderSystem:init()
@@ -151,6 +167,27 @@ function RenderSystem:draw_entity(entity)
 
     if not renderable.visible then return end
 
+    -- Check cloaking visibility
+    -- Reference: Original C&C - cloaked units invisible to enemies, shimmer to owner
+    local cloak_alpha = 1
+    local shimmer_enabled = false
+    local shimmer_x, shimmer_y = 0, 0
+    local cloak_tint = {1, 1, 1}
+
+    if entity:has("cloak") and self.cloak_system then
+        local render_info = self.cloak_system:get_render_info(entity, self.viewer_house)
+        cloak_alpha = render_info.alpha
+        shimmer_enabled = render_info.shimmer_enabled
+        shimmer_x = render_info.shimmer_x
+        shimmer_y = render_info.shimmer_y
+        cloak_tint = render_info.color_tint
+
+        -- Don't render if fully invisible
+        if cloak_alpha <= 0 then
+            return
+        end
+    end
+
     -- Convert lepton position to pixels
     local px = transform.x / Constants.PIXEL_LEPTON_W
     local py = transform.y / Constants.PIXEL_LEPTON_H
@@ -158,6 +195,12 @@ function RenderSystem:draw_entity(entity)
     -- Apply offset
     px = px + (renderable.offset_x or 0)
     py = py + (renderable.offset_y or 0)
+
+    -- Apply shimmer offset for cloaked units
+    if shimmer_enabled then
+        px = px + shimmer_x
+        py = py + shimmer_y
+    end
 
     -- Aircraft altitude handling - draw shadow and offset sprite
     -- Reference: Original C&C draws shadow at ground level, sprite at altitude
@@ -179,9 +222,15 @@ function RenderSystem:draw_entity(entity)
         py = py - altitude
     end
 
-    -- Apply color/tint
+    -- Apply color/tint with cloak effects
     local color = renderable.color or {1, 1, 1, 1}
-    love.graphics.setColor(unpack(color))
+    local final_color = {
+        color[1] * cloak_tint[1],
+        color[2] * cloak_tint[2],
+        color[3] * cloak_tint[3],
+        (color[4] or 1) * cloak_alpha
+    }
+    love.graphics.setColor(unpack(final_color))
 
     -- Check if we have a sprite name string that we can load
     local sprite_name = renderable.sprite

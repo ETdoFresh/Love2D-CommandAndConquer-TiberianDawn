@@ -465,6 +465,43 @@ function TeamSystem:assign_team_mission(team)
             if self.ai_system then
                 self.ai_system:set_mission(entity, Constants.MISSION.HUNT)
             end
+
+        elseif mission == TeamSystem.MISSION.DEPLOY then
+            -- Deploy MCVs to create Construction Yards
+            -- Reference: Original C&C - DEPLOY mission makes MCVs deploy at waypoint
+            if entity:has("deployable") then
+                -- Move to deployment waypoint first
+                local waypoint = team.waypoints[1]
+                if waypoint and self.ai_system then
+                    self.ai_system:set_mission(entity, Constants.MISSION.MOVE)
+                    entity.target_x = waypoint.x
+                    entity.target_y = waypoint.y
+                    entity.deploy_on_arrival = true  -- Flag to deploy when arriving
+                end
+            else
+                -- Non-MCV units just guard
+                if self.ai_system then
+                    self.ai_system:set_mission(entity, Constants.MISSION.GUARD)
+                end
+            end
+
+        elseif mission == TeamSystem.MISSION.UNLOAD then
+            -- Unload transports at waypoint
+            -- Reference: Original C&C - UNLOAD mission makes transports drop cargo
+            if entity:has("transport") then
+                local waypoint = team.waypoints[1]
+                if waypoint and self.ai_system then
+                    self.ai_system:set_mission(entity, Constants.MISSION.MOVE)
+                    entity.target_x = waypoint.x
+                    entity.target_y = waypoint.y
+                    entity.unload_on_arrival = true  -- Flag to unload when arriving
+                end
+            else
+                -- Non-transport units just guard
+                if self.ai_system then
+                    self.ai_system:set_mission(entity, Constants.MISSION.GUARD)
+                end
+            end
         end
     end
 end
@@ -503,6 +540,60 @@ function TeamSystem:update_team(team, dt)
     elseif team.mission == TeamSystem.MISSION.ATTACK_BASE or
            team.mission == TeamSystem.MISSION.ATTACK_UNITS then
         self:update_coordinated_attack(team)
+
+    elseif team.mission == TeamSystem.MISSION.DEPLOY then
+        self:update_deploy_mission(team)
+
+    elseif team.mission == TeamSystem.MISSION.UNLOAD then
+        self:update_unload_mission(team)
+    end
+end
+
+-- Update DEPLOY mission - deploy MCVs when they arrive at waypoint
+-- Reference: Original C&C - AI deploys MCV at designated location
+function TeamSystem:update_deploy_mission(team)
+    for _, entity in ipairs(team.members) do
+        if entity.deploy_on_arrival and entity:has("deployable") and entity:has("transform") then
+            local transform = entity:get("transform")
+            local waypoint = team.waypoints[1]
+
+            if waypoint then
+                -- Check if entity has arrived at waypoint (within 1 cell)
+                local dx = transform.x - waypoint.x
+                local dy = transform.y - waypoint.y
+                local dist = math.sqrt(dx * dx + dy * dy)
+
+                if dist < Constants.LEPTON_PER_CELL then
+                    -- Try to deploy
+                    Events.emit("DEPLOY_UNIT", entity)
+                    entity.deploy_on_arrival = false
+                end
+            end
+        end
+    end
+end
+
+-- Update UNLOAD mission - unload transports when they arrive at waypoint
+-- Reference: Original C&C - Chinooks and APCs unload at designated location
+function TeamSystem:update_unload_mission(team)
+    for _, entity in ipairs(team.members) do
+        if entity.unload_on_arrival and entity:has("transport") and entity:has("transform") then
+            local transform = entity:get("transform")
+            local waypoint = team.waypoints[1]
+
+            if waypoint then
+                -- Check if entity has arrived at waypoint (within 1 cell)
+                local dx = transform.x - waypoint.x
+                local dy = transform.y - waypoint.y
+                local dist = math.sqrt(dx * dx + dy * dy)
+
+                if dist < Constants.LEPTON_PER_CELL then
+                    -- Unload all passengers
+                    Events.emit("UNLOAD_TRANSPORT", entity)
+                    entity.unload_on_arrival = false
+                end
+            end
+        end
     end
 end
 
