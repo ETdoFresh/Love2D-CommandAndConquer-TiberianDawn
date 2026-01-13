@@ -773,6 +773,12 @@ end
 
 --[[
     Mission_Unload - Harvester unloading at refinery.
+
+    Reference: UnitClass::Mission_Unload from UNIT.CPP
+
+    Called when harvester is docked at refinery. Offloads tiberium
+    one bail at a time, crediting the owning house for each bail.
+    When empty, returns to harvesting.
 ]]
 function UnitClass:Mission_Unload()
     if not self:Is_Harvester() then
@@ -782,14 +788,29 @@ function UnitClass:Mission_Unload()
 
     -- Empty? Go back to harvesting
     if self:Is_Empty() then
-        self:Find_Tiberium()
+        -- Reset harvest status for new cycle
+        self.Status = 0  -- LOOKING state
+        self.IsHarvesting = false
+
+        -- Break radio contact with refinery
+        if self:In_Radio_Contact() then
+            self:Transmit_Message(self.RADIO.OVER_OUT)
+        end
+
+        -- Find tiberium to harvest
+        if self:Find_Tiberium() then
+            self:Assign_Mission(self.MISSION.HARVEST)
+        else
+            self:Enter_Idle_Mode()
+        end
         return 15
     end
 
-    -- Unload one bail
+    -- Unload one bail of tiberium
     local credits = self:Offload_Tiberium_Bail()
     if credits > 0 and self.House then
-        -- self.House:Refund_Money(credits)
+        -- Credit the owning house for tiberium value
+        self.House:add_credits(credits)
     end
 
     return UnitClass.UNLOAD_DELAY

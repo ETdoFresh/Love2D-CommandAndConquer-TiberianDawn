@@ -307,15 +307,106 @@ function BuildingClass:Power_Drain()
 end
 
 --[[
-    Check if building has enough power.
+    Check if building has enough power to operate.
+
+    Reference: BuildingClass::Has_Power from BUILDING.CPP
+
+    Returns true if the building has sufficient power to function.
+    Buildings that don't require power (like walls) always return true.
+    Production and defensive buildings require adequate power.
+
+    @return true if building can operate normally
 ]]
 function BuildingClass:Has_Power()
     if not self.House then
         return true
     end
-    -- Would check house power status
-    -- return self.House:Power_Status() >= 1.0
-    return true
+
+    -- Check if this building type requires power
+    local type_class = self.Class
+    if type_class then
+        -- Power plants themselves always "have power" for basic operation
+        if type_class.IsPowerPlant then
+            return true
+        end
+
+        -- Buildings with no power drain don't need power
+        if (type_class.PowerDrain or 0) <= 0 then
+            return true
+        end
+    end
+
+    -- Check house power ratio
+    local power_ratio = self.House:get_power_ratio()
+
+    -- Full power if ratio >= 1.0
+    if power_ratio >= 1.0 then
+        return true
+    end
+
+    -- Low power affects operation
+    return false
+end
+
+--[[
+    Get power efficiency multiplier for this building.
+
+    Reference: Based on original C&C power mechanics
+
+    Returns a value 0.0-1.0 indicating operational efficiency.
+    At full power: 1.0 (100% efficiency)
+    At low power: reduced based on power ratio
+    At no power: 0.0 (building offline)
+
+    @return efficiency multiplier (0.0 to 1.0)
+]]
+function BuildingClass:Power_Efficiency()
+    if not self.House then
+        return 1.0
+    end
+
+    -- Check if building requires power at all
+    local type_class = self.Class
+    if type_class then
+        if type_class.IsPowerPlant then
+            return 1.0
+        end
+        if (type_class.PowerDrain or 0) <= 0 then
+            return 1.0
+        end
+    end
+
+    local power_ratio = self.House:get_power_ratio()
+
+    -- Full efficiency at or above 100% power
+    if power_ratio >= 1.0 then
+        return 1.0
+    end
+
+    -- Efficiency scales with power ratio (minimum 25% if any power)
+    if power_ratio > 0 then
+        return 0.25 + (power_ratio * 0.75)
+    end
+
+    -- No power means offline
+    return 0.0
+end
+
+--[[
+    Check if building can produce/fire due to power status.
+
+    Reference: Original C&C required adequate power for production
+
+    @return true if building can perform active operations
+]]
+function BuildingClass:Can_Operate()
+    -- Must be operational (not destroyed, not in limbo)
+    if not self:Is_Operational() then
+        return false
+    end
+
+    -- Check power status
+    return self:Has_Power()
 end
 
 --============================================================================
@@ -1119,6 +1210,114 @@ function BuildingClass:Debug_Dump()
     if self.SabotageTimer > 0 then
         print(string.format("  SABOTAGE: %d ticks remaining!", self.SabotageTimer))
     end
+end
+
+--============================================================================
+-- Radio Communication
+--============================================================================
+
+--[[
+    Handle incoming radio messages.
+
+    Reference: BuildingClass::Receive_Message from BUILDING.CPP
+
+    Buildings respond to various radio messages from units, especially
+    refineries responding to harvesters requesting docking.
+
+    @param from - The object sending the message
+    @param message - The radio message type
+    @param param - Optional parameter
+    @return Response message
+]]
+function BuildingClass:Receive_Message(from, message, param)
+    -- Let parent handle basic messages first
+    local response = TechnoClass.Receive_Message(self, from, message, param)
+
+    -- If parent didn't handle it (returned STATIC), try building-specific handling
+    if response ~= self.RADIO.STATIC then
+        return response
+    end
+
+    local type_class = self.Class
+
+    -- Refinery-specific handling
+    if type_class and type_class.IsRefinery then
+        -- HELLO from harvester - request to dock
+        if message == self.RADIO.HELLO then
+            -- Check if we're already busy with another harvester
+            if self:In_Radio_Contact() and self.Radio ~= from then
+                return self.RADIO.NEGATIVE
+            end
+
+            -- Check if refinery is operational
+            if not self:Is_Operational() then
+                return self.RADIO.NEGATIVE
+            end
+
+            -- Accept the harvester
+            self.Radio = from
+            return self.RADIO.ROGER
+        end
+
+        -- DOCKING - harvester is arriving to dock
+        if message == self.RADIO.DOCKING then
+            if self.Radio == from then
+                -- Set building state to FULL (harvester docking)
+                self:Begin_Mode(BuildingClass.BSTATE.FULL)
+                return self.RADIO.ROGER
+            end
+            return self.RADIO.NEGATIVE
+        end
+
+        -- IM_IN - harvester has entered/docked
+        if message == self.RADIO.IM_IN then
+            if self.Radio == from then
+                -- Harvester is now inside, ready to unload
+                return self.RADIO.ROGER
+            end
+            return self.RADIO.NEGATIVE
+        end
+
+        -- OVER_OUT - harvester is leaving
+        if message == self.RADIO.OVER_OUT then
+            if self.Radio == from then
+                self.Radio = nil
+                -- Return to idle state
+                self:Begin_Mode(BuildingClass.BSTATE.IDLE)
+            end
+            return self.RADIO.ROGER
+        end
+    end
+
+    -- Repair facility specific handling
+    if type_class and type_class.IsRepairFacility then
+        if message == self.RADIO.HELLO then
+            if self:In_Radio_Contact() and self.Radio ~= from then
+                return self.RADIO.NEGATIVE
+            end
+            if not self:Is_Operational() then
+                return self.RADIO.NEGATIVE
+            end
+            self.Radio = from
+            return self.RADIO.ROGER
+        end
+    end
+
+    -- Helipad specific handling
+    if type_class and type_class.IsHelipad then
+        if message == self.RADIO.HELLO then
+            if self:In_Radio_Contact() and self.Radio ~= from then
+                return self.RADIO.NEGATIVE
+            end
+            if not self:Is_Operational() then
+                return self.RADIO.NEGATIVE
+            end
+            self.Radio = from
+            return self.RADIO.ROGER
+        end
+    end
+
+    return self.RADIO.STATIC
 end
 
 return BuildingClass

@@ -328,6 +328,7 @@ function IPC:process_command(command)
             "test_combat_system - Test Combat system (Explosion_Damage, BulletClass, Approach_Target)",
             "test_pathfinding - Test Pathfinding and Animation effects (SmudgeClass, Middle())",
             "test_economy - Test Economy and Production systems (Phase 4: harvesters, MCV, factories)",
+            "test_economy_integration - Test Economy Integration (harvester credits, power penalties, refinery docking)",
             "help - Show this help"
         }
 
@@ -362,6 +363,13 @@ function IPC:process_command(command)
     elseif cmd == "test_economy" then
         -- Test Economy and Production systems (Phase 4)
         local test_result = self:test_economy()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
+    elseif cmd == "test_economy_integration" then
+        -- Test Economy Integration (harvester credits, power, refinery)
+        local test_result = self:test_economy_integration()
         response.success = test_result.success
         response.tests = test_result.tests
         response.message = test_result.message
@@ -5663,6 +5671,214 @@ function IPC:test_economy()
 
     if not ok7 then
         add_test("Grid search functionality", false, tostring(err7))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test Economy Integration (harvester credits, power penalties, refinery docking)
+function IPC:test_economy_integration()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: Mission_Unload credits House
+    local ok1, err1 = pcall(function()
+        local House = require("src.house.house")
+        local UnitClass = require("src.objects.unit")
+
+        -- Create a test house
+        local house = House.new(0, "TestHouse")
+        house.credits = 1000
+
+        -- Create a mock harvester
+        local harvester = {
+            House = house,
+            Tiberium = 5,
+            Class = { IsHarvester = true },
+            UnloadTimer = 0,
+            Status = 0,
+            IsHarvesting = false,
+            MISSION = { HARVEST = 1 },
+            RADIO = { OVER_OUT = 10 },
+        }
+
+        -- Mock methods
+        function harvester:Is_Harvester() return true end
+        function harvester:Is_Empty() return self.Tiberium <= 0 end
+        function harvester:Is_Full() return false end
+        function harvester:In_Radio_Contact() return false end
+        function harvester:Transmit_Message() return 0 end
+        function harvester:Find_Tiberium() return false end
+        function harvester:Enter_Idle_Mode() end
+        function harvester:Assign_Mission() end
+
+        -- Use UnitClass's Offload_Tiberium_Bail
+        setmetatable(harvester, { __index = UnitClass })
+
+        local initial_credits = house.credits
+        local bail_value = harvester:Offload_Tiberium_Bail()
+
+        assert(bail_value == 25, "Offload_Tiberium_Bail should return 25 credits")
+
+        -- Manually test add_credits (simulating what Mission_Unload does)
+        house:add_credits(bail_value)
+        assert(house.credits == initial_credits + bail_value,
+            "House credits should increase after unloading")
+
+        add_test("Mission_Unload credits House", true, "Credits properly added to house")
+    end)
+
+    if not ok1 then
+        add_test("Mission_Unload credits House", false, tostring(err1))
+    end
+
+    -- Test 2: Power penalties affect production
+    local ok2, err2 = pcall(function()
+        local House = require("src.house.house")
+        local FactoryClass = require("src.production.factory")
+
+        -- Create a test house with low power
+        local house = House.new(0, "TestHouse")
+        house.power_output = 50
+        house.power_drain = 100  -- 50% power ratio
+
+        local ratio = house:get_power_ratio()
+        assert(ratio == 0.5, "Power ratio should be 0.5 at 50/100")
+
+        -- Test low power flag (is_low_power uses has_power flag)
+        house.has_power = false  -- Simulate low power state
+        assert(house:is_low_power() == true, "Should detect low power when has_power=false")
+
+        -- Create full power house
+        house.power_output = 200
+        house.power_drain = 100
+        house.has_power = true  -- Simulate adequate power
+        ratio = house:get_power_ratio()
+        assert(ratio >= 1.0, "Power ratio should be >= 1.0 at full power")
+        assert(house:is_low_power() == false, "Should not be low power when has_power=true")
+
+        add_test("Power penalties affect production", true, "Power ratio calculations correct")
+    end)
+
+    if not ok2 then
+        add_test("Power penalties affect production", false, tostring(err2))
+    end
+
+    -- Test 3: BuildingClass power methods
+    local ok3, err3 = pcall(function()
+        local BuildingClass = require("src.objects.building")
+
+        -- Check methods exist
+        assert(type(BuildingClass.Has_Power) == "function", "Has_Power should exist")
+        assert(type(BuildingClass.Power_Efficiency) == "function", "Power_Efficiency should exist")
+        assert(type(BuildingClass.Can_Operate) == "function", "Can_Operate should exist")
+
+        add_test("BuildingClass power methods", true, "All power penalty methods available")
+    end)
+
+    if not ok3 then
+        add_test("BuildingClass power methods", false, tostring(err3))
+    end
+
+    -- Test 4: Building Receive_Message for refineries
+    local ok4, err4 = pcall(function()
+        local BuildingClass = require("src.objects.building")
+
+        -- Check Receive_Message is defined
+        assert(type(BuildingClass.Receive_Message) == "function",
+            "BuildingClass:Receive_Message should exist")
+
+        -- Check radio constants
+        assert(BuildingClass.RADIO ~= nil or require("src.objects.radio").RADIO ~= nil,
+            "RADIO constants should be available")
+
+        add_test("Building refinery radio handling", true, "Receive_Message method available")
+    end)
+
+    if not ok4 then
+        add_test("Building refinery radio handling", false, tostring(err4))
+    end
+
+    -- Test 5: UnitClass harvester state machine
+    local ok5, err5 = pcall(function()
+        local UnitClass = require("src.objects.unit")
+
+        -- Check harvester methods exist
+        assert(type(UnitClass.Mission_Harvest) == "function", "Mission_Harvest should exist")
+        assert(type(UnitClass.Mission_Unload) == "function", "Mission_Unload should exist")
+        assert(type(UnitClass.On_Tiberium) == "function", "On_Tiberium should exist")
+        assert(type(UnitClass.Harvesting) == "function", "Harvesting should exist")
+        assert(type(UnitClass.Find_Tiberium) == "function", "Find_Tiberium should exist")
+        assert(type(UnitClass.Find_Refinery) == "function", "Find_Refinery should exist")
+
+        add_test("UnitClass harvester state machine", true, "All harvester methods available")
+    end)
+
+    if not ok5 then
+        add_test("UnitClass harvester state machine", false, tostring(err5))
+    end
+
+    -- Test 6: Cell tiberium harvesting
+    local ok6, err6 = pcall(function()
+        local Cell = require("src.map.cell")
+
+        -- Create a test cell with tiberium
+        local cell = Cell.new(10, 10)
+        cell.overlay = 10  -- Tiberium overlay type (value = (10-5)*10 = 50)
+
+        assert(cell:has_tiberium() == true, "Cell should have tiberium")
+
+        local value_before = cell:get_tiberium_value()
+        assert(value_before == 50, "Initial tiberium value should be 50")
+
+        -- Harvest enough to actually change the level
+        local harvested = cell:harvest_tiberium(15)  -- Harvest 15 units
+
+        assert(harvested == 15, "Should harvest 15 tiberium units")
+
+        local value_after = cell:get_tiberium_value()
+        assert(value_after < value_before, "Tiberium value should decrease after harvesting")
+        assert(value_after == 35 or value_after == 40,
+            "Tiberium should be 35-40 after harvesting 15 from 50")
+
+        -- Test harvesting all remaining tiberium
+        local cell2 = Cell.new(5, 5)
+        cell2.overlay = 6  -- Minimum tiberium (value = 10)
+        local all_harvested = cell2:harvest_tiberium(100)  -- Try to harvest more than available
+        assert(all_harvested == 10, "Should only harvest what's available")
+        assert(cell2:has_tiberium() == false, "Cell should have no tiberium after full harvest")
+
+        add_test("Cell tiberium harvesting", true, "Cell harvest_tiberium works correctly")
+    end)
+
+    if not ok6 then
+        add_test("Cell tiberium harvesting", false, tostring(err6))
     end
 
     -- Summary

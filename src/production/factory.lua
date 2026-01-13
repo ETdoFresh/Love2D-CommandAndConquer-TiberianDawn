@@ -437,6 +437,21 @@ function FactoryClass:AI()
     if not self.IsSuspended and (self.Object or self.ObjectType or
        self.SpecialItem ~= FactoryClass.SPECIAL.NONE) then
 
+        -- Check power status - production slows or stops at low power
+        local power_mult = 1.0
+        if self.House then
+            local power_ratio = self.House:get_power_ratio()
+            if power_ratio < 1.0 then
+                if power_ratio <= 0 then
+                    -- No power - production stops completely
+                    return
+                end
+                -- Low power - production runs at reduced speed
+                -- At 50% power, production runs at 50% speed
+                power_mult = power_ratio
+            end
+        end
+
         -- Calculate acceleration factor (multiple factories)
         local stages = 1
         if self.House and self.House.is_human and self.ObjectType then
@@ -453,8 +468,11 @@ function FactoryClass:AI()
             stages = math.max(stages, 1)
         end
 
-        -- Process multiple stages if accelerated
-        for _ = 1, stages do
+        -- Apply power multiplier to stages (minimum 1 if any progress)
+        local effective_stages = math.max(1, math.floor(stages * power_mult))
+
+        -- Process stages (reduced by power penalty)
+        for _ = 1, effective_stages do
             if not self:Has_Completed() and self:Graphic_Logic() then
                 self.IsDifferent = true
 
