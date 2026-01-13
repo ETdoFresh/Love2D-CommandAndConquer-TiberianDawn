@@ -327,6 +327,21 @@ function Game:register_events()
             end
         end
     end)
+
+    -- Handle AI production queue requests
+    Events.on("AI_QUEUE_BUILD", function(house, item_type, category)
+        self:handle_ai_queue_build(house, item_type, category)
+    end)
+
+    -- Handle AI building placement requests
+    Events.on("AI_PLACE_BUILDING", function(house, building_type, cell_x, cell_y)
+        self:handle_ai_place_building(house, building_type, cell_x, cell_y)
+    end)
+
+    -- Handle AI building repair requests
+    Events.on("AI_REPAIR_BUILDING", function(house, building)
+        self:handle_ai_repair_building(house, building)
+    end)
 end
 
 -- Get waypoint from current scenario
@@ -3330,6 +3345,186 @@ function Game:find_construction_yard()
         end
     end
     return nil
+end
+
+--[[
+    Find a construction yard for a specific house.
+
+    @param house - The house ID (Constants.HOUSE.GOOD, Constants.HOUSE.BAD, etc.)
+    @return entity - The construction yard entity or nil
+]]
+function Game:find_construction_yard_for_house(house)
+    local entities = self.world:get_all_entities()
+    for _, entity in ipairs(entities) do
+        if entity:has("building") and entity:has("production") and entity:has("owner") then
+            local owner = entity:get("owner")
+            local building = entity:get("building")
+
+            if owner.house == house and building.structure_type == "FACT" then
+                return entity
+            end
+        end
+    end
+    return nil
+end
+
+--[[
+    Find a factory for a specific house and unit category.
+
+    @param house - The house ID
+    @param category - "infantry", "vehicle", or "aircraft"
+    @return entity - The factory entity or nil
+]]
+function Game:find_factory_for_house(house, category)
+    local entities = self.world:get_all_entities()
+    local target_types = {
+        infantry = {"PYLE", "HAND"},      -- Barracks or Hand of Nod
+        vehicle = {"WEAP"},                -- Weapons Factory
+        aircraft = {"AFLD", "HPAD"}        -- Airfield or Helipad
+    }
+
+    local valid_types = target_types[category]
+    if not valid_types then return nil end
+
+    for _, entity in ipairs(entities) do
+        if entity:has("building") and entity:has("production") and entity:has("owner") then
+            local owner = entity:get("owner")
+            local building = entity:get("building")
+
+            if owner.house == house then
+                for _, btype in ipairs(valid_types) do
+                    if building.structure_type == btype then
+                        return entity
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+--[[
+    Handle AI production queue requests.
+
+    Called when AI controller wants to start building something.
+    Routes the request to the appropriate factory and deducts credits.
+
+    @param house - The AI house making the request
+    @param item_type - Type identifier (e.g., "NUKE", "E1", "HTNK")
+    @param category - "building", "infantry", "vehicle", or "aircraft"
+]]
+function Game:handle_ai_queue_build(house, item_type, category)
+    if not self.production_system or not self.harvest_system then
+        return
+    end
+
+    -- Find the appropriate factory for this house
+    local factory
+    if category == "building" then
+        factory = self:find_construction_yard_for_house(house)
+    else
+        factory = self:find_factory_for_house(house, category)
+    end
+
+    if not factory then
+        return  -- No factory available
+    end
+
+    -- Get item cost
+    local cost = 0
+    if category == "building" then
+        local data = self.production_system.building_data[item_type]
+        cost = data and data.cost or 0
+    else
+        local data = self.production_system.unit_data[item_type]
+        cost = data and data.cost or 0
+    end
+
+    -- Check if house has enough credits
+    local house_credits = self.harvest_system:get_credits(house)
+    if house_credits < cost then
+        return  -- Not enough credits
+    end
+
+    -- Queue production
+    local success, err
+    if category == "building" then
+        success, err = self.production_system:queue_building(factory, item_type)
+    else
+        success, err = self.production_system:queue_unit(factory, item_type)
+    end
+
+    if success then
+        -- Deduct credits from house
+        self.harvest_system:spend_credits(house, cost)
+    end
+end
+
+--[[
+    Handle AI building placement requests.
+
+    Called when AI has a completed building ready to place.
+
+    @param house - The AI house placing the building
+    @param building_type - The building type to place
+    @param cell_x, cell_y - Target cell coordinates
+]]
+function Game:handle_ai_place_building(house, building_type, cell_x, cell_y)
+    if not self.production_system or not self.grid then
+        return
+    end
+
+    -- Find the construction yard for this house
+    local cy = self:find_construction_yard_for_house(house)
+    if not cy then
+        return
+    end
+
+    -- Check if there's a building ready to place
+    local production = cy:get("production")
+    if not production or not production.ready_to_place then
+        return
+    end
+
+    -- Verify the building type matches
+    if production.placing_type ~= building_type then
+        return
+    end
+
+    -- Place the building
+    local building, err = self.production_system:place_building(cy, cell_x, cell_y, self.grid)
+    if building then
+        -- Update grid occupancy
+        local data = self.production_system.building_data[building_type]
+        if data and data.size then
+            self.grid:place_building(cell_x, cell_y, data.size[1], data.size[2], building.id, house)
+        end
+    end
+end
+
+--[[
+    Handle AI building repair requests.
+
+    Called when AI wants to repair a damaged building.
+
+    @param house - The AI house
+    @param building - The building entity to repair
+]]
+function Game:handle_ai_repair_building(house, building)
+    if not self.production_system or not building then
+        return
+    end
+
+    -- Verify ownership
+    if building:has("owner") then
+        local owner = building:get("owner")
+        if owner.house ~= house then
+            return  -- Not owned by this house
+        end
+    end
+
+    -- Start repair
+    self.production_system:start_repair(building)
 end
 
 -- Start production of a unit at the appropriate factory

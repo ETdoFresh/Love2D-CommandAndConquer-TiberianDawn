@@ -159,6 +159,12 @@ function AIController.new(house)
     self.credits_reserve = 1000  -- Keep this much for emergencies
     self.low_credits_threshold = 500
 
+    -- Building repair management
+    self.repair_timer = 0
+    self.repair_interval = 60  -- Check every 4 seconds (60 ticks at 15 FPS)
+    self.repair_threshold = 0.5  -- Repair when below 50% health
+    self.repairing_buildings = {}  -- Track buildings being repaired
+
     -- Team management
     self.teams = {}
     self.team_counter = 0
@@ -379,6 +385,58 @@ function AIController:can_place_at(cell_x, cell_y, width, height, building_type)
 end
 
 --[[
+    Check all owned buildings for damage and initiate repairs.
+
+    Scans through all buildings owned by this AI house and starts
+    repairs on any building below the repair threshold health.
+
+    Reference: Original C&C AI repair behavior
+]]
+function AIController:check_building_repairs()
+    if not self.world then
+        return
+    end
+
+    local entities = self.world:get_all_entities()
+
+    for _, entity in ipairs(entities) do
+        -- Check if this is our building
+        if entity:has("building") and entity:has("owner") and entity:has("health") then
+            local owner = entity:get("owner")
+
+            if owner.house == self.house then
+                local health = entity:get("health")
+                local health_ratio = health.current / health.max
+
+                -- Check if building needs repair and isn't already being repaired
+                if health_ratio < self.repair_threshold and not self.repairing_buildings[entity.id] then
+                    -- Check if building is already being repaired
+                    if health.repairing then
+                        self.repairing_buildings[entity.id] = true
+                    else
+                        -- Start repair via event
+                        Events.emit("AI_REPAIR_BUILDING", self.house, entity)
+                        self.repairing_buildings[entity.id] = true
+                    end
+                elseif health_ratio >= 1.0 then
+                    -- Building fully repaired, remove from tracking
+                    self.repairing_buildings[entity.id] = nil
+                end
+            end
+        end
+    end
+end
+
+--[[
+    Set world reference for entity queries.
+
+    @param world - The ECS world instance
+]]
+function AIController:set_world(world)
+    self.world = world
+end
+
+--[[
     Get building size from type data.
 
     @param building_type - Building type name
@@ -448,6 +506,13 @@ function AIController:update(dt)
     if self.production_timer >= self.production_interval then
         self.production_timer = 0
         self:manage_production()
+    end
+
+    -- Update building repair checks
+    self.repair_timer = self.repair_timer + 1
+    if self.repair_timer >= self.repair_interval then
+        self.repair_timer = 0
+        self:check_building_repairs()
     end
 
     -- Decay threat level

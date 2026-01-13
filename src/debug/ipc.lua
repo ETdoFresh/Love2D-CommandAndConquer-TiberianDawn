@@ -331,6 +331,7 @@ function IPC:process_command(command)
             "test_economy_integration - Test Economy Integration (harvester credits, power penalties, refinery docking)",
             "test_phase4_phase5 - Test Phase 4-5 features (Toggle_Primary, Sell_Back, AI teams, triggers)",
             "test_ai_building - Test AI building system (placement, building sizes, states)",
+            "test_ai_game_integration - Test AI-Game integration (event handlers, factory lookup, repairs)",
             "help - Show this help"
         }
 
@@ -386,6 +387,13 @@ function IPC:process_command(command)
     elseif cmd == "test_ai_building" then
         -- Test AI Building Functionality (AIController base building)
         local test_result = self:test_ai_building()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
+    elseif cmd == "test_ai_game_integration" then
+        -- Test AI-Game Integration (event handlers, factory lookup)
+        local test_result = self:test_ai_game_integration()
         response.success = test_result.success
         response.tests = test_result.tests
         response.message = test_result.message
@@ -6231,6 +6239,148 @@ function IPC:test_ai_building()
 
     if not ok6 then
         add_test("AI States", false, tostring(err6))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test AI-Game Integration (event handlers, factory lookup)
+function IPC:test_ai_game_integration()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: Game has AI event handlers registered
+    local ok1, err1 = pcall(function()
+        local Game = require("src.core.game")
+
+        -- Check handler methods exist
+        assert(type(Game.handle_ai_queue_build) == "function",
+            "handle_ai_queue_build should exist")
+        assert(type(Game.handle_ai_place_building) == "function",
+            "handle_ai_place_building should exist")
+        assert(type(Game.handle_ai_repair_building) == "function",
+            "handle_ai_repair_building should exist")
+
+        add_test("Game AI handlers", true, "All AI event handlers available")
+    end)
+
+    if not ok1 then
+        add_test("Game AI handlers", false, tostring(err1))
+    end
+
+    -- Test 2: Game has factory lookup functions
+    local ok2, err2 = pcall(function()
+        local Game = require("src.core.game")
+
+        assert(type(Game.find_construction_yard_for_house) == "function",
+            "find_construction_yard_for_house should exist")
+        assert(type(Game.find_factory_for_house) == "function",
+            "find_factory_for_house should exist")
+
+        add_test("Game factory lookup", true, "Factory lookup functions available")
+    end)
+
+    if not ok2 then
+        add_test("Game factory lookup", false, tostring(err2))
+    end
+
+    -- Test 3: AIController has repair methods
+    local ok3, err3 = pcall(function()
+        local AIController = require("src.house.ai_controller")
+
+        assert(type(AIController.check_building_repairs) == "function",
+            "check_building_repairs should exist")
+        assert(type(AIController.set_world) == "function",
+            "set_world should exist")
+
+        add_test("AIController repair methods", true, "Repair methods available")
+    end)
+
+    if not ok3 then
+        add_test("AIController repair methods", false, tostring(err3))
+    end
+
+    -- Test 4: AIController has repair configuration
+    local ok4, err4 = pcall(function()
+        local AIController = require("src.house.ai_controller")
+
+        -- Create a test controller
+        local controller = AIController.new(nil, "medium")
+
+        assert(controller.repair_timer ~= nil, "repair_timer should be initialized")
+        assert(controller.repair_interval ~= nil, "repair_interval should be initialized")
+        assert(controller.repair_threshold ~= nil, "repair_threshold should be initialized")
+        assert(type(controller.repairing_buildings) == "table",
+            "repairing_buildings should be table")
+        assert(controller.repair_threshold == 0.5, "repair_threshold should be 0.5")
+
+        add_test("AIController repair config", true, "Repair configuration correct")
+    end)
+
+    if not ok4 then
+        add_test("AIController repair config", false, tostring(err4))
+    end
+
+    -- Test 5: Events module has events defined
+    local ok5, err5 = pcall(function()
+        local Events = require("src.core.events")
+
+        -- Check that event system exists and is functional
+        assert(Events.on ~= nil, "Events.on should exist")
+        assert(Events.emit ~= nil, "Events.emit should exist")
+        assert(type(Events.EVENTS) == "table", "Events.EVENTS should exist")
+
+        add_test("Events system", true, "Events system functional")
+    end)
+
+    if not ok5 then
+        add_test("Events system", false, tostring(err5))
+    end
+
+    -- Test 6: Production system has queue methods
+    local ok6, err6 = pcall(function()
+        local ProductionSystem = require("src.systems.production_system")
+
+        assert(type(ProductionSystem.queue_building) == "function",
+            "queue_building should exist")
+        assert(type(ProductionSystem.queue_unit) == "function",
+            "queue_unit should exist")
+        assert(type(ProductionSystem.place_building) == "function",
+            "place_building should exist")
+        assert(type(ProductionSystem.start_repair) == "function",
+            "start_repair should exist")
+
+        add_test("ProductionSystem methods", true, "Production methods available")
+    end)
+
+    if not ok6 then
+        add_test("ProductionSystem methods", false, tostring(err6))
     end
 
     -- Summary
