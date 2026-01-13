@@ -323,8 +323,16 @@ function IPC:process_command(command)
             "test_phase4 - Test Phase 4 integration (economy, production, overlays)",
             "test_phase5 - Test Phase 5 integration (teams, triggers, scenarios)",
             "test_phase6 - Test Phase 6 integration (network events)",
+            "test_terrain_smudge - Test TerrainClass, SmudgeClass and type classes",
             "help - Show this help"
         }
+
+    elseif cmd == "test_terrain_smudge" then
+        -- Test terrain and smudge classes
+        local test_result = self:test_terrain_smudge()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
 
     else
         response.success = false
@@ -4698,6 +4706,218 @@ function IPC:test_phase6_integration()
 
     if not ok19 then
         add_test("Pointers module", false, tostring(err19))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test terrain and smudge classes
+function IPC:test_terrain_smudge()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: TerrainTypeClass loading
+    local ok1, err1 = pcall(function()
+        local TerrainTypeClass = require("src.objects.types.terraintype")
+
+        -- Check enum
+        assert(TerrainTypeClass.TERRAIN.NONE == -1, "TERRAIN.NONE should be -1")
+        assert(TerrainTypeClass.TERRAIN.TREE1 == 0, "TERRAIN.TREE1 should be 0")
+        assert(TerrainTypeClass.TERRAIN.ROCK1 == 25, "TERRAIN.ROCK1 should be 25")
+        assert(TerrainTypeClass.TERRAIN.COUNT == 32, "TERRAIN.COUNT should be 32")
+
+        add_test("TerrainTypeClass enum", true, "Enum values correct")
+    end)
+
+    if not ok1 then
+        add_test("TerrainTypeClass enum", false, tostring(err1))
+    end
+
+    -- Test 2: TerrainTypeClass creation
+    local ok2, err2 = pcall(function()
+        local TerrainTypeClass = require("src.objects.types.terraintype")
+
+        local tree = TerrainTypeClass.Create(TerrainTypeClass.TERRAIN.TREE1)
+        assert(tree ~= nil, "Tree type should be created")
+        assert(tree.IniName == "T01", "IniName should be T01")
+        assert(tree.IsDestroyable == true, "Trees are destroyable")
+        assert(tree.IsFlammable == true, "Trees are flammable")
+
+        local rock = TerrainTypeClass.Create(TerrainTypeClass.TERRAIN.ROCK1)
+        assert(rock ~= nil, "Rock type should be created")
+        assert(rock.IniName == "ROCK1", "IniName should be ROCK1")
+        assert(rock.IsDestroyable == false, "Rocks are not destroyable")
+        assert(rock.IsFlammable == false, "Rocks are not flammable")
+
+        local blossom = TerrainTypeClass.Create(TerrainTypeClass.TERRAIN.BLOSSOMTREE1)
+        assert(blossom ~= nil, "Blossom type should be created")
+        assert(blossom.IsTiberiumSpawn == true, "Blossom trees spawn tiberium")
+
+        add_test("TerrainTypeClass creation", true, "All terrain types create correctly")
+    end)
+
+    if not ok2 then
+        add_test("TerrainTypeClass creation", false, tostring(err2))
+    end
+
+    -- Test 3: SmudgeTypeClass loading
+    local ok3, err3 = pcall(function()
+        local SmudgeTypeClass = require("src.objects.types.smudgetype")
+
+        -- Check enum
+        assert(SmudgeTypeClass.SMUDGE.NONE == -1, "SMUDGE.NONE should be -1")
+        assert(SmudgeTypeClass.SMUDGE.CRATER1 == 0, "SMUDGE.CRATER1 should be 0")
+        assert(SmudgeTypeClass.SMUDGE.SCORCH1 == 6, "SMUDGE.SCORCH1 should be 6")
+        assert(SmudgeTypeClass.SMUDGE.BIB1 == 12, "SMUDGE.BIB1 should be 12")
+        assert(SmudgeTypeClass.SMUDGE.COUNT == 15, "SMUDGE.COUNT should be 15")
+
+        add_test("SmudgeTypeClass enum", true, "Enum values correct")
+    end)
+
+    if not ok3 then
+        add_test("SmudgeTypeClass enum", false, tostring(err3))
+    end
+
+    -- Test 4: SmudgeTypeClass creation
+    local ok4, err4 = pcall(function()
+        local SmudgeTypeClass = require("src.objects.types.smudgetype")
+
+        local crater = SmudgeTypeClass.Create(SmudgeTypeClass.SMUDGE.CRATER1)
+        assert(crater ~= nil, "Crater type should be created")
+        assert(crater.IsCrater == true, "Craters are marked as craters")
+        assert(crater.IsBib == false, "Craters are not bibs")
+        assert(crater.Width == 1, "Craters are 1x1")
+
+        local scorch = SmudgeTypeClass.Create(SmudgeTypeClass.SMUDGE.SCORCH1)
+        assert(scorch ~= nil, "Scorch type should be created")
+        assert(scorch.IsCrater == false, "Scorch marks are not craters")
+
+        local bib = SmudgeTypeClass.Create(SmudgeTypeClass.SMUDGE.BIB1)
+        assert(bib ~= nil, "Bib type should be created")
+        assert(bib.IsBib == true, "Bibs are marked as bibs")
+        assert(bib.Width == 4, "BIB1 is 4 cells wide")
+        assert(bib.Height == 2, "BIB1 is 2 cells tall")
+
+        add_test("SmudgeTypeClass creation", true, "All smudge types create correctly")
+    end)
+
+    if not ok4 then
+        add_test("SmudgeTypeClass creation", false, tostring(err4))
+    end
+
+    -- Test 5: TerrainClass instantiation
+    local ok5, err5 = pcall(function()
+        local TerrainClass = require("src.objects.terrain")
+        local TerrainTypeClass = require("src.objects.types.terraintype")
+
+        local terrain = TerrainClass:new(TerrainTypeClass.TERRAIN.TREE1)
+        assert(terrain ~= nil, "Terrain should be created")
+        assert(terrain.Type == TerrainTypeClass.TERRAIN.TREE1, "Type should be TREE1")
+        assert(terrain.Class ~= nil, "Class reference should be set")
+        assert(terrain.IsOnFire == false, "Should not be on fire initially")
+        assert(terrain.IsCrumbling == false, "Should not be crumbling initially")
+        assert(terrain:What_Am_I() == 10, "RTTI should be 10 (TERRAIN)")
+
+        add_test("TerrainClass instantiation", true, "TerrainClass creates correctly")
+    end)
+
+    if not ok5 then
+        add_test("TerrainClass instantiation", false, tostring(err5))
+    end
+
+    -- Test 6: SmudgeClass instantiation
+    local ok6, err6 = pcall(function()
+        local SmudgeClass = require("src.objects.smudge")
+        local SmudgeTypeClass = require("src.objects.types.smudgetype")
+
+        local smudge = SmudgeClass:new(SmudgeTypeClass.SMUDGE.CRATER1)
+        assert(smudge ~= nil, "Smudge should be created")
+        assert(smudge.Type == SmudgeTypeClass.SMUDGE.CRATER1, "Type should be CRATER1")
+        assert(smudge.Class ~= nil, "Class reference should be set")
+        assert(smudge:What_Am_I() == 12, "RTTI should be 12 (SMUDGE)")
+
+        add_test("SmudgeClass instantiation", true, "SmudgeClass creates correctly")
+    end)
+
+    if not ok6 then
+        add_test("SmudgeClass instantiation", false, tostring(err6))
+    end
+
+    -- Test 7: TerrainClass fire mechanics
+    local ok7, err7 = pcall(function()
+        local TerrainClass = require("src.objects.terrain")
+        local TerrainTypeClass = require("src.objects.types.terraintype")
+
+        local tree = TerrainClass:new(TerrainTypeClass.TERRAIN.TREE1)
+
+        -- Trees should be able to catch fire
+        local caught = tree:Catch_Fire()
+        assert(caught == true, "Tree should catch fire")
+        assert(tree.IsOnFire == true, "IsOnFire should be true")
+
+        -- Calling again should return false
+        local caught_again = tree:Catch_Fire()
+        assert(caught_again == false, "Already on fire")
+
+        -- Rock should not catch fire
+        local rock = TerrainClass:new(TerrainTypeClass.TERRAIN.ROCK1)
+        local rock_fire = rock:Catch_Fire()
+        assert(rock_fire == false, "Rocks should not catch fire")
+
+        add_test("TerrainClass fire mechanics", true, "Fire mechanics work correctly")
+    end)
+
+    if not ok7 then
+        add_test("TerrainClass fire mechanics", false, tostring(err7))
+    end
+
+    -- Test 8: Adapters module
+    local ok8, err8 = pcall(function()
+        local HDGraphics = require("src.adapters.hd_graphics")
+        local Controller = require("src.adapters.controller")
+        local Hotkeys = require("src.adapters.hotkeys")
+        local RemasteredAudio = require("src.adapters.remastered_audio")
+
+        assert(HDGraphics ~= nil, "HDGraphics should load")
+        assert(Controller ~= nil, "Controller should load")
+        assert(Hotkeys ~= nil, "Hotkeys should load")
+        assert(RemasteredAudio ~= nil, "RemasteredAudio should load")
+
+        -- Check default bindings exist
+        assert(Hotkeys.defaults.select_all == "e", "select_all default should be 'e'")
+        assert(Hotkeys.defaults.stop == "s", "stop default should be 's'")
+
+        add_test("Adapters module", true, "All adapter modules load correctly")
+    end)
+
+    if not ok8 then
+        add_test("Adapters module", false, tostring(err8))
     end
 
     -- Summary
