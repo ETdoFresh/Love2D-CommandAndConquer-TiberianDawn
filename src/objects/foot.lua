@@ -477,123 +477,182 @@ end
 
 --============================================================================
 -- Mission Implementations
+-- Ported from FOOT.CPP
 --============================================================================
 
+-- TICKS_PER_SECOND constant (from DEFINES.H)
+local TICKS_PER_SECOND = 15
+
 --[[
-    Mission_Move - Move to destination.
+    Mission_Move - AI process for moving a vehicle to its destination.
+    Port of FootClass::Mission_Move from FOOT.CPP
+
+    This simple AI script handles moving the vehicle to its desired destination.
+    Since simple movement is handled directly by the engine, this routine merely
+    waits until the unit has reached its destination, and then causes the unit
+    to enter idle mode.
 ]]
 function FootClass:Mission_Move()
-    if not Target.Is_Valid(self.NavCom) then
+    -- If no valid destination and not driving and no queued mission, go idle
+    if not Target.Is_Valid(self.NavCom) and not self.IsDriving and
+       self.MissionQueue == self.MISSION.NONE then
         self:Enter_Idle_Mode()
-        return 15  -- Check again in 1 second
     end
 
-    -- Try to calculate path if needed
-    if self.Path[1] == FootClass.FACING.NONE then
-        if self.PathDelay > 0 then
-            self.PathDelay = self.PathDelay - 1
-            return 1
-        end
-
-        if not self:Basic_Path() then
-            -- Path failed
-            self.TryTryAgain = self.TryTryAgain - 1
-            if self.TryTryAgain <= 0 then
-                -- Give up
-                self.NavCom = Target.TARGET_NONE
-                self:Enter_Idle_Mode()
-            else
-                self.PathDelay = FootClass.PATH_DELAY
-            end
-            return 15
-        end
-
-        self.TryTryAgain = FootClass.PATH_RETRY
+    -- If no attack target and not human controlled, look for threats while moving
+    if not Target.Is_Valid(self.TarCom) and self.House and not self.House.IsHuman then
+        self:Target_Something_Nearby(TechnoClass.THREAT.RANGE)
     end
 
-    -- Follow path
-    -- (simplified - full implementation would handle movement ticks)
-
-    return 1
+    return TICKS_PER_SECOND + 3
 end
 
 --[[
-    Mission_Attack - Attack target.
+    Mission_Attack - AI for heading towards and firing upon target.
+    Port of FootClass::Mission_Attack from FOOT.CPP
+
+    This AI routine handles heading to within range of the target and then
+    firing upon it until it is destroyed. If the target is destroyed, then
+    the unit will change missions to match its "idle mode" of operation.
 ]]
 function FootClass:Mission_Attack()
-    if not Target.Is_Valid(self.TarCom) then
-        self:Enter_Idle_Mode()
-        return 15
-    end
-
-    -- Check if in range
-    if self:In_Range(self.TarCom, 0) then
-        -- Fire at target
-        self:Fire_At(self.TarCom, 0)
-        return self:Rearm_Delay(false)
-    else
-        -- Move toward target
+    if Target.Is_Valid(self.TarCom) then
         self:Approach_Target()
-        return 1
+    else
+        self:Enter_Idle_Mode()
     end
+    return TICKS_PER_SECOND + 2
 end
 
 --[[
-    Mission_Guard - Guard current position.
+    Mission_Guard - Handles the AI for guarding in place.
+    Port of FootClass::Mission_Guard from FOOT.CPP
+
+    Units that are performing stationary guard duty use this AI process.
+    They will sit still and target any enemies that get within range.
 ]]
 function FootClass:Mission_Guard()
-    -- Look for threats
-    local threat = self:Greatest_Threat(0)  -- THREAT_NORMAL
-    if Target.Is_Valid(threat) then
-        self:Assign_Target(threat)
-        self:Assign_Mission(self.MISSION.ATTACK)
+    if not self:Target_Something_Nearby(TechnoClass.THREAT.RANGE) then
+        self:Random_Animate()
     end
-
-    return 15  -- Check every second
+    return TICKS_PER_SECOND + math.random(0, 4)
 end
 
 --[[
-    Mission_Guard_Area - Guard an area.
+    Mission_Guard_Area - Causes unit to guard an area about twice weapon range.
+    Port of FootClass::Mission_Guard_Area from FOOT.CPP
+
+    Similar to guard but uses area range instead of weapon range.
 ]]
 function FootClass:Mission_Guard_Area()
-    -- Similar to guard but returns to archive position
-    return self:Mission_Guard()
+    if not self:Target_Something_Nearby(TechnoClass.THREAT.AREA) then
+        self:Random_Animate()
+    end
+    return TICKS_PER_SECOND + math.random(0, 4)
 end
 
 --[[
-    Mission_Hunt - Hunt down enemies.
+    Mission_Hunt - Handles the default hunt order.
+    Port of FootClass::Mission_Hunt from FOOT.CPP
+
+    This routine is the default hunt order for game objects. It handles
+    searching for a nearby object and heading toward it. The act of
+    targeting will cause it to attack the target it selects.
 ]]
 function FootClass:Mission_Hunt()
-    -- Look for any valid target
-    local threat = self:Greatest_Threat(0)  -- THREAT_NORMAL
-    if Target.Is_Valid(threat) then
-        self:Assign_Target(threat)
-        self:Assign_Mission(self.MISSION.ATTACK)
+    if not self:Target_Something_Nearby(TechnoClass.THREAT.NORMAL) then
+        self:Random_Animate()
+    else
+        -- Special case: Engineers capture instead of attack
+        local rtti = self:What_Am_I()
+        if rtti == Target.RTTI.INFANTRY then
+            -- Check if this is an engineer (Type E7)
+            local type_class = self.Class
+            if type_class and type_class.Type == 6 then  -- INFANTRY_E7 = Engineer
+                self:Assign_Destination(self.TarCom)
+                self:Assign_Mission(self.MISSION.CAPTURE)
+            else
+                self:Approach_Target()
+            end
+        else
+            self:Approach_Target()
+        end
+    end
+    return TICKS_PER_SECOND + 5
+end
+
+--[[
+    Mission_Timed_Hunt - AI process for multiplayer computer units.
+    Port of FootClass::Mission_Timed_Hunt from FOOT.CPP
+
+    For multiplayer games, the computer AI can't just blitz the human players;
+    the humans need a little time to set up their base. This state just waits
+    for a certain period of time, then goes into hunt mode.
+]]
+function FootClass:Mission_Timed_Hunt()
+    local changed = false
+
+    if self.House and not self.House.IsHuman then
+        -- Jump into HUNT mode if time has elapsed or house has lost units
+        if self.House.BlitzTime and self.House.BlitzTime <= 0 then
+            self:Assign_Mission(self.MISSION.HUNT)
+            changed = true
+        end
+
+        -- Random chance to snap out and start hunting
+        if math.random(0, 5000) == 1 then
+            self:Assign_Mission(self.MISSION.HUNT)
+            changed = true
+        end
+
+        -- If still in timed hunt, act like guard area
+        if not changed then
+            self:Mission_Guard_Area()
+        end
     end
 
-    return 15
+    return TICKS_PER_SECOND + math.random(0, 4)
 end
 
 --[[
-    Mission_Capture - Capture target (for engineers).
+    Mission_Capture - Handles the capture mission.
+    Port of FootClass::Mission_Capture from FOOT.CPP
+
+    Capture missions are nearly the same as normal movement missions.
+    The only difference is that the final destination is handled in a
+    special way so that it is not marked as impassable.
 ]]
 function FootClass:Mission_Capture()
-    -- Override in InfantryClass
-    self:Enter_Idle_Mode()
-    return 15
+    if not Target.Is_Valid(self.NavCom) and not self:In_Radio_Contact() then
+        self:Enter_Idle_Mode()
+        -- Would scatter if standing on a building
+    end
+    return TICKS_PER_SECOND - 2
 end
 
 --[[
-    Mission_Enter - Enter target (transport/building).
+    Mission_Enter - Enter (cooperatively) mission handler.
+    Port of FootClass::Mission_Enter from FOOT.CPP
+
+    Move to target and enter it (transport or building).
 ]]
 function FootClass:Mission_Enter()
-    -- Move to target and enter it
     if not Target.Is_Valid(self.NavCom) then
         self:Enter_Idle_Mode()
-        return 15
+        return TICKS_PER_SECOND
     end
 
     return self:Mission_Move()
+end
+
+--[[
+    Random_Animate - Perform random idle animation.
+    Called when unit has nothing better to do.
+]]
+function FootClass:Random_Animate()
+    -- Override in derived classes for specific animations
+    -- Infantry: fidget, look around
+    -- Vehicles: small turret movements
 end
 
 --[[

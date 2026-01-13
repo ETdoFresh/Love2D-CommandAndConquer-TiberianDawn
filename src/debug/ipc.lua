@@ -324,12 +324,20 @@ function IPC:process_command(command)
             "test_phase5 - Test Phase 5 integration (teams, triggers, scenarios)",
             "test_phase6 - Test Phase 6 integration (network events)",
             "test_terrain_smudge - Test TerrainClass, SmudgeClass and type classes",
+            "test_missions - Test FootClass mission methods and threat detection",
             "help - Show this help"
         }
 
     elseif cmd == "test_terrain_smudge" then
         -- Test terrain and smudge classes
         local test_result = self:test_terrain_smudge()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
+    elseif cmd == "test_missions" then
+        -- Test FootClass missions and TechnoClass threat detection
+        local test_result = self:test_missions()
         response.success = test_result.success
         response.tests = test_result.tests
         response.message = test_result.message
@@ -4918,6 +4926,215 @@ function IPC:test_terrain_smudge()
 
     if not ok8 then
         add_test("Adapters module", false, tostring(err8))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test FootClass mission methods and TechnoClass threat detection
+function IPC:test_missions()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: TechnoClass THREAT constants
+    local ok1, err1 = pcall(function()
+        local TechnoClass = require("src.objects.techno")
+
+        assert(TechnoClass.THREAT ~= nil, "THREAT constants should exist")
+        assert(TechnoClass.THREAT.NORMAL == 0x0000, "THREAT_NORMAL should be 0")
+        assert(TechnoClass.THREAT.RANGE == 0x0001, "THREAT_RANGE should be 1")
+        assert(TechnoClass.THREAT.AREA == 0x0002, "THREAT_AREA should be 2")
+        assert(TechnoClass.THREAT.AIR == 0x0004, "THREAT_AIR should be 4")
+        assert(TechnoClass.THREAT.INFANTRY == 0x0008, "THREAT_INFANTRY should be 8")
+        assert(TechnoClass.THREAT.VEHICLES == 0x0010, "THREAT_VEHICLES should be 16")
+        assert(TechnoClass.THREAT.BUILDINGS == 0x0020, "THREAT_BUILDINGS should be 32")
+        assert(TechnoClass.THREAT.GROUND ~= nil, "THREAT_GROUND combined flag should exist")
+
+        add_test("TechnoClass THREAT constants", true, "All THREAT flags defined correctly")
+    end)
+
+    if not ok1 then
+        add_test("TechnoClass THREAT constants", false, tostring(err1))
+    end
+
+    -- Test 2: TechnoClass methods exist
+    local ok2, err2 = pcall(function()
+        local TechnoClass = require("src.objects.techno")
+
+        -- Create a minimal techno instance to test methods
+        local techno = setmetatable({
+            IsActive = true,
+            IsInLimbo = false,
+            TarCom = 0,
+            House = nil,
+            Coord = 0,
+            Class = { MaxStrength = 100 },
+            Strength = 100,
+        }, { __index = TechnoClass })
+
+        -- Check methods exist
+        assert(type(TechnoClass.Greatest_Threat) == "function", "Greatest_Threat should be a function")
+        assert(type(TechnoClass.Target_Something_Nearby) == "function", "Target_Something_Nearby should be a function")
+        assert(type(TechnoClass.Is_Enemy) == "function", "Is_Enemy should be a function")
+        assert(type(TechnoClass.Evaluate_Object) == "function", "Evaluate_Object should be a function")
+        assert(type(TechnoClass.Threat_Range) == "function", "Threat_Range should be a function")
+
+        add_test("TechnoClass threat methods", true, "All threat detection methods exist")
+    end)
+
+    if not ok2 then
+        add_test("TechnoClass threat methods", false, tostring(err2))
+    end
+
+    -- Test 3: FootClass mission methods exist
+    local ok3, err3 = pcall(function()
+        local FootClass = require("src.objects.foot")
+
+        -- Check mission methods exist
+        assert(type(FootClass.Mission_Move) == "function", "Mission_Move should be a function")
+        assert(type(FootClass.Mission_Attack) == "function", "Mission_Attack should be a function")
+        assert(type(FootClass.Mission_Guard) == "function", "Mission_Guard should be a function")
+        assert(type(FootClass.Mission_Guard_Area) == "function", "Mission_Guard_Area should be a function")
+        assert(type(FootClass.Mission_Hunt) == "function", "Mission_Hunt should be a function")
+        assert(type(FootClass.Mission_Capture) == "function", "Mission_Capture should be a function")
+        assert(type(FootClass.Mission_Enter) == "function", "Mission_Enter should be a function")
+        assert(type(FootClass.Mission_Timed_Hunt) == "function", "Mission_Timed_Hunt should be a function")
+        assert(type(FootClass.Random_Animate) == "function", "Random_Animate should be a function")
+
+        add_test("FootClass mission methods", true, "All mission methods exist")
+    end)
+
+    if not ok3 then
+        add_test("FootClass mission methods", false, tostring(err3))
+    end
+
+    -- Test 4: InfantryClass loads and has missions
+    local ok4, err4 = pcall(function()
+        local InfantryClass = require("src.objects.infantry")
+        local Target = require("src.core.target")
+
+        -- InfantryClass should inherit from FootClass
+        assert(type(InfantryClass.Mission_Move) == "function", "InfantryClass should have Mission_Move")
+        assert(type(InfantryClass.Mission_Attack) == "function", "InfantryClass should have Mission_Attack")
+        assert(type(InfantryClass.Mission_Guard) == "function", "InfantryClass should have Mission_Guard")
+
+        add_test("InfantryClass inheritance", true, "InfantryClass inherits mission methods")
+    end)
+
+    if not ok4 then
+        add_test("InfantryClass inheritance", false, tostring(err4))
+    end
+
+    -- Test 5: UnitClass loads and has missions
+    local ok5, err5 = pcall(function()
+        local UnitClass = require("src.objects.unit")
+
+        -- UnitClass should inherit from FootClass
+        assert(type(UnitClass.Mission_Move) == "function", "UnitClass should have Mission_Move")
+        assert(type(UnitClass.Mission_Attack) == "function", "UnitClass should have Mission_Attack")
+        assert(type(UnitClass.Mission_Hunt) == "function", "UnitClass should have Mission_Hunt")
+
+        add_test("UnitClass inheritance", true, "UnitClass inherits mission methods")
+    end)
+
+    if not ok5 then
+        add_test("UnitClass inheritance", false, tostring(err5))
+    end
+
+    -- Test 6: Mission_Move returns correct delay
+    local ok6, err6 = pcall(function()
+        local FootClass = require("src.objects.foot")
+        local Target = require("src.core.target")
+
+        -- Create a mock foot instance
+        local foot = setmetatable({
+            IsActive = true,
+            IsInLimbo = false,
+            NavCom = 0,  -- TARGET_NONE
+            TarCom = 0,
+            IsDriving = false,
+            MissionQueue = 0,  -- MISSION_NONE
+            House = nil,
+            Mission = 0,
+            MISSION = FootClass.MISSION or { NONE = 0, SLEEP = 1, GUARD = 2 },
+            Enter_Idle_Mode = function(self) self.Mission = 2 end,
+            Target_Something_Nearby = function() return false end,
+        }, { __index = FootClass })
+
+        -- Call Mission_Move with no valid NavCom
+        local delay = foot:Mission_Move()
+        assert(type(delay) == "number", "Mission_Move should return a number")
+        assert(delay > 0, "Mission_Move delay should be positive")
+        assert(delay == 18, "Mission_Move should return TICKS_PER_SECOND + 3 = 18")
+
+        add_test("Mission_Move return value", true, "Mission_Move returns correct tick delay")
+    end)
+
+    if not ok6 then
+        add_test("Mission_Move return value", false, tostring(err6))
+    end
+
+    -- Test 7: Target module integration
+    local ok7, err7 = pcall(function()
+        local Target = require("src.core.target")
+
+        -- Check Target constants exist
+        assert(Target.TARGET_NONE ~= nil, "TARGET_NONE should exist")
+        assert(Target.RTTI ~= nil, "RTTI constants should exist")
+        assert(Target.RTTI.INFANTRY ~= nil, "RTTI.INFANTRY should exist")
+        assert(Target.RTTI.UNIT ~= nil, "RTTI.UNIT should exist")
+        assert(Target.RTTI.BUILDING ~= nil, "RTTI.BUILDING should exist")
+
+        -- Check target functions
+        assert(type(Target.Is_Valid) == "function", "Is_Valid should be a function")
+
+        add_test("Target module integration", true, "Target module has required constants")
+    end)
+
+    if not ok7 then
+        add_test("Target module integration", false, tostring(err7))
+    end
+
+    -- Test 8: Coord module has required functions
+    local ok8, err8 = pcall(function()
+        local Coord = require("src.core.coord")
+
+        assert(type(Coord.Coord_Cell) == "function", "Coord_Cell should be a function")
+        assert(type(Coord.Cell_X) == "function", "Cell_X should be a function")
+        assert(type(Coord.Cell_Y) == "function", "Cell_Y should be a function")
+        assert(type(Coord.Distance) == "function", "Distance should be a function")
+
+        add_test("Coord module functions", true, "Coord module has required functions")
+    end)
+
+    if not ok8 then
+        add_test("Coord module functions", false, tostring(err8))
     end
 
     -- Summary

@@ -97,6 +97,27 @@ TechnoClass.BODY_SHAPE = {
     24, 25, 26, 27, 28, 29, 30, 31,
 }
 
+-- Threat type flags (from DEFINES.H)
+TechnoClass.THREAT = {
+    NORMAL = 0x0000,        -- Any distance threat scan
+    RANGE = 0x0001,         -- Limit scan to weapon range
+    AREA = 0x0002,          -- Limit scan to general area (twice weapon range)
+    AIR = 0x0004,           -- Scan for air units
+    INFANTRY = 0x0008,      -- Scan for infantry units
+    VEHICLES = 0x0010,      -- Scan for vehicles
+    BUILDINGS = 0x0020,     -- Scan for buildings
+    TIBERIUM = 0x0040,      -- Limit scan to Tiberium processing objects
+    BOATS = 0x0080,         -- Scan for gunboats
+    CIVILIANS = 0x0100,     -- Consider civilians to be primary target
+    CAPTURE = 0x0200,       -- Consider capturable buildings only
+}
+-- Combined threat types
+TechnoClass.THREAT.GROUND = bit.bor(
+    TechnoClass.THREAT.VEHICLES,
+    TechnoClass.THREAT.BUILDINGS,
+    TechnoClass.THREAT.INFANTRY
+)
+
 --============================================================================
 -- Constructor
 --============================================================================
@@ -643,14 +664,209 @@ end
 
 --[[
     Find the greatest threat in range.
+    Port of TechnoClass::Greatest_Threat from TECHNO.CPP
 
-    @param threat - ThreatType flags
+    @param method - ThreatType flags
     @return TARGET of greatest threat, or TARGET_NONE
 ]]
-function TechnoClass:Greatest_Threat(threat)
-    -- Simplified implementation
-    -- Full implementation would scan nearby cells
+function TechnoClass:Greatest_Threat(method)
+    local Globals = require("src.heap.globals")
+    local bit = bit or require("bit")
+
+    local bestobject = nil
+    local bestval = -1
+
+    -- Build RTTI mask based on threat method
+    local mask = 0
+    if bit.band(method, TechnoClass.THREAT.CIVILIANS) ~= 0 then
+        mask = bit.bor(mask, bit.lshift(1, Target.RTTI.BUILDING))
+        mask = bit.bor(mask, bit.lshift(1, Target.RTTI.INFANTRY))
+        mask = bit.bor(mask, bit.lshift(1, Target.RTTI.UNIT))
+    end
+    if bit.band(method, TechnoClass.THREAT.AIR) ~= 0 then
+        mask = bit.bor(mask, bit.lshift(1, Target.RTTI.AIRCRAFT))
+    end
+    if bit.band(method, TechnoClass.THREAT.CAPTURE) ~= 0 then
+        mask = bit.bor(mask, bit.lshift(1, Target.RTTI.BUILDING))
+    end
+    if bit.band(method, TechnoClass.THREAT.BUILDINGS) ~= 0 then
+        mask = bit.bor(mask, bit.lshift(1, Target.RTTI.BUILDING))
+    end
+    if bit.band(method, TechnoClass.THREAT.INFANTRY) ~= 0 then
+        mask = bit.bor(mask, bit.lshift(1, Target.RTTI.INFANTRY))
+    end
+    if bit.band(method, TechnoClass.THREAT.VEHICLES) ~= 0 then
+        mask = bit.bor(mask, bit.lshift(1, Target.RTTI.UNIT))
+    end
+
+    -- If method is NORMAL (0), scan for all ground threats
+    if method == TechnoClass.THREAT.NORMAL then
+        mask = bit.bor(mask, bit.lshift(1, Target.RTTI.BUILDING))
+        mask = bit.bor(mask, bit.lshift(1, Target.RTTI.INFANTRY))
+        mask = bit.bor(mask, bit.lshift(1, Target.RTTI.UNIT))
+    end
+
+    -- Determine scan range
+    local range
+    if bit.band(method, bit.bor(TechnoClass.THREAT.AREA, TechnoClass.THREAT.RANGE)) ~= 0 then
+        range = self:Threat_Range(bit.band(method, TechnoClass.THREAT.RANGE) == 0 and 1 or 0)
+    else
+        -- Default: use weapon range
+        range = math.max(self:Weapon_Range(0), self:Weapon_Range(1))
+    end
+
+    -- Convert range to cells (256 leptons per cell)
+    local crange = math.floor(range / 256)
+    if crange < 1 then crange = 5 end  -- Minimum scan radius
+    if crange > 20 then crange = 20 end  -- Maximum scan radius
+
+    local my_coord = self:Center_Coord()
+    local my_cell = Coord.Coord_Cell(my_coord)
+    local my_x = Coord.Cell_X(my_cell)
+    local my_y = Coord.Cell_Y(my_cell)
+
+    -- Scan object heaps for threats
+    local rtti_list = {}
+    if bit.band(mask, bit.lshift(1, Target.RTTI.INFANTRY)) ~= 0 then
+        table.insert(rtti_list, Target.RTTI.INFANTRY)
+    end
+    if bit.band(mask, bit.lshift(1, Target.RTTI.UNIT)) ~= 0 then
+        table.insert(rtti_list, Target.RTTI.UNIT)
+    end
+    if bit.band(mask, bit.lshift(1, Target.RTTI.BUILDING)) ~= 0 then
+        table.insert(rtti_list, Target.RTTI.BUILDING)
+    end
+    if bit.band(mask, bit.lshift(1, Target.RTTI.AIRCRAFT)) ~= 0 then
+        table.insert(rtti_list, Target.RTTI.AIRCRAFT)
+    end
+
+    -- Iterate through heaps and evaluate objects
+    for _, rtti in ipairs(rtti_list) do
+        local heap = Globals.Get_Heap(rtti)
+        if heap then
+            for i = 1, heap:Count() do
+                local object = heap:Get(i)
+                if object and object.IsActive and not object.IsInLimbo then
+                    -- Check if enemy
+                    if self:Is_Enemy(object) then
+                        -- Get object location
+                        local obj_coord = object:Center_Coord()
+                        local obj_cell = Coord.Coord_Cell(obj_coord)
+                        local obj_x = Coord.Cell_X(obj_cell)
+                        local obj_y = Coord.Cell_Y(obj_cell)
+
+                        -- Check distance in cells
+                        local dx = math.abs(obj_x - my_x)
+                        local dy = math.abs(obj_y - my_y)
+                        local dist = math.max(dx, dy)
+
+                        if dist <= crange then
+                            -- Evaluate threat value
+                            local value = self:Evaluate_Object(method, object, range)
+                            if value > bestval then
+                                bestobject = object
+                                bestval = value
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if bestobject then
+        return bestobject:As_Target()
+    end
     return Target.TARGET_NONE
+end
+
+--[[
+    Check if another object is an enemy.
+    @param object - Object to check
+    @return true if enemy
+]]
+function TechnoClass:Is_Enemy(object)
+    if not object or not object.House then
+        return false
+    end
+    if not self.House then
+        return false
+    end
+    -- Different houses are enemies unless allied
+    if object.House ~= self.House then
+        -- Check alliance (simplified - would check House.Is_Ally)
+        return true
+    end
+    return false
+end
+
+--[[
+    Evaluate a potential target object.
+    @param method - ThreatType flags
+    @param object - Object to evaluate
+    @param range - Maximum range
+    @return Value (higher = better target)
+]]
+function TechnoClass:Evaluate_Object(method, object, range)
+    if not object or not object.IsActive or object.IsInLimbo then
+        return -1
+    end
+
+    -- Base value on distance (closer = higher value)
+    local my_coord = self:Center_Coord()
+    local obj_coord = object:Center_Coord()
+    local dist = Coord.Distance(my_coord, obj_coord)
+
+    -- Value inversely proportional to distance
+    local value = math.max(0, range - dist)
+
+    -- Bonus for damaged targets (easier to finish off)
+    if object.Strength and object.Class and object.Class.MaxStrength then
+        local health_pct = object.Strength / object.Class.MaxStrength
+        if health_pct < 0.5 then
+            value = value + 100  -- Bonus for half-dead targets
+        end
+    end
+
+    -- Bonus for high-value targets
+    local rtti = object:What_Am_I()
+    if rtti == Target.RTTI.BUILDING then
+        value = value + 50  -- Buildings are valuable targets
+    end
+
+    return value
+end
+
+--[[
+    Get the threat scanning range.
+    @param ctrl - 0=weapon range, 1=area range (2x weapon)
+    @return Range in leptons
+]]
+function TechnoClass:Threat_Range(ctrl)
+    local range = math.max(self:Weapon_Range(0), self:Weapon_Range(1))
+    if ctrl == 1 then
+        range = range * 2
+    end
+    -- Clamp range
+    if range < 256 then range = 256 end
+    if range > 5120 then range = 5120 end
+    return range
+end
+
+--[[
+    Try to target something nearby.
+    Port of TechnoClass::Target_Something_Nearby from TECHNO.CPP
+
+    @param method - ThreatType flags
+    @return true if target was found and assigned
+]]
+function TechnoClass:Target_Something_Nearby(method)
+    local threat = self:Greatest_Threat(method)
+    if Target.Is_Valid(threat) then
+        self:Assign_Target(threat)
+        return true
+    end
+    return false
 end
 
 --[[
