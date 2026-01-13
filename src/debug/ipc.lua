@@ -214,6 +214,13 @@ function IPC:process_command(command)
             response.error = "Usage: click <x> <y> [button]"
         end
 
+    elseif cmd == "test_classes" then
+        -- Test the new class hierarchy implementation
+        local test_result = self:test_class_hierarchy()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
     elseif cmd == "help" then
         response.commands = {
             "input <key> - Simulate key press",
@@ -227,6 +234,7 @@ function IPC:process_command(command)
             "tick [n] - Advance n ticks",
             "quit - Quit game",
             "eval <lua> - Execute Lua code",
+            "test_classes - Test the class hierarchy",
             "help - Show this help"
         }
 
@@ -422,6 +430,232 @@ function IPC:encode_json(value, indent)
     else
         return '"[' .. t .. ']"'
     end
+end
+
+-- Test the class hierarchy implementation
+function IPC:test_class_hierarchy()
+    local result = {
+        success = true,
+        tests = {},
+        message = ""
+    }
+
+    local function add_test(name, passed, detail)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            detail = detail or ""
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: Load all modules
+    local ok, err = pcall(function()
+        -- Core utilities
+        local Coord = require("src.core.coord")
+        local Target = require("src.core.target")
+
+        -- Class system
+        local Class = require("src.objects.class")
+        local AbstractClass = require("src.objects.abstract")
+        local ObjectClass = require("src.objects.object")
+        local MissionClass = require("src.objects.mission")
+        local RadioClass = require("src.objects.radio")
+
+        -- Heap system
+        local HeapClass = require("src.heap.heap")
+        local Globals = require("src.heap.globals")
+
+        add_test("Module loading", true, "All modules loaded successfully")
+    end)
+
+    if not ok then
+        add_test("Module loading", false, tostring(err))
+        result.message = "Failed to load modules: " .. tostring(err)
+        return result
+    end
+
+    -- Test 2: COORDINATE utilities
+    local Coord = require("src.core.coord")
+    local ok2, err2 = pcall(function()
+        -- Create a coordinate
+        local coord = Coord.XYL_Coord(10, 20, 128, 128)
+
+        -- Extract cell
+        local cell_x = Coord.Coord_XCell(coord)
+        local cell_y = Coord.Coord_YCell(coord)
+        assert(cell_x == 10, "Cell X should be 10, got " .. cell_x)
+        assert(cell_y == 20, "Cell Y should be 20, got " .. cell_y)
+
+        -- Cell operations
+        local cell = Coord.XY_Cell(15, 25)
+        assert(Coord.Cell_X(cell) == 15, "Cell_X failed")
+        assert(Coord.Cell_Y(cell) == 25, "Cell_Y failed")
+
+        -- Distance
+        local coord1 = Coord.XYL_Coord(0, 0, 128, 128)
+        local coord2 = Coord.XYL_Coord(10, 0, 128, 128)
+        local dist = Coord.Distance(coord1, coord2)
+        assert(dist > 2000, "Distance should be > 2000 leptons")
+
+        add_test("Coordinate utilities", true, "COORD/CELL operations work")
+    end)
+
+    if not ok2 then
+        add_test("Coordinate utilities", false, tostring(err2))
+    end
+
+    -- Test 3: TARGET utilities
+    local Target = require("src.core.target")
+    local ok3, err3 = pcall(function()
+        -- Create targets
+        local infantry_target = Target.Build(Target.RTTI.INFANTRY, 5)
+        assert(Target.Is_Valid(infantry_target), "Infantry target should be valid")
+        assert(Target.Get_RTTI(infantry_target) == Target.RTTI.INFANTRY, "RTTI should be INFANTRY")
+        assert(Target.Get_ID(infantry_target) == 5, "ID should be 5")
+
+        -- Cell target
+        local cell = Coord.XY_Cell(10, 20)
+        local cell_target = Target.As_Cell(cell)
+        assert(Target.Is_Cell(cell_target), "Should be cell target")
+        assert(Target.Target_Cell(cell_target) == cell, "Cell value should match")
+
+        add_test("TARGET utilities", true, "TARGET encoding/decoding works")
+    end)
+
+    if not ok3 then
+        add_test("TARGET utilities", false, tostring(err3))
+    end
+
+    -- Test 4: Class inheritance
+    local Class = require("src.objects.class")
+    local AbstractClass = require("src.objects.abstract")
+    local ObjectClass = require("src.objects.object")
+    local MissionClass = require("src.objects.mission")
+    local RadioClass = require("src.objects.radio")
+
+    local ok4, err4 = pcall(function()
+        -- Create a RadioClass instance (top of base hierarchy)
+        local obj = RadioClass:new()
+
+        -- Check inheritance chain
+        assert(obj.IsActive == false, "Should start inactive")
+        assert(obj.IsInLimbo == true, "Should start in limbo")
+        assert(obj.Mission == MissionClass.MISSION.NONE, "Should have no mission")
+        assert(obj.Radio == nil, "Should have no radio contact")
+
+        -- Test methods from different levels
+        obj.Coord = Coord.XYL_Coord(5, 10, 64, 64)
+        local center = obj:Center_Coord()
+        assert(center == obj.Coord, "Center_Coord should return Coord")
+
+        -- Set active
+        obj:Set_Active()
+        assert(obj.IsActive == true, "Should be active after Set_Active")
+        assert(obj.IsRecentlyCreated == true, "Should be recently created")
+
+        add_test("Class inheritance", true, "Inheritance chain works correctly")
+    end)
+
+    if not ok4 then
+        add_test("Class inheritance", false, tostring(err4))
+    end
+
+    -- Test 5: Mission system
+    local ok5, err5 = pcall(function()
+        local obj = RadioClass:new()
+        obj:Set_Active()
+        obj.IsInLimbo = false
+
+        -- Assign mission
+        obj:Assign_Mission(MissionClass.MISSION.GUARD)
+
+        -- Mission should be queued or active
+        assert(obj.Mission == MissionClass.MISSION.GUARD or
+               obj.MissionQueue == MissionClass.MISSION.GUARD,
+               "Mission should be assigned")
+
+        add_test("Mission system", true, "Mission assignment works")
+    end)
+
+    if not ok5 then
+        add_test("Mission system", false, tostring(err5))
+    end
+
+    -- Test 6: Radio system
+    local ok6, err6 = pcall(function()
+        local obj1 = RadioClass:new()
+        local obj2 = RadioClass:new()
+        obj1:Set_Active()
+        obj2:Set_Active()
+
+        -- Establish contact
+        local reply = obj1:Transmit_Message(RadioClass.RADIO.HELLO, 0, obj2)
+        assert(reply == RadioClass.RADIO.ROGER, "Should get ROGER reply")
+        assert(obj1.Radio == obj2, "obj1 should be in contact with obj2")
+
+        -- Break contact
+        obj1:Transmit_Message(RadioClass.RADIO.OVER_OUT)
+        assert(obj1.Radio == nil, "Contact should be broken")
+
+        add_test("Radio system", true, "Radio contact works")
+    end)
+
+    if not ok6 then
+        add_test("Radio system", false, tostring(err6))
+    end
+
+    -- Test 7: HeapClass
+    local HeapClass = require("src.heap.heap")
+    local ok7, err7 = pcall(function()
+        -- Create a small heap for testing
+        local heap = HeapClass.new(RadioClass, 10, Target.RTTI.INFANTRY)
+
+        assert(heap:Count() == 0, "Heap should start empty")
+        assert(heap:Max_Count() == 10, "Max should be 10")
+
+        -- Allocate some objects
+        local obj1 = heap:Allocate()
+        local obj2 = heap:Allocate()
+        assert(obj1 ~= nil, "Should allocate obj1")
+        assert(obj2 ~= nil, "Should allocate obj2")
+        assert(heap:Count() == 2, "Should have 2 active")
+
+        -- Objects should have different heap indices
+        assert(obj1:get_heap_index() ~= obj2:get_heap_index(), "Different indices")
+
+        -- Free one
+        heap:Free(obj1)
+        assert(heap:Count() == 1, "Should have 1 active after free")
+
+        -- Allocate again - should reuse slot
+        local obj3 = heap:Allocate()
+        assert(obj3 ~= nil, "Should allocate obj3")
+        assert(heap:Count() == 2, "Should have 2 active again")
+
+        add_test("HeapClass", true, "Heap allocation/deallocation works")
+    end)
+
+    if not ok7 then
+        add_test("HeapClass", false, tostring(err7))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
 end
 
 -- Cleanup on quit

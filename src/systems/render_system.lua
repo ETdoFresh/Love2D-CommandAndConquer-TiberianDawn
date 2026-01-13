@@ -350,7 +350,7 @@ function RenderSystem:draw_placeholder(entity, px, py)
     local is_building = entity:has("building")
     local is_infantry = entity:has("infantry")
     local is_vehicle = entity:has("mobile") and not is_infantry
-    local is_effect = entity:has_tag and entity:has_tag("effect")
+    local is_effect = entity.has_tag and entity:has_tag("effect")
 
     -- Flash effect
     if renderable.flash then

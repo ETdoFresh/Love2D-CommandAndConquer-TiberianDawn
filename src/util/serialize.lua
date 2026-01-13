@@ -375,6 +375,16 @@ end
 
 -- Load JSON from file
 function Serialize.load_json(filepath)
+    -- Try love.filesystem first if available (for Love2D sandboxed access)
+    if love and love.filesystem then
+        local content, err = love.filesystem.read(filepath)
+        if content then
+            return Serialize.from_json(content)
+        end
+        -- Fall through to try io.open if love.filesystem failed
+    end
+
+    -- Fall back to io.open for system files
     local file, err = io.open(filepath, "r")
     if not file then
         return nil, "Could not open file: " .. tostring(err)

@@ -96,37 +96,45 @@ function ProductionSystem:load_data()
 
     -- Load infantry
     local infantry = Serialize.load_json("data/units/infantry.json")
-    if infantry then
+    if infantry and type(infantry) == "table" then
         for name, data in pairs(infantry) do
-            data.type = "infantry"
-            self.unit_data[name] = data
+            if type(data) == "table" then
+                data.type = "infantry"
+                self.unit_data[name] = data
+            end
         end
     end
 
     -- Load vehicles
     local vehicles = Serialize.load_json("data/units/vehicles.json")
-    if vehicles then
+    if vehicles and type(vehicles) == "table" then
         for name, data in pairs(vehicles) do
-            data.type = "vehicle"
-            self.unit_data[name] = data
+            if type(data) == "table" then
+                data.type = "vehicle"
+                self.unit_data[name] = data
+            end
         end
     end
 
     -- Load aircraft
     local aircraft = Serialize.load_json("data/units/aircraft.json")
-    if aircraft then
+    if aircraft and type(aircraft) == "table" then
         for name, data in pairs(aircraft) do
-            data.type = "aircraft"
-            self.unit_data[name] = data
+            if type(data) == "table" then
+                data.type = "aircraft"
+                self.unit_data[name] = data
+            end
         end
     end
 
     -- Load buildings
     local buildings = Serialize.load_json("data/buildings/structures.json")
-    if buildings then
+    if buildings and type(buildings) == "table" then
         for name, data in pairs(buildings) do
-            data.type = "building"
-            self.building_data[name] = data
+            if type(data) == "table" then
+                data.type = "building"
+                self.building_data[name] = data
+            end
         end
     end
 
