@@ -249,6 +249,13 @@ function IPC:process_command(command)
         response.tests = test_result.tests
         response.message = test_result.message
 
+    elseif cmd == "test_concrete" then
+        -- Test the concrete classes (InfantryClass, UnitClass, AircraftClass, BuildingClass)
+        local test_result = self:test_concrete_classes()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
     elseif cmd == "help" then
         response.commands = {
             "input <key> - Simulate key press",
@@ -267,6 +274,7 @@ function IPC:process_command(command)
             "test_techno - Test TechnoClass and FootClass",
             "test_drive - Test DriveClass, TurretClass, TarComClass, FlyClass",
             "test_types - Test AbstractTypeClass, ObjectTypeClass, TechnoTypeClass",
+            "test_concrete - Test InfantryClass, UnitClass, AircraftClass, BuildingClass",
             "help - Show this help"
         }
 
@@ -1911,6 +1919,451 @@ function IPC:test_type_classes()
 
     if not ok12 then
         add_test("Type hierarchy inheritance", false, tostring(err12))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test the concrete classes (InfantryClass, UnitClass, AircraftClass, BuildingClass)
+function IPC:test_concrete_classes()
+    local result = { success = true, tests = {} }
+
+    local function add_test(name, passed, detail)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            detail = detail
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: Load all concrete class modules
+    local ok1, err1 = pcall(function()
+        local InfantryClass = require("src.objects.infantry")
+        local UnitClass = require("src.objects.unit")
+        local AircraftClass = require("src.objects.aircraft")
+        local BuildingClass = require("src.objects.building")
+
+        assert(InfantryClass ~= nil, "InfantryClass should load")
+        assert(UnitClass ~= nil, "UnitClass should load")
+        assert(AircraftClass ~= nil, "AircraftClass should load")
+        assert(BuildingClass ~= nil, "BuildingClass should load")
+
+        add_test("Concrete module loading", true, "All concrete modules loaded")
+    end)
+
+    if not ok1 then
+        add_test("Concrete module loading", false, tostring(err1))
+        return result
+    end
+
+    -- Test 2: InfantryClass initialization
+    local InfantryClass = require("src.objects.infantry")
+    local ok2, err2 = pcall(function()
+        local infantry = InfantryClass:new()
+
+        -- Should have FootClass properties
+        assert(infantry.NavCom ~= nil, "Should have NavCom from FootClass")
+        assert(infantry.IsDriving == false, "Should not be driving")
+
+        -- Infantry specific
+        assert(infantry.Fear == InfantryClass.FEAR.NONE, "Should have no fear")
+        assert(infantry.Doing == InfantryClass.DO.NOTHING, "Should be doing nothing")
+        assert(infantry.IsProne == false, "Should not be prone")
+        assert(infantry.IsTechnician == false, "Should not be technician")
+        assert(infantry.Occupy == InfantryClass.SUBCELL.CENTER, "Should be in center")
+
+        add_test("InfantryClass initialization", true, "InfantryClass initializes correctly")
+    end)
+
+    if not ok2 then
+        add_test("InfantryClass initialization", false, tostring(err2))
+    end
+
+    -- Test 3: InfantryClass fear system
+    local ok3, err3 = pcall(function()
+        local infantry = InfantryClass:new()
+
+        assert(infantry:Get_Fear() == 0, "Should have no fear")
+        assert(infantry:Is_Panicking() == false, "Should not be panicking")
+        assert(infantry:Is_Scared() == false, "Should not be scared")
+
+        -- Add fear
+        infantry:Add_Fear(InfantryClass.FEAR_ATTACK)
+        assert(infantry:Get_Fear() == InfantryClass.FEAR_ATTACK, "Should have attack fear")
+        assert(infantry:Is_Scared() == false, "Not yet scared")
+
+        -- More fear
+        infantry:Add_Fear(InfantryClass.FEAR_ATTACK)
+        assert(infantry:Get_Fear() == 100, "Should have 100 fear")
+        assert(infantry:Is_Scared() == true, "Should be scared now")
+
+        -- Panic level
+        infantry:Add_Fear(150)
+        assert(infantry:Is_Panicking() == true, "Should be panicking")
+
+        -- Fear decay
+        infantry:Reduce_Fear()
+        assert(infantry:Get_Fear() < InfantryClass.FEAR.MAXIMUM, "Fear should decrease")
+
+        add_test("InfantryClass fear system", true, "Fear system works")
+    end)
+
+    if not ok3 then
+        add_test("InfantryClass fear system", false, tostring(err3))
+    end
+
+    -- Test 4: InfantryClass prone system
+    local ok4, err4 = pcall(function()
+        local infantry = InfantryClass:new()
+
+        assert(infantry:Is_Prone() == false, "Should not be prone")
+
+        infantry:Go_Prone()
+        assert(infantry.IsProne == true, "Should be prone")
+        assert(infantry.Stop == InfantryClass.STOP.PRONE, "Stop should be PRONE")
+
+        infantry:Clear_Prone()
+        assert(infantry:Is_Prone() == false, "Should not be prone after clear")
+
+        add_test("InfantryClass prone system", true, "Prone system works")
+    end)
+
+    if not ok4 then
+        add_test("InfantryClass prone system", false, tostring(err4))
+    end
+
+    -- Test 5: InfantryClass actions
+    local ok5, err5 = pcall(function()
+        local infantry = InfantryClass:new()
+
+        assert(infantry:Get_Action() == InfantryClass.DO.NOTHING, "Should be doing nothing")
+
+        infantry:Do_Action(InfantryClass.DO.WALK)
+        assert(infantry:Get_Action() == InfantryClass.DO.WALK, "Should be walking")
+
+        infantry:Clear_Action()
+        assert(infantry:Get_Action() == InfantryClass.DO.NOTHING, "Should be doing nothing after clear")
+
+        add_test("InfantryClass actions", true, "Action system works")
+    end)
+
+    if not ok5 then
+        add_test("InfantryClass actions", false, tostring(err5))
+    end
+
+    -- Test 6: UnitClass initialization
+    local UnitClass = require("src.objects.unit")
+    local ok6, err6 = pcall(function()
+        local unit = UnitClass:new()
+
+        -- Should have TarComClass properties
+        assert(unit.ScanTimer ~= nil, "Should have ScanTimer from TarComClass")
+        assert(unit.SecondaryFacing ~= nil, "Should have SecondaryFacing from TurretClass")
+        assert(unit.Tiberium ~= nil, "Should have Tiberium from DriveClass")
+
+        -- Unit specific
+        assert(unit.Flagged == false, "Should not be flagged")
+        assert(unit.IsDeploying == false, "Should not be deploying")
+        assert(unit.HarvestTimer == 0, "Should have no harvest timer")
+
+        add_test("UnitClass initialization", true, "UnitClass initializes correctly")
+    end)
+
+    if not ok6 then
+        add_test("UnitClass initialization", false, tostring(err6))
+    end
+
+    -- Test 7: UnitClass harvester system
+    local ok7, err7 = pcall(function()
+        local unit = UnitClass:new()
+
+        -- Make it a harvester for testing
+        unit.Class = { IsHarvester = true }
+
+        assert(unit:Is_Harvester() == true, "Should be harvester")
+        assert(unit:Is_Empty() == true, "Should be empty")
+        assert(unit:Is_Full() == false, "Should not be full")
+        assert(unit:Tiberium_Load() == 0, "Should have no tiberium")
+
+        -- Add tiberium
+        unit.Tiberium = 14
+        assert(unit:Is_Empty() == false, "Should not be empty")
+        assert(unit:Is_Full() == false, "Should not be full yet")
+
+        -- Fill completely
+        unit.Tiberium = UnitClass.TIBERIUM_CAPACITY
+        assert(unit:Is_Full() == true, "Should be full")
+
+        -- Offload
+        local credits = unit:Offload_Tiberium_Bail()
+        assert(credits == 25, "Should get 25 credits per bail")
+        assert(unit.Tiberium == UnitClass.TIBERIUM_CAPACITY - 1, "Should have one less")
+
+        add_test("UnitClass harvester", true, "Harvester system works")
+    end)
+
+    if not ok7 then
+        add_test("UnitClass harvester", false, tostring(err7))
+    end
+
+    -- Test 8: UnitClass deployment
+    local ok8, err8 = pcall(function()
+        local unit = UnitClass:new()
+
+        -- Make it an MCV
+        unit.Class = { IsDeployable = true }
+
+        assert(unit:Can_Deploy() == true, "MCV should be able to deploy")
+
+        local deployed = unit:Deploy()
+        assert(deployed == true, "Should start deployment")
+        assert(unit.IsDeploying == true, "Should be deploying")
+        assert(unit.DeployTimer > 0, "Should have deploy timer")
+
+        -- Already deploying
+        assert(unit:Can_Deploy() == false, "Cannot deploy while deploying")
+
+        add_test("UnitClass deployment", true, "MCV deployment works")
+    end)
+
+    if not ok8 then
+        add_test("UnitClass deployment", false, tostring(err8))
+    end
+
+    -- Test 9: AircraftClass initialization
+    local AircraftClass = require("src.objects.aircraft")
+    local FlyClass = require("src.objects.drive.fly")
+    local ok9, err9 = pcall(function()
+        local aircraft = AircraftClass:new()
+
+        -- Should have FootClass properties
+        assert(aircraft.NavCom ~= nil, "Should have NavCom from FootClass")
+
+        -- Should have FlyClass mixin properties
+        assert(aircraft.Altitude == FlyClass.ALTITUDE.GROUND, "Should be on ground")
+        assert(aircraft.FlightState == FlyClass.FLIGHT_STATE.GROUNDED, "Should be grounded")
+
+        -- Aircraft specific
+        assert(aircraft.IsLanding == false, "Should not be landing")
+        assert(aircraft.IsTakingOff == false, "Should not be taking off")
+        assert(aircraft.Fuel == 255, "Should have full fuel")
+
+        add_test("AircraftClass initialization", true, "AircraftClass initializes correctly")
+    end)
+
+    if not ok9 then
+        add_test("AircraftClass initialization", false, tostring(err9))
+    end
+
+    -- Test 10: AircraftClass flight control
+    local ok10, err10 = pcall(function()
+        local aircraft = AircraftClass:new()
+
+        assert(aircraft:Is_Grounded() == true, "Should be grounded")
+        assert(aircraft:Is_Airborne() == false, "Should not be airborne")
+
+        -- Takeoff
+        aircraft:Start_Takeoff()
+        assert(aircraft.IsTakingOff == true, "Should be taking off")
+        assert(aircraft.FlightState == FlyClass.FLIGHT_STATE.TAKING_OFF, "Flight state should be TAKING_OFF")
+
+        -- Process until airborne
+        for i = 1, 100 do
+            aircraft:AI_Fly()
+        end
+        assert(aircraft:Is_Airborne() == true, "Should be airborne")
+
+        -- Landing
+        aircraft:Start_Landing()
+        assert(aircraft.IsLanding == true, "Should be landing")
+
+        -- Process landing
+        for i = 1, 200 do
+            aircraft:AI_Fly()
+        end
+        assert(aircraft:Is_Grounded() == true, "Should be grounded after landing")
+
+        add_test("AircraftClass flight control", true, "Flight control works")
+    end)
+
+    if not ok10 then
+        add_test("AircraftClass flight control", false, tostring(err10))
+    end
+
+    -- Test 11: AircraftClass return to base
+    local ok11, err11 = pcall(function()
+        local aircraft = AircraftClass:new()
+        aircraft.MaxAmmo = 4
+        aircraft.Ammo = 4
+
+        assert(aircraft:Should_Return_To_Base() == false, "Should not need RTB with full ammo")
+
+        aircraft.Ammo = 0
+        assert(aircraft:Should_Return_To_Base() == true, "Should RTB with no ammo")
+
+        aircraft.Ammo = 4
+        aircraft.Fuel = 20
+        assert(aircraft:Should_Return_To_Base() == true, "Should RTB with low fuel")
+
+        -- Reload
+        aircraft:Reload_Ammo()
+        assert(aircraft.Ammo == 4, "Should have reloaded ammo")
+
+        add_test("AircraftClass RTB", true, "Return to base logic works")
+    end)
+
+    if not ok11 then
+        add_test("AircraftClass RTB", false, tostring(err11))
+    end
+
+    -- Test 12: BuildingClass initialization
+    local BuildingClass = require("src.objects.building")
+    local ok12, err12 = pcall(function()
+        local building = BuildingClass:new()
+
+        -- Should have TechnoClass properties
+        assert(building.TarCom ~= nil, "Should have TarCom from TechnoClass")
+        assert(building.Cloak ~= nil, "Should have Cloak from TechnoClass")
+
+        -- Building specific
+        assert(building.BState == BuildingClass.BSTATE.IDLE, "Should be idle")
+        assert(building.IsRepairing == false, "Should not be repairing")
+        assert(building.IsSelling == false, "Should not be selling")
+        assert(building.IsCaptured == false, "Should not be captured")
+        assert(building.TiberiumStored == 0, "Should have no tiberium")
+
+        add_test("BuildingClass initialization", true, "BuildingClass initializes correctly")
+    end)
+
+    if not ok12 then
+        add_test("BuildingClass initialization", false, tostring(err12))
+    end
+
+    -- Test 13: BuildingClass state machine
+    local ok13, err13 = pcall(function()
+        local building = BuildingClass:new()
+
+        assert(building:Get_State() == BuildingClass.BSTATE.IDLE, "Should be idle")
+        assert(building:Is_Operational() == true, "Should be operational")
+
+        building:Set_State(BuildingClass.BSTATE.ACTIVE)
+        assert(building:Get_State() == BuildingClass.BSTATE.ACTIVE, "Should be active")
+
+        building:Set_State(BuildingClass.BSTATE.CONSTRUCTION)
+        assert(building:Is_Under_Construction() == true, "Should be under construction")
+        assert(building:Is_Operational() == false, "Should not be operational during construction")
+
+        add_test("BuildingClass state machine", true, "State machine works")
+    end)
+
+    if not ok13 then
+        add_test("BuildingClass state machine", false, tostring(err13))
+    end
+
+    -- Test 14: BuildingClass power system
+    local ok14, err14 = pcall(function()
+        local building = BuildingClass:new()
+        building.PowerOutput = 100
+        building.PowerDrain = 20
+        building.Strength = 100
+        building.MaxStrength = 100
+
+        assert(building:Power_Output() == 100, "Full health = full power")
+        assert(building:Power_Drain() == 20, "Should drain 20")
+
+        -- Damaged building produces less power
+        building.Strength = 50
+        assert(building:Power_Output() == 50, "Half health = half power")
+
+        -- Not operational = no power
+        building.BState = BuildingClass.BSTATE.CONSTRUCTION
+        assert(building:Power_Output() == 0, "Construction = no power")
+        assert(building:Power_Drain() == 0, "Construction = no drain")
+
+        add_test("BuildingClass power system", true, "Power system works")
+    end)
+
+    if not ok14 then
+        add_test("BuildingClass power system", false, tostring(err14))
+    end
+
+    -- Test 15: BuildingClass tiberium storage
+    local ok15, err15 = pcall(function()
+        local building = BuildingClass:new()
+        building.TiberiumCapacity = 1000
+
+        assert(building:Tiberium_Stored() == 0, "Should start empty")
+        assert(building:Storage_Capacity() == 1000, "Capacity should be 1000")
+        assert(building:Is_Storage_Full() == false, "Should not be full")
+
+        -- Store tiberium
+        local stored = building:Store_Tiberium(500)
+        assert(stored == 500, "Should store 500")
+        assert(building:Tiberium_Stored() == 500, "Should have 500")
+
+        -- Try to store more than capacity
+        stored = building:Store_Tiberium(700)
+        assert(stored == 500, "Should only store 500 more")
+        assert(building:Is_Storage_Full() == true, "Should be full")
+
+        -- Remove tiberium
+        local removed = building:Remove_Tiberium(200)
+        assert(removed == 200, "Should remove 200")
+        assert(building:Tiberium_Stored() == 800, "Should have 800 left")
+
+        add_test("BuildingClass tiberium storage", true, "Storage system works")
+    end)
+
+    if not ok15 then
+        add_test("BuildingClass tiberium storage", false, tostring(err15))
+    end
+
+    -- Test 16: BuildingClass repair system
+    local ok16, err16 = pcall(function()
+        local building = BuildingClass:new()
+        building.Strength = 50
+        building.MaxStrength = 100
+
+        assert(building:Can_Repair() == true, "Should be able to repair")
+
+        building:Start_Repair()
+        assert(building.IsRepairing == true, "Should be repairing")
+
+        -- Process repair
+        building.RepairTimer = 1  -- Almost ready
+        building:Process_Repair()
+        -- Timer reset to 15
+        for i = 1, 16 do
+            building:Process_Repair()
+        end
+        assert(building.Strength > 50, "Should have more health")
+
+        -- Full health = stop repair
+        building.Strength = building.MaxStrength
+        building:Process_Repair()
+        assert(building.IsRepairing == false, "Should stop when full")
+
+        add_test("BuildingClass repair system", true, "Repair system works")
+    end)
+
+    if not ok16 then
+        add_test("BuildingClass repair system", false, tostring(err16))
     end
 
     -- Summary
