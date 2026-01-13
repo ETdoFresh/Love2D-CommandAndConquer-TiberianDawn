@@ -482,30 +482,48 @@ end
 
 --[[
     Explode the bullet, dealing damage and spawning effects.
+    Port of BulletClass::Detonate from BULLET.CPP
 ]]
 function BulletClass:Detonate()
     if self.IsInLimbo then return end
 
+    -- Lazy load combat system
+    local Combat = require("src.combat.combat")
+    local AnimClass = require("src.objects.anim")
+
     local impact_coord = self:Center_Coord()
 
-    -- Calculate damage
+    -- Calculate base damage from weapon
     local damage = 0
-    if self.Payback and self.Payback.Class then
-        -- Would get damage from weapon type
-        damage = 25  -- Default damage
+    local warhead = -1
+
+    if self.Class then
+        damage = self.Class.Damage or 25
+        warhead = self.Class.Warhead or 0
     end
 
-    -- Apply anti-aircraft bonus
-    -- (Would check if target is aircraft)
+    -- Apply anti-aircraft bonus if target is aircraft
+    if self.TarCom and Target.Is_Valid(self.TarCom) then
+        local target_rtti = Target.Get_RTTI(self.TarCom)
+        if target_rtti == Target.RTTI.AIRCRAFT then
+            -- Apply AA damage bonus
+            local bonus = BulletClass.AA_DAMAGE_BONUS
+            -- TOW missiles have reduced AA bonus
+            if self.Class and self.Class.IsTOW then
+                bonus = BulletClass.TOW_AA_DAMAGE_BONUS
+            end
+            damage = math.floor(damage * (1 + bonus))
+        end
+    end
 
     -- Spawn explosion animation
-    if self.Class and self.Class.Explosion >= 0 then
-        -- Would spawn AnimClass here
-        -- AnimClass:new(self.Class.Explosion, impact_coord)
+    local anim_type = -1
+    if self.Class and self.Class.Explosion and self.Class.Explosion >= 0 then
+        anim_type = self.Class.Explosion
     end
 
-    -- Deal damage to nearby objects
-    -- Would call Explosion_Damage() here
+    -- Apply explosion damage and spawn animation
+    Combat.Do_Explosion(impact_coord, damage, self.Payback, warhead, anim_type)
 
     -- Remove bullet from game
     self:Limbo()

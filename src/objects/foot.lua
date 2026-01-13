@@ -657,14 +657,95 @@ end
 
 --[[
     Approach the current target.
+    Port of FootClass::Approach_Target from FOOT.CPP
+
+    Determines if the target is within weapon range.
+    If in range, fires. If not, moves closer.
 ]]
 function FootClass:Approach_Target()
+    -- Early out if no valid target
     if not Target.Is_Valid(self.TarCom) then
         return
     end
 
-    -- Set destination to target
-    self:Assign_Destination(self.TarCom)
+    -- Check if already in range of target
+    local in_range_primary = self:In_Range(self.TarCom, 0)
+    local in_range_secondary = self:In_Range(self.TarCom, 1)
+
+    if in_range_primary or in_range_secondary then
+        -- In range - attempt to fire
+        local weapon = in_range_primary and 0 or 1
+        local fire_error = self:Can_Fire(self.TarCom, weapon)
+
+        if fire_error == TechnoClass.FIRE_ERROR.OK then
+            self:Fire_At(self.TarCom, weapon)
+        end
+        return
+    end
+
+    -- Not in range - need to move closer
+    -- Don't reassign destination if we already have one
+    if Target.Is_Valid(self.NavCom) then
+        return
+    end
+
+    -- Calculate max weapon range
+    local maxrange = math.max(self:Weapon_Range(0), self:Weapon_Range(1))
+
+    -- Adjust range for safety margin
+    maxrange = maxrange - 0x00B7  -- ~183 leptons (~0.7 cells)
+    maxrange = math.max(maxrange, 0)
+
+    -- Get target coordinate
+    local target_coord = Target.As_Coord(self.TarCom)
+    if not target_coord or target_coord == 0 then
+        -- Fall back to assigning target directly as destination
+        self:Assign_Destination(self.TarCom)
+        return
+    end
+
+    -- Calculate direction from target to us
+    local my_coord = self:Center_Coord()
+    local dir = Coord.Direction256(target_coord, my_coord)
+
+    -- Try to find an intermediate cell within weapon range
+    local found = false
+    local try_coord = nil
+
+    -- Sweep through positions at different angles
+    local angles = {0, 8, -8, 16, -16, 24, -24, 32, -32, 48, -48, 64, -64}
+
+    for range = maxrange, 0x0080, -0x0100 do
+        for _, angle in ipairs(angles) do
+            local test_dir = (dir + angle) % 256
+            local test_coord = Coord.Coord_Move_Dir(target_coord, test_dir, range)
+
+            -- Check if this position is within range of target
+            local dist_to_target = Coord.Distance(test_coord, target_coord)
+            if dist_to_target < range then
+                -- Check if we can enter this cell
+                local test_cell = Coord.Coord_Cell(test_coord)
+                local move_type = self:Can_Enter_Cell(test_cell, 0)
+
+                if move_type == FootClass.MOVE.OK or move_type == FootClass.MOVE.MOVING_BLOCK then
+                    try_coord = test_coord
+                    found = true
+                    break
+                end
+            end
+        end
+        if found then break end
+    end
+
+    -- Assign destination
+    if found and try_coord then
+        -- Move to the calculated position
+        local cell = Coord.Coord_Cell(try_coord)
+        self:Assign_Destination(Target.As_Cell(cell))
+    else
+        -- Couldn't find intermediate - head directly toward target
+        self:Assign_Destination(self.TarCom)
+    end
 end
 
 --============================================================================

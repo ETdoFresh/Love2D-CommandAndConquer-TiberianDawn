@@ -312,6 +312,39 @@ function Coord.Coord_Move(coord, dx, dy)
 end
 
 --[[
+    Move a coordinate in a direction by a distance.
+    Port of Coord_Move(coord, dir, dist) from COORD.CPP
+
+    @param coord - Starting COORDINATE
+    @param direction - Direction (0-255, where 0=N, 64=E, 128=S, 192=W)
+    @param distance - Distance to move in leptons
+    @return New COORDINATE
+]]
+function Coord.Coord_Move_Dir(coord, direction, distance)
+    if distance == 0 then return coord end
+
+    -- Convert direction (0-255) to radians
+    -- Direction 0 = North, 64 = East, 128 = South, 192 = West
+    local radians = (direction / 256) * 2 * math.pi
+
+    -- Calculate deltas (note: Y is inverted in screen coords)
+    local dx = math.sin(radians) * distance
+    local dy = -math.cos(radians) * distance
+
+    local x = Coord.Coord_X(coord) + dx
+    local y = Coord.Coord_Y(coord) + dy
+
+    -- Clamp to map bounds
+    local max_x = (Coord.MAP_CELL_W - 1) * Coord.CELL_LEPTON_W + 255
+    local max_y = (Coord.MAP_CELL_H - 1) * Coord.CELL_LEPTON_W + 255
+
+    x = math.max(0, math.min(max_x, x))
+    y = math.max(0, math.min(max_y, y))
+
+    return Coord.XY_Coord(math.floor(x), math.floor(y))
+end
+
+--[[
     Move coordinate toward target by specified distance (in leptons)
 ]]
 function Coord.Coord_Move_Toward(coord, target, distance)

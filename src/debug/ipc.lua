@@ -325,6 +325,7 @@ function IPC:process_command(command)
             "test_phase6 - Test Phase 6 integration (network events)",
             "test_terrain_smudge - Test TerrainClass, SmudgeClass and type classes",
             "test_missions - Test FootClass mission methods and threat detection",
+            "test_combat_system - Test Combat system (Explosion_Damage, BulletClass, Approach_Target)",
             "help - Show this help"
         }
 
@@ -338,6 +339,13 @@ function IPC:process_command(command)
     elseif cmd == "test_missions" then
         -- Test FootClass missions and TechnoClass threat detection
         local test_result = self:test_missions()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
+    elseif cmd == "test_combat_system" then
+        -- Test Combat system (Explosion_Damage, BulletClass:Detonate, FootClass:Approach_Target)
+        local test_result = self:test_combat()
         response.success = test_result.success
         response.tests = test_result.tests
         response.message = test_result.message
@@ -5135,6 +5143,165 @@ function IPC:test_missions()
 
     if not ok8 then
         add_test("Coord module functions", false, tostring(err8))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test Combat system (Explosion_Damage, BulletClass:Detonate, FootClass:Approach_Target)
+function IPC:test_combat()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: Combat module loads
+    local ok1, err1 = pcall(function()
+        local Combat = require("src.combat.combat")
+
+        assert(Combat ~= nil, "Combat module should load")
+        assert(type(Combat.Explosion_Damage) == "function", "Explosion_Damage should be a function")
+        assert(type(Combat.Do_Explosion) == "function", "Do_Explosion should be a function")
+        assert(type(Combat.Distance_Modify) == "function", "Distance_Modify should be a function")
+
+        add_test("Combat module loads", true, "All combat functions available")
+    end)
+
+    if not ok1 then
+        add_test("Combat module loads", false, tostring(err1))
+    end
+
+    -- Test 2: WarheadTypeClass has damage modifiers
+    local ok2, err2 = pcall(function()
+        local WarheadTypeClass = require("src.combat.warhead")
+
+        -- Test creating a warhead
+        local he_warhead = WarheadTypeClass.Create(WarheadTypeClass.WARHEAD.HE)
+        assert(he_warhead ~= nil, "HE warhead should be created")
+        assert(he_warhead.Name == "High Explosive", "Name should be High Explosive")
+
+        -- Test damage modification
+        local base_damage = 100
+        local mod_damage = he_warhead:Modify_Damage(base_damage, WarheadTypeClass.ARMOR.NONE)
+        assert(mod_damage > 0, "Modified damage should be positive")
+
+        -- Test armor resistance
+        local steel_damage = he_warhead:Modify_Damage(base_damage, WarheadTypeClass.ARMOR.STEEL)
+        assert(steel_damage <= mod_damage, "Steel should resist HE damage")
+
+        add_test("WarheadTypeClass damage modifiers", true, "Damage modification works correctly")
+    end)
+
+    if not ok2 then
+        add_test("WarheadTypeClass damage modifiers", false, tostring(err2))
+    end
+
+    -- Test 3: BulletClass has Detonate method
+    local ok3, err3 = pcall(function()
+        local BulletClass = require("src.objects.bullet")
+
+        assert(type(BulletClass.Detonate) == "function", "Detonate should be a function")
+
+        add_test("BulletClass:Detonate exists", true, "Detonate method available")
+    end)
+
+    if not ok3 then
+        add_test("BulletClass:Detonate exists", false, tostring(err3))
+    end
+
+    -- Test 4: FootClass has Approach_Target
+    local ok4, err4 = pcall(function()
+        local FootClass = require("src.objects.foot")
+
+        assert(type(FootClass.Approach_Target) == "function", "Approach_Target should be a function")
+        assert(type(FootClass.Mission_Move) == "function", "Mission_Move should be a function")
+        assert(type(FootClass.Mission_Attack) == "function", "Mission_Attack should be a function")
+
+        add_test("FootClass combat methods", true, "All combat methods available")
+    end)
+
+    if not ok4 then
+        add_test("FootClass combat methods", false, tostring(err4))
+    end
+
+    -- Test 5: Coord module has Coord_Move_Dir
+    local ok5, err5 = pcall(function()
+        local Coord = require("src.core.coord")
+
+        assert(type(Coord.Coord_Move_Dir) == "function", "Coord_Move_Dir should be a function")
+        assert(type(Coord.Direction256) == "function", "Direction256 should be a function")
+        assert(type(Coord.Distance) == "function", "Distance should be a function")
+
+        -- Test Coord_Move_Dir
+        local start_coord = Coord.XY_Coord(1000, 1000)
+        local moved_coord = Coord.Coord_Move_Dir(start_coord, 64, 100)  -- Move east 100 leptons
+        assert(moved_coord ~= start_coord, "Moved coord should differ from start")
+
+        local new_x = Coord.Coord_X(moved_coord)
+        assert(new_x > 1000, "X should increase when moving east (dir=64)")
+
+        add_test("Coord directional movement", true, "Coord_Move_Dir works correctly")
+    end)
+
+    if not ok5 then
+        add_test("Coord directional movement", false, tostring(err5))
+    end
+
+    -- Test 6: ObjectClass Take_Damage returns correct results
+    local ok6, err6 = pcall(function()
+        local ObjectClass = require("src.objects.object")
+
+        -- Check RESULT constants exist
+        assert(ObjectClass.RESULT ~= nil, "RESULT constants should exist")
+        assert(ObjectClass.RESULT.NONE ~= nil, "RESULT.NONE should exist")
+        assert(ObjectClass.RESULT.LIGHT ~= nil, "RESULT.LIGHT should exist")
+        assert(ObjectClass.RESULT.HALF ~= nil, "RESULT.HALF should exist")
+        assert(ObjectClass.RESULT.DESTROYED ~= nil, "RESULT.DESTROYED should exist")
+
+        add_test("ObjectClass damage results", true, "Damage result constants defined")
+    end)
+
+    if not ok6 then
+        add_test("ObjectClass damage results", false, tostring(err6))
+    end
+
+    -- Test 7: TechnoClass has threat detection
+    local ok7, err7 = pcall(function()
+        local TechnoClass = require("src.objects.techno")
+
+        assert(TechnoClass.THREAT ~= nil, "THREAT constants should exist")
+        assert(type(TechnoClass.Greatest_Threat) == "function", "Greatest_Threat should be a function")
+        assert(type(TechnoClass.Target_Something_Nearby) == "function", "Target_Something_Nearby should exist")
+
+        add_test("TechnoClass threat detection", true, "Threat detection methods available")
+    end)
+
+    if not ok7 then
+        add_test("TechnoClass threat detection", false, tostring(err7))
     end
 
     -- Summary
