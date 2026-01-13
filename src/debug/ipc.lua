@@ -235,6 +235,13 @@ function IPC:process_command(command)
         response.tests = test_result.tests
         response.message = test_result.message
 
+    elseif cmd == "test_drive" then
+        -- Test the DriveClass, TurretClass, TarComClass, and FlyClass implementation
+        local test_result = self:test_drive_classes()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
     elseif cmd == "help" then
         response.commands = {
             "input <key> - Simulate key press",
@@ -251,6 +258,7 @@ function IPC:process_command(command)
             "test_classes - Test the class hierarchy",
             "test_display - Test the display hierarchy",
             "test_techno - Test TechnoClass and FootClass",
+            "test_drive - Test DriveClass, TurretClass, TarComClass, FlyClass",
             "help - Show this help"
         }
 
@@ -1222,6 +1230,374 @@ function IPC:test_techno_classes()
 
     if not ok10 then
         add_test("FootClass inheritance", false, tostring(err10))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test the DriveClass, TurretClass, TarComClass, and FlyClass implementation (Phase 2 movement)
+function IPC:test_drive_classes()
+    local result = { success = true, tests = {} }
+
+    local function add_test(name, passed, detail)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            detail = detail
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: Load all drive modules
+    local ok1, err1 = pcall(function()
+        local DriveClass = require("src.objects.drive.drive")
+        local TurretClass = require("src.objects.drive.turret")
+        local TarComClass = require("src.objects.drive.tarcom")
+        local FlyClass = require("src.objects.drive.fly")
+
+        assert(DriveClass ~= nil, "DriveClass should load")
+        assert(TurretClass ~= nil, "TurretClass should load")
+        assert(TarComClass ~= nil, "TarComClass should load")
+        assert(FlyClass ~= nil, "FlyClass should load")
+
+        add_test("Drive module loading", true, "All drive modules loaded")
+    end)
+
+    if not ok1 then
+        add_test("Drive module loading", false, tostring(err1))
+        return result
+    end
+
+    -- Test 2: DriveClass inheritance and initialization
+    local DriveClass = require("src.objects.drive.drive")
+    local ok2, err2 = pcall(function()
+        local drive = DriveClass:new()
+
+        -- Should have FootClass properties
+        assert(drive.NavCom ~= nil, "Should have NavCom from FootClass")
+        assert(drive.IsDriving == false, "Should not be driving initially")
+        assert(drive.Speed == 255, "Should have full speed")
+
+        -- DriveClass specific properties
+        assert(drive.Tiberium == 0, "Should have no tiberium")
+        assert(drive.IsHarvesting == false, "Should not be harvesting")
+        assert(drive.IsReturning == false, "Should not be returning")
+        assert(drive.TrackNumber == DriveClass.TRACK.NONE, "Should have no track")
+        assert(drive.TrackIndex == 0, "Track index should be 0")
+
+        add_test("DriveClass initialization", true, "DriveClass initializes correctly")
+    end)
+
+    if not ok2 then
+        add_test("DriveClass initialization", false, tostring(err2))
+    end
+
+    -- Test 3: DriveClass track system
+    local ok3, err3 = pcall(function()
+        local drive = DriveClass:new()
+
+        -- Test track determination
+        local track = drive:Determine_Track(0, 0)
+        assert(track == DriveClass.TRACK.STRAIGHT, "Same facing should be straight")
+
+        track = drive:Determine_Track(0, 16)
+        assert(track == DriveClass.TRACK.CURVE_RIGHT, "Small right turn should curve right")
+
+        track = drive:Determine_Track(0, 240)  -- -16 in 256 space
+        assert(track == DriveClass.TRACK.CURVE_LEFT, "Small left turn should curve left")
+
+        track = drive:Determine_Track(0, 128)
+        assert(track == DriveClass.TRACK.U_TURN_RIGHT, "Large right turn should U-turn")
+
+        -- Test starting a track
+        drive.PrimaryFacing = { Current = 0, Desired = 64 }
+        local started = drive:Start_Track(DriveClass.TRACK.CURVE_RIGHT, 64)
+        assert(started == true, "Should start track")
+        assert(drive.TrackNumber == DriveClass.TRACK.CURVE_RIGHT, "Track number set")
+        assert(drive.IsDriving == true, "Should be driving")
+
+        -- Test following track
+        for i = 1, 10 do
+            drive:Follow_Track()
+        end
+        assert(drive.TrackNumber == DriveClass.TRACK.NONE, "Track should be complete")
+
+        add_test("DriveClass track system", true, "Track-based turning works")
+    end)
+
+    if not ok3 then
+        add_test("DriveClass track system", false, tostring(err3))
+    end
+
+    -- Test 4: DriveClass harvesting
+    local ok4, err4 = pcall(function()
+        local drive = DriveClass:new()
+
+        -- Override Is_Harvester for this test
+        function drive:Is_Harvester() return true end
+
+        assert(drive:Is_Harvester_Empty() == true, "Should be empty")
+        assert(drive:Is_Harvester_Full() == false, "Should not be full")
+        assert(drive:Tiberium_Percentage() == 0, "Should be 0%")
+
+        -- Simulate loading tiberium
+        drive.Tiberium = 50
+        assert(drive:Is_Harvester_Empty() == false, "Should not be empty")
+        assert(drive:Tiberium_Percentage() == 50, "Should be 50%")
+
+        -- Fill completely
+        drive.Tiberium = DriveClass.MAX_TIBERIUM
+        assert(drive:Is_Harvester_Full() == true, "Should be full")
+        assert(drive:Tiberium_Percentage() == 100, "Should be 100%")
+
+        -- Test offload
+        local value = drive:Offload_Tiberium_Bail()
+        assert(value == 25, "Should get 25 credits per bail")
+        assert(drive.Tiberium == DriveClass.MAX_TIBERIUM - 1, "Should have one less")
+
+        add_test("DriveClass harvesting", true, "Tiberium harvesting works")
+    end)
+
+    if not ok4 then
+        add_test("DriveClass harvesting", false, tostring(err4))
+    end
+
+    -- Test 5: TurretClass initialization and inheritance
+    local TurretClass = require("src.objects.drive.turret")
+    local ok5, err5 = pcall(function()
+        local turret = TurretClass:new()
+
+        -- Should have DriveClass properties
+        assert(turret.Tiberium ~= nil, "Should have Tiberium from DriveClass")
+        assert(turret.TrackNumber ~= nil, "Should have TrackNumber from DriveClass")
+
+        -- TurretClass specific
+        assert(turret.Reload == 0, "Should not be reloading")
+        assert(turret.SecondaryFacing ~= nil, "Should have SecondaryFacing")
+        assert(turret.SecondaryFacing.Current == 0, "Turret should face 0")
+        assert(turret.IsTurretRotating == false, "Turret should not be rotating")
+
+        add_test("TurretClass initialization", true, "TurretClass initializes correctly")
+    end)
+
+    if not ok5 then
+        add_test("TurretClass initialization", false, tostring(err5))
+    end
+
+    -- Test 6: TurretClass turret control
+    local ok6, err6 = pcall(function()
+        local turret = TurretClass:new()
+
+        -- Test turret facing
+        turret:Set_Turret_Facing(90)
+        assert(turret.SecondaryFacing.Desired == 90, "Should set desired facing")
+
+        -- Test turret rotation
+        turret.SecondaryFacing.Current = 0
+        local done = turret:Do_Turn_Turret()
+        assert(done == false, "Should not be done immediately")
+        assert(turret.SecondaryFacing.Current > 0, "Should have rotated")
+        assert(turret.IsTurretRotating == true, "Should be rotating")
+
+        -- Complete rotation
+        for i = 1, 20 do
+            turret:Do_Turn_Turret()
+        end
+        assert(turret.SecondaryFacing.Current == 90, "Should reach target facing")
+        assert(turret.IsTurretRotating == false, "Should stop rotating")
+
+        -- Test turret lock
+        turret:Lock_Turret()
+        assert(turret.IsTurretLockedDown == true, "Should be locked")
+        assert(turret:Can_Rotate_Turret() == false, "Should not rotate when locked")
+
+        turret:Unlock_Turret()
+        assert(turret.IsTurretLockedDown == false, "Should be unlocked")
+
+        add_test("TurretClass turret control", true, "Turret rotation works")
+    end)
+
+    if not ok6 then
+        add_test("TurretClass turret control", false, tostring(err6))
+    end
+
+    -- Test 7: TurretClass reload system
+    local ok7, err7 = pcall(function()
+        local turret = TurretClass:new()
+
+        assert(turret:Is_Reloading() == false, "Should not be reloading")
+        assert(turret:Is_Weapon_Ready() == true, "Weapon should be ready")
+
+        turret:Start_Reload(10)
+        assert(turret:Is_Reloading() == true, "Should be reloading")
+        assert(turret:Reload_Time() == 10, "Should have 10 ticks left")
+
+        -- Process reload
+        for i = 1, 5 do
+            turret:Process_Reload()
+        end
+        assert(turret:Reload_Time() == 5, "Should have 5 ticks left")
+
+        for i = 1, 5 do
+            turret:Process_Reload()
+        end
+        assert(turret:Is_Weapon_Ready() == true, "Should be ready after reload")
+
+        add_test("TurretClass reload", true, "Reload timer works")
+    end)
+
+    if not ok7 then
+        add_test("TurretClass reload", false, tostring(err7))
+    end
+
+    -- Test 8: TarComClass initialization and inheritance
+    local TarComClass = require("src.objects.drive.tarcom")
+    local ok8, err8 = pcall(function()
+        local tarcom = TarComClass:new()
+
+        -- Should have TurretClass properties
+        assert(tarcom.SecondaryFacing ~= nil, "Should have SecondaryFacing from TurretClass")
+        assert(tarcom.Reload ~= nil, "Should have Reload from TurretClass")
+
+        -- TarComClass specific
+        assert(tarcom.ScanTimer == 0, "Should have scan timer")
+        assert(tarcom.LastTargetCoord == 0, "Should have no last target coord")
+        assert(tarcom.IsEngaging == false, "Should not be engaging")
+
+        add_test("TarComClass initialization", true, "TarComClass initializes correctly")
+    end)
+
+    if not ok8 then
+        add_test("TarComClass initialization", false, tostring(err8))
+    end
+
+    -- Test 9: TarComClass target evaluation
+    local Target = require("src.core.target")
+    local ok9, err9 = pcall(function()
+        local tarcom = TarComClass:new()
+
+        -- Invalid target should have 0 threat
+        local threat = tarcom:Evaluate_Threat(Target.TARGET_NONE)
+        assert(threat == 0, "Invalid target should have 0 threat")
+
+        -- Test engaging state
+        assert(tarcom:Is_Engaging() == false, "Should not be engaging")
+
+        tarcom.IsEngaging = true
+        tarcom.TarCom = Target.Build(Target.RTTI.UNIT, 5)
+        assert(tarcom:Is_Engaging() == true, "Should be engaging with valid target")
+
+        add_test("TarComClass targeting", true, "Targeting state works")
+    end)
+
+    if not ok9 then
+        add_test("TarComClass targeting", false, tostring(err9))
+    end
+
+    -- Test 10: FlyClass mixin
+    local FlyClass = require("src.objects.drive.fly")
+    local ok10, err10 = pcall(function()
+        -- FlyClass is a mixin, create a test object with metatable for method access
+        local flyer = setmetatable({}, { __index = FlyClass })
+        FlyClass.init(flyer)
+
+        -- Initial state
+        assert(flyer.SpeedAccum == 0, "Should have no speed accumulated")
+        assert(flyer.Altitude == FlyClass.ALTITUDE.GROUND, "Should be on ground")
+        assert(flyer.FlightState == FlyClass.FLIGHT_STATE.GROUNDED, "Should be grounded")
+
+        assert(flyer:Is_Grounded() == true, "Should be grounded")
+        assert(flyer:Is_Airborne() == false, "Should not be airborne")
+
+        -- Test takeoff
+        flyer:Take_Off()
+        assert(flyer.FlightState == FlyClass.FLIGHT_STATE.TAKING_OFF, "Should be taking off")
+        assert(flyer.TargetAltitude == FlyClass.ALTITUDE.MEDIUM, "Should target medium altitude")
+
+        -- Process altitude change
+        for i = 1, 100 do
+            flyer:Process_Altitude()
+        end
+        assert(flyer:Is_Airborne() == true, "Should be airborne")
+        assert(flyer.FlightState == FlyClass.FLIGHT_STATE.FLYING, "Should be flying")
+
+        -- Test landing
+        flyer:Land()
+        assert(flyer.FlightState == FlyClass.FLIGHT_STATE.LANDING, "Should be landing")
+
+        for i = 1, 200 do
+            flyer:Process_Altitude()
+        end
+        assert(flyer:Is_Grounded() == true, "Should be grounded after landing")
+
+        add_test("FlyClass mixin", true, "Flight physics works")
+    end)
+
+    if not ok10 then
+        add_test("FlyClass mixin", false, tostring(err10))
+    end
+
+    -- Test 11: FlyClass speed control
+    local ok11, err11 = pcall(function()
+        local flyer = setmetatable({}, { __index = FlyClass })
+        FlyClass.init(flyer)
+
+        -- Set speed
+        flyer:Fly_Speed(255, 50)  -- Full throttle, max 50 MPH
+        assert(flyer.SpeedAdd == 50, "Should be at max speed")
+
+        flyer:Fly_Speed(128, 50)  -- Half throttle
+        assert(flyer.SpeedAdd == 25, "Should be at half speed")
+
+        flyer:Stop_Flight()
+        assert(flyer.SpeedAdd == 0, "Should have stopped")
+        assert(flyer.SpeedAccum == 0, "Accumulator should be cleared")
+
+        add_test("FlyClass speed", true, "Speed control works")
+    end)
+
+    if not ok11 then
+        add_test("FlyClass speed", false, tostring(err11))
+    end
+
+    -- Test 12: FlyClass VTOL hover
+    local ok12, err12 = pcall(function()
+        local flyer = setmetatable({}, { __index = FlyClass })
+        FlyClass.init(flyer)
+        flyer.IsVTOL = true
+
+        -- Take off and fly
+        flyer:Take_Off()
+        for i = 1, 100 do
+            flyer:Process_Altitude()
+        end
+        assert(flyer.FlightState == FlyClass.FLIGHT_STATE.FLYING, "Should be flying")
+
+        -- Enter hover mode
+        flyer:Hover()
+        assert(flyer.FlightState == FlyClass.FLIGHT_STATE.HOVERING, "VTOL should hover")
+        assert(flyer.SpeedAdd == 0, "Should stop moving when hovering")
+
+        add_test("FlyClass VTOL hover", true, "VTOL hovering works")
+    end)
+
+    if not ok12 then
+        add_test("FlyClass VTOL hover", false, tostring(err12))
     end
 
     -- Summary
