@@ -217,6 +217,13 @@ function AIController:register_events()
             self.attack_target = target
         end
     end)
+
+    -- Handle production completion for AI houses
+    Events.on("PRODUCTION_COMPLETE", function(house, item_type, item_name, category)
+        if house == self.house then
+            self:on_production_complete(item_type, item_name, category)
+        end
+    end)
 end
 
 -- Handle being attacked
@@ -265,6 +272,161 @@ end
 -- Handle entity destroyed
 function AIController:on_entity_destroyed(entity)
     self:remove_from_attack_force(entity)
+end
+
+--[[
+    Handle production completion.
+
+    When a building or unit finishes production, the AI needs to:
+    - For buildings: Find a valid placement location and place it
+    - For units: They auto-spawn at factory, just track them
+
+    @param item_type - The type identifier (e.g., "NUKE", "E1")
+    @param item_name - Human readable name
+    @param category - "building", "infantry", "vehicle", "aircraft"
+]]
+function AIController:on_production_complete(item_type, item_name, category)
+    if category == "building" then
+        -- Find location and place building
+        local location = self:find_build_location(item_type)
+        if location then
+            -- Emit event for game to place building
+            Events.emit("AI_PLACE_BUILDING", self.house, item_type, location.x, location.y)
+            self.current_building = nil
+        else
+            -- Can't place, cancel and retry later
+            self.current_building = nil
+        end
+    else
+        -- Units auto-spawn at factory, clear queue slot
+        self.current_unit = nil
+    end
+end
+
+--[[
+    Find a valid build location for a building type.
+
+    Searches outward from the base center in a spiral pattern
+    to find a valid placement cell that is:
+    1. Adjacent to an existing friendly building
+    2. Has enough clear space for the building footprint
+    3. Not on water, rock, or tiberium
+
+    Reference: Original C&C AI building placement logic
+
+    @param building_type - The building type (e.g., "NUKE", "PROC")
+    @return {x, y} cell coordinates or nil if no valid location
+]]
+function AIController:find_build_location(building_type)
+    -- Get building size from data
+    local size = self:get_building_size(building_type)
+    if not size then
+        return nil
+    end
+
+    -- Start from base center
+    local center_x = self.base_center_x or 32
+    local center_y = self.base_center_y or 32
+
+    -- Search in expanding rings around base center
+    -- Maximum search radius (cells)
+    local max_radius = 15
+
+    -- Spiral search pattern
+    for radius = 1, max_radius do
+        -- Check positions in this ring
+        for dx = -radius, radius do
+            for dy = -radius, radius do
+                -- Only check cells on the perimeter of this ring
+                if math.abs(dx) == radius or math.abs(dy) == radius then
+                    local cell_x = center_x + dx
+                    local cell_y = center_y + dy
+
+                    if self:can_place_at(cell_x, cell_y, size.width, size.height, building_type) then
+                        return {x = cell_x, y = cell_y}
+                    end
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+--[[
+    Check if a building can be placed at the given cell.
+
+    @param cell_x, cell_y - Cell coordinates
+    @param width, height - Building footprint size
+    @param building_type - Building type for special rules
+    @return true if placement is valid
+]]
+function AIController:can_place_at(cell_x, cell_y, width, height, building_type)
+    -- Need grid reference to check placement
+    if not self.grid then
+        return false
+    end
+
+    -- Construction Yards don't require adjacency (for MCV deployment)
+    local require_adjacent = building_type ~= "FACT"
+
+    local can_place, _ = self.grid:can_place_building(
+        cell_x, cell_y, width, height,
+        self.house, require_adjacent, building_type
+    )
+
+    return can_place
+end
+
+--[[
+    Get building size from type data.
+
+    @param building_type - Building type name
+    @return {width, height} or nil
+]]
+function AIController:get_building_size(building_type)
+    -- Common building sizes for C&C buildings
+    local sizes = {
+        -- Power
+        NUKE = {width = 2, height = 2},  -- Power Plant
+        NUK2 = {width = 2, height = 2},  -- Advanced Power
+        -- Economy
+        PROC = {width = 3, height = 2},  -- Refinery
+        SILO = {width = 2, height = 1},  -- Tiberium Silo
+        -- Production
+        PYLE = {width = 2, height = 2},  -- Barracks
+        HAND = {width = 2, height = 2},  -- Hand of Nod
+        WEAP = {width = 3, height = 2},  -- Weapons Factory
+        AFLD = {width = 2, height = 2},  -- Airfield
+        HPAD = {width = 2, height = 2},  -- Helipad
+        FACT = {width = 3, height = 2},  -- Construction Yard
+        -- Defense
+        GTWR = {width = 1, height = 1},  -- Guard Tower
+        ATWR = {width = 1, height = 1},  -- Advanced Guard Tower
+        GUN = {width = 1, height = 1},   -- Gun Turret
+        SAM = {width = 2, height = 1},   -- SAM Site
+        OBLI = {width = 1, height = 2},  -- Obelisk of Light
+        -- Tech
+        HQ = {width = 2, height = 2},    -- Communications Center
+        EYE = {width = 2, height = 2},   -- Advanced Comm Center
+        FIX = {width = 2, height = 3},   -- Repair Facility
+        TMPL = {width = 2, height = 2},  -- Temple of Nod
+        -- Walls
+        SBAG = {width = 1, height = 1},  -- Sandbags
+        CYCL = {width = 1, height = 1},  -- Chain Link
+        BRIK = {width = 1, height = 1},  -- Concrete Wall
+    }
+
+    return sizes[building_type]
+end
+
+--[[
+    Set grid reference for placement checks.
+
+    @param grid - The map grid instance
+]]
+function AIController:set_grid(grid)
+    self.grid = grid
 end
 
 -- Update AI (call each game tick)

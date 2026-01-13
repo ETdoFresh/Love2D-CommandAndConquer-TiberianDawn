@@ -330,6 +330,7 @@ function IPC:process_command(command)
             "test_economy - Test Economy and Production systems (Phase 4: harvesters, MCV, factories)",
             "test_economy_integration - Test Economy Integration (harvester credits, power penalties, refinery docking)",
             "test_phase4_phase5 - Test Phase 4-5 features (Toggle_Primary, Sell_Back, AI teams, triggers)",
+            "test_ai_building - Test AI building system (placement, building sizes, states)",
             "help - Show this help"
         }
 
@@ -378,6 +379,13 @@ function IPC:process_command(command)
     elseif cmd == "test_phase4_phase5" then
         -- Test Phase 4-5 Features (building management, AI, teams, triggers)
         local test_result = self:test_phase4_phase5()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
+    elseif cmd == "test_ai_building" then
+        -- Test AI Building Functionality (AIController base building)
+        local test_result = self:test_ai_building()
         response.success = test_result.success
         response.tests = test_result.tests
         response.message = test_result.message
@@ -6071,6 +6079,158 @@ function IPC:test_phase4_phase5()
 
     if not ok7 then
         add_test("TeamTypeClass", false, tostring(err7))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test AI Building Functionality (AIController base building)
+function IPC:test_ai_building()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: AIController find_build_location method exists
+    local ok1, err1 = pcall(function()
+        local AIController = require("src.house.ai_controller")
+
+        -- Check method exists
+        assert(type(AIController.find_build_location) == "function",
+            "find_build_location should exist")
+        assert(type(AIController.can_place_at) == "function",
+            "can_place_at should exist")
+        assert(type(AIController.get_building_size) == "function",
+            "get_building_size should exist")
+        assert(type(AIController.set_grid) == "function",
+            "set_grid should exist")
+
+        add_test("AIController build methods", true, "All AI building methods available")
+    end)
+
+    if not ok1 then
+        add_test("AIController build methods", false, tostring(err1))
+    end
+
+    -- Test 2: Building sizes defined correctly
+    local ok2, err2 = pcall(function()
+        local AIController = require("src.house.ai_controller")
+
+        -- Create dummy controller to test
+        local controller = setmetatable({}, {__index = AIController})
+
+        -- Test common building sizes
+        local nuke = controller:get_building_size("NUKE")
+        assert(nuke and nuke.width == 2 and nuke.height == 2,
+            "NUKE should be 2x2")
+
+        local proc = controller:get_building_size("PROC")
+        assert(proc and proc.width == 3 and proc.height == 2,
+            "PROC should be 3x2")
+
+        local weap = controller:get_building_size("WEAP")
+        assert(weap and weap.width == 3 and weap.height == 2,
+            "WEAP should be 3x2")
+
+        local gtwr = controller:get_building_size("GTWR")
+        assert(gtwr and gtwr.width == 1 and gtwr.height == 1,
+            "GTWR should be 1x1")
+
+        add_test("Building sizes", true, "Building sizes correctly defined")
+    end)
+
+    if not ok2 then
+        add_test("Building sizes", false, tostring(err2))
+    end
+
+    -- Test 3: on_production_complete method exists
+    local ok3, err3 = pcall(function()
+        local AIController = require("src.house.ai_controller")
+
+        assert(type(AIController.on_production_complete) == "function",
+            "on_production_complete should exist")
+
+        add_test("Production complete handler", true, "Production handler available")
+    end)
+
+    if not ok3 then
+        add_test("Production complete handler", false, tostring(err3))
+    end
+
+    -- Test 4: GDI building types defined
+    local ok4, err4 = pcall(function()
+        local AIController = require("src.house.ai_controller")
+
+        assert(AIController.GDI_BUILDINGS ~= nil, "GDI_BUILDINGS should exist")
+        assert(AIController.GDI_BUILDINGS.power ~= nil, "GDI power buildings defined")
+        assert(AIController.GDI_BUILDINGS.economy ~= nil, "GDI economy buildings defined")
+        assert(AIController.GDI_BUILDINGS.infantry ~= nil, "GDI infantry buildings defined")
+        assert(AIController.GDI_BUILDINGS.vehicle ~= nil, "GDI vehicle buildings defined")
+        assert(AIController.GDI_BUILDINGS.defense ~= nil, "GDI defense buildings defined")
+
+        add_test("GDI building types", true, "GDI building categories defined")
+    end)
+
+    if not ok4 then
+        add_test("GDI building types", false, tostring(err4))
+    end
+
+    -- Test 5: NOD building types defined
+    local ok5, err5 = pcall(function()
+        local AIController = require("src.house.ai_controller")
+
+        assert(AIController.NOD_BUILDINGS ~= nil, "NOD_BUILDINGS should exist")
+        assert(AIController.NOD_BUILDINGS.power ~= nil, "NOD power buildings defined")
+        assert(AIController.NOD_BUILDINGS.infantry ~= nil, "NOD infantry buildings defined")
+        assert(AIController.NOD_BUILDINGS.defense ~= nil, "NOD defense buildings defined")
+
+        add_test("NOD building types", true, "NOD building categories defined")
+    end)
+
+    if not ok5 then
+        add_test("NOD building types", false, tostring(err5))
+    end
+
+    -- Test 6: AI States defined
+    local ok6, err6 = pcall(function()
+        local AIController = require("src.house.ai_controller")
+
+        assert(AIController.STATE ~= nil, "AI states should exist")
+        assert(AIController.STATE.BUILDING == "building", "BUILDING state defined")
+        assert(AIController.STATE.DEFENDING == "defending", "DEFENDING state defined")
+        assert(AIController.STATE.ATTACKING == "attacking", "ATTACKING state defined")
+        assert(AIController.STATE.HARVESTING == "harvesting", "HARVESTING state defined")
+        assert(AIController.STATE.REGROUPING == "regrouping", "REGROUPING state defined")
+
+        add_test("AI States", true, "All 5 AI states defined")
+    end)
+
+    if not ok6 then
+        add_test("AI States", false, tostring(err6))
     end
 
     -- Summary
