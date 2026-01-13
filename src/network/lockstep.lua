@@ -1,9 +1,12 @@
 --[[
     Lockstep - Deterministic lockstep synchronization for multiplayer
     Ensures all clients execute the same commands on the same frames
+    Reference: Original C&C used per-frame CRC checks for desync detection
 ]]
 
 local Protocol = require("src.network.protocol")
+local CRC32 = require("src.util.crc")
+local Events = require("src.core.events")
 
 local Lockstep = {}
 Lockstep.__index = Lockstep
@@ -50,11 +53,27 @@ function Lockstep.new(player_count)
     -- Protocol instance
     self.protocol = Protocol.new()
 
+    -- World reference for CRC calculation
+    self.world = nil
+
+    -- Desync tracking
+    self.desync_info = {
+        local_crc = 0,
+        remote_crc = 0,
+        mismatched_player = nil
+    }
+
     -- Callbacks
     self.on_send = nil      -- function(data) - send data to network
     self.on_execute = nil   -- function(commands) - execute commands
+    self.on_desync = nil    -- function(frame, local_crc, remote_crc) - desync callback
 
     return self
+end
+
+-- Set world reference for state CRC calculation
+function Lockstep:set_world(world)
+    self.world = world
 end
 
 -- Set local player ID
@@ -202,18 +221,29 @@ function Lockstep:update()
     return true
 end
 
+-- Calculate current game state CRC
+function Lockstep:calculate_state_crc()
+    if not self.world then
+        return 0
+    end
+
+    -- Use the CRC32 utility to compute deterministic game state hash
+    return CRC32.quick_state(self.world, self.current_frame)
+end
+
 -- Send synchronization checksum
 function Lockstep:send_sync_check()
-    if self.on_checksum then
-        local checksum = self.on_checksum()
-        self.checksums[self.current_frame] = {
-            [self.local_player_id] = checksum
-        }
+    -- Calculate CRC of current game state
+    local checksum = self:calculate_state_crc()
 
-        local packet = self.protocol:create_sync_check(self.current_frame, checksum)
-        if self.on_send then
-            self.on_send(packet)
-        end
+    self.checksums[self.current_frame] = {
+        [self.local_player_id] = checksum
+    }
+    self.desync_info.local_crc = checksum
+
+    local packet = self.protocol:create_sync_check(self.current_frame, checksum)
+    if self.on_send then
+        self.on_send(packet)
     end
 end
 
@@ -237,19 +267,56 @@ function Lockstep:receive_sync_check(player_id, frame, checksum)
     if all_received then
         -- Verify all checksums match
         local reference = nil
-        for _, cs in pairs(self.checksums[frame]) do
+        local reference_player = nil
+
+        for pid, cs in pairs(self.checksums[frame]) do
             if reference == nil then
                 reference = cs
+                reference_player = pid
             elseif cs ~= reference then
                 -- Desync detected!
                 self.desync = true
                 self.desync_frame = frame
+                self.desync_info.local_crc = self.checksums[frame][self.local_player_id] or 0
+                self.desync_info.remote_crc = cs
+                self.desync_info.mismatched_player = pid
+
+                -- Emit desync event
+                Events.emit("MULTIPLAYER_DESYNC", {
+                    frame = frame,
+                    local_player = self.local_player_id,
+                    local_crc = self.desync_info.local_crc,
+                    remote_player = pid,
+                    remote_crc = cs
+                })
+
+                -- Call desync callback if set
+                if self.on_desync then
+                    self.on_desync(frame, self.desync_info.local_crc, cs, pid)
+                end
+
                 return false
             end
         end
     end
 
     return true
+end
+
+-- Check if game is in desync state
+function Lockstep:is_desynced()
+    return self.desync
+end
+
+-- Get desync details
+function Lockstep:get_desync_info()
+    return {
+        desynced = self.desync,
+        frame = self.desync_frame,
+        local_crc = self.desync_info.local_crc,
+        remote_crc = self.desync_info.remote_crc,
+        mismatched_player = self.desync_info.mismatched_player
+    }
 end
 
 -- Clean up old frame data

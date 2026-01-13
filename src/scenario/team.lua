@@ -83,6 +83,91 @@ function TeamSystem:register_events()
     Events.on("REINFORCEMENT", function(team_type_name, waypoint_name)
         self:spawn_reinforcement(team_type_name, waypoint_name)
     end)
+
+    -- Listen for autocreate toggle from triggers
+    Events.on("AUTOCREATE", function(house, enabled)
+        self:set_autocreate_enabled(house, enabled)
+    end)
+
+    -- Listen for scenario start to spawn initial autocreate teams
+    Events.on("SCENARIO_STARTED", function()
+        self:spawn_autocreate_teams()
+    end)
+end
+
+-- Autocreate state per house
+TeamSystem.autocreate_enabled = {}
+
+-- Enable or disable autocreate for a house
+function TeamSystem:set_autocreate_enabled(house, enabled)
+    TeamSystem.autocreate_enabled[house] = enabled
+    if enabled then
+        -- Immediately try to spawn any pending autocreate teams
+        self:spawn_autocreate_teams_for_house(house)
+    end
+end
+
+-- Spawn all autocreate teams at scenario start
+function TeamSystem:spawn_autocreate_teams()
+    for name, team_type in pairs(self.team_types) do
+        if team_type.autocreate then
+            -- Autocreate teams spawn at mission start
+            local team = self:create_team(name)
+            if team then
+                Events.emit("TEAM_AUTOCREATED", name, team.id)
+            end
+        end
+    end
+end
+
+-- Spawn autocreate teams for a specific house (when enabled via trigger)
+function TeamSystem:spawn_autocreate_teams_for_house(house)
+    -- Convert house constant to string for comparison
+    local house_str = house
+    if type(house) == "number" then
+        if house == Constants.HOUSE.BAD then
+            house_str = "BAD"
+        elseif house == Constants.HOUSE.GOOD then
+            house_str = "GOOD"
+        end
+    end
+
+    for name, team_type in pairs(self.team_types) do
+        if team_type.autocreate then
+            local team_house = team_type.house
+            if type(team_house) == "string" then
+                if team_house == "BadGuy" then team_house = "BAD" end
+                if team_house == "GoodGuy" then team_house = "GOOD" end
+            end
+
+            if team_house == house_str or team_house == house then
+                -- Check if we already have an active team of this type
+                local has_active = false
+                for _, active_team in pairs(self.active_teams) do
+                    if active_team.type_name == name then
+                        has_active = true
+                        break
+                    end
+                end
+
+                if not has_active then
+                    local team = self:create_team(name)
+                    if team then
+                        Events.emit("TEAM_AUTOCREATED", name, team.id)
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Check if we should rebuild autocreate teams (called periodically by AI)
+function TeamSystem:check_autocreate_rebuild()
+    for house, enabled in pairs(TeamSystem.autocreate_enabled) do
+        if enabled then
+            self:spawn_autocreate_teams_for_house(house)
+        end
+    end
 end
 
 -- Spawn reinforcement team at specified waypoint or map edge
