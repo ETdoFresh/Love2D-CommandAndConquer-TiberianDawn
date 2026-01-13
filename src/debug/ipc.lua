@@ -332,6 +332,8 @@ function IPC:process_command(command)
             "test_phase4_phase5 - Test Phase 4-5 features (Toggle_Primary, Sell_Back, AI teams, triggers)",
             "test_ai_building - Test AI building system (placement, building sizes, states)",
             "test_ai_game_integration - Test AI-Game integration (event handlers, factory lookup, repairs)",
+            "test_debug_systems - Test Debug systems (Dump, Mono, Cheats)",
+            "test_spectator_network - Test Spectator adapter and Network protocol",
             "help - Show this help"
         }
 
@@ -394,6 +396,20 @@ function IPC:process_command(command)
     elseif cmd == "test_ai_game_integration" then
         -- Test AI-Game Integration (event handlers, factory lookup)
         local test_result = self:test_ai_game_integration()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
+    elseif cmd == "test_debug_systems" then
+        -- Test Debug Systems (Dump, Mono, Cheats)
+        local test_result = self:test_debug_systems()
+        response.success = test_result.success
+        response.tests = test_result.tests
+        response.message = test_result.message
+
+    elseif cmd == "test_spectator_network" then
+        -- Test Spectator and Network Systems
+        local test_result = self:test_spectator_network()
         response.success = test_result.success
         response.tests = test_result.tests
         response.message = test_result.message
@@ -6381,6 +6397,325 @@ function IPC:test_ai_game_integration()
 
     if not ok6 then
         add_test("ProductionSystem methods", false, tostring(err6))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test Debug Systems (Dump, Mono, Cheats)
+function IPC:test_debug_systems()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: Debug module loads all components
+    local ok1, err1 = pcall(function()
+        local Debug = require("src.debug")
+
+        assert(Debug.IPC ~= nil, "IPC should be loaded")
+        assert(Debug.Dump ~= nil, "Dump should be loaded")
+        assert(Debug.Mono ~= nil, "Mono should be loaded")
+        assert(Debug.Cheats ~= nil, "Cheats should be loaded")
+
+        add_test("Debug module", true, "All debug components loaded")
+    end)
+
+    if not ok1 then
+        add_test("Debug module", false, tostring(err1))
+    end
+
+    -- Test 2: Dump system methods
+    local ok2, err2 = pcall(function()
+        local Dump = require("src.debug.dump")
+
+        assert(type(Dump.init) == "function", "Dump.init should exist")
+        assert(type(Dump.print) == "function", "Dump.print should exist")
+        assert(type(Dump.printf) == "function", "Dump.printf should exist")
+        assert(type(Dump.section) == "function", "Dump.section should exist")
+        assert(type(Dump.flag) == "function", "Dump.flag should exist")
+        assert(type(Dump.field) == "function", "Dump.field should exist")
+        assert(type(Dump.entity) == "function", "Dump.entity should exist")
+        assert(type(Dump.techno) == "function", "Dump.techno should exist")
+
+        add_test("Dump system", true, "All dump methods available")
+    end)
+
+    if not ok2 then
+        add_test("Dump system", false, tostring(err2))
+    end
+
+    -- Test 3: MonoClass methods
+    local ok3, err3 = pcall(function()
+        local Mono = require("src.debug.mono")
+
+        -- Check class methods
+        assert(type(Mono.new) == "function", "Mono.new should exist")
+        assert(type(Mono.Enable) == "function", "Mono.Enable should exist")
+        assert(type(Mono.Disable) == "function", "Mono.Disable should exist")
+        assert(type(Mono.Is_Enabled) == "function", "Mono.Is_Enabled should exist")
+
+        -- Check constants
+        assert(Mono.COLUMNS == 80, "COLUMNS should be 80")
+        assert(Mono.LINES == 25, "LINES should be 25")
+        assert(Mono.MAX_MONO_PAGES == 16, "MAX_MONO_PAGES should be 16")
+
+        -- Check box styles
+        assert(Mono.BOX_STYLE.SINGLE == 1, "BOX_STYLE.SINGLE should be 1")
+        assert(Mono.BOX_STYLE.DOUBLE == 4, "BOX_STYLE.DOUBLE should be 4")
+
+        add_test("MonoClass", true, "MonoClass port complete")
+    end)
+
+    if not ok3 then
+        add_test("MonoClass", false, tostring(err3))
+    end
+
+    -- Test 4: MonoClass instance methods
+    local ok4, err4 = pcall(function()
+        local Mono = require("src.debug.mono")
+
+        -- Create instance
+        local mono = Mono.new()
+        assert(mono ~= nil, "Should create mono instance")
+
+        -- Check instance methods
+        assert(type(mono.Clear) == "function", "Clear should exist")
+        assert(type(mono.Set_Cursor) == "function", "Set_Cursor should exist")
+        assert(type(mono.Print) == "function", "Print should exist")
+        assert(type(mono.Printf) == "function", "Printf should exist")
+        assert(type(mono.Text_Print) == "function", "Text_Print should exist")
+        assert(type(mono.Draw_Box) == "function", "Draw_Box should exist")
+
+        -- Test cursor
+        mono:Set_Cursor(10, 5)
+        assert(mono:Get_X() == 10, "X should be 10")
+        assert(mono:Get_Y() == 5, "Y should be 5")
+
+        add_test("MonoClass instance", true, "Instance methods working")
+    end)
+
+    if not ok4 then
+        add_test("MonoClass instance", false, tostring(err4))
+    end
+
+    -- Test 5: Cheats system commands
+    local ok5, err5 = pcall(function()
+        local Cheats = require("src.debug.cheats")
+
+        -- Check basic methods
+        assert(type(Cheats.init) == "function", "init should exist")
+        assert(type(Cheats.set_enabled) == "function", "set_enabled should exist")
+        assert(type(Cheats.execute) == "function", "execute should exist")
+        assert(type(Cheats.show_help) == "function", "show_help should exist")
+
+        -- Check cheat commands exist
+        assert(type(Cheats.add_credits) == "function", "add_credits should exist")
+        assert(type(Cheats.toggle_god_mode) == "function", "toggle_god_mode should exist")
+        assert(type(Cheats.reveal_all) == "function", "reveal_all should exist")
+        assert(type(Cheats.toggle_instant_build) == "function", "toggle_instant_build should exist")
+        assert(type(Cheats.win_mission) == "function", "win_mission should exist")
+
+        -- Check command registry
+        assert(Cheats.commands ~= nil, "commands table should exist")
+        assert(Cheats.commands.credits ~= nil, "credits command should exist")
+        assert(Cheats.commands.god ~= nil, "god command should exist")
+        assert(Cheats.commands.reveal ~= nil, "reveal command should exist")
+        assert(Cheats.commands.help ~= nil, "help command should exist")
+
+        add_test("Cheats system", true, "All cheat commands available")
+    end)
+
+    if not ok5 then
+        add_test("Cheats system", false, tostring(err5))
+    end
+
+    -- Test 6: Cheats status tracking
+    local ok6, err6 = pcall(function()
+        local Cheats = require("src.debug.cheats")
+
+        local status = Cheats.get_status()
+        assert(status ~= nil, "get_status should return table")
+        assert(status.enabled ~= nil, "status.enabled should exist")
+        assert(status.god_mode ~= nil, "status.god_mode should exist")
+        assert(status.instant_build ~= nil, "status.instant_build should exist")
+        assert(status.reveal_map ~= nil, "status.reveal_map should exist")
+
+        add_test("Cheats status", true, "Status tracking working")
+    end)
+
+    if not ok6 then
+        add_test("Cheats status", false, tostring(err6))
+    end
+
+    -- Summary
+    local passed = 0
+    local failed = 0
+    for _, test in ipairs(result.tests) do
+        if test.passed then
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+    end
+
+    result.message = string.format("%d/%d tests passed", passed, passed + failed)
+
+    return result
+end
+
+-- Test Spectator and Network Systems
+function IPC:test_spectator_network()
+    local result = {
+        success = true,
+        tests = {}
+    }
+
+    local function add_test(name, passed, message)
+        table.insert(result.tests, {
+            name = name,
+            passed = passed,
+            message = message
+        })
+        if not passed then
+            result.success = false
+        end
+    end
+
+    -- Test 1: Spectator adapter loads
+    local ok1, err1 = pcall(function()
+        local Spectator = require("src.adapters.spectator")
+
+        assert(Spectator ~= nil, "Spectator should load")
+        assert(type(Spectator.init) == "function", "init should exist")
+        assert(type(Spectator.enable) == "function", "enable should exist")
+        assert(type(Spectator.disable) == "function", "disable should exist")
+
+        add_test("Spectator adapter", true, "Spectator adapter loaded")
+    end)
+
+    if not ok1 then
+        add_test("Spectator adapter", false, tostring(err1))
+    end
+
+    -- Test 2: Spectator view modes
+    local ok2, err2 = pcall(function()
+        local Spectator = require("src.adapters.spectator")
+
+        assert(Spectator.VIEW_MODE ~= nil, "VIEW_MODE should exist")
+        assert(Spectator.VIEW_MODE.FREE == 1, "FREE mode should be 1")
+        assert(Spectator.VIEW_MODE.PLAYER == 2, "PLAYER mode should be 2")
+        assert(Spectator.VIEW_MODE.UNIT == 3, "UNIT mode should be 3")
+
+        add_test("Spectator view modes", true, "All view modes defined")
+    end)
+
+    if not ok2 then
+        add_test("Spectator view modes", false, tostring(err2))
+    end
+
+    -- Test 3: Spectator methods
+    local ok3, err3 = pcall(function()
+        local Spectator = require("src.adapters.spectator")
+
+        assert(type(Spectator.track_player) == "function", "track_player should exist")
+        assert(type(Spectator.track_unit) == "function", "track_unit should exist")
+        assert(type(Spectator.next_player) == "function", "next_player should exist")
+        assert(type(Spectator.set_camera) == "function", "set_camera should exist")
+        assert(type(Spectator.set_zoom) == "function", "set_zoom should exist")
+        assert(type(Spectator.update) == "function", "update should exist")
+        assert(type(Spectator.keypressed) == "function", "keypressed should exist")
+
+        add_test("Spectator methods", true, "All spectator methods available")
+    end)
+
+    if not ok3 then
+        add_test("Spectator methods", false, tostring(err3))
+    end
+
+    -- Test 4: Protocol module
+    local ok4, err4 = pcall(function()
+        local Protocol = require("src.network.protocol")
+
+        assert(Protocol ~= nil, "Protocol should load")
+        assert(Protocol.VERSION == 1, "VERSION should be 1")
+        assert(Protocol.PACKET ~= nil, "PACKET types should exist")
+
+        -- Check packet types
+        assert(Protocol.PACKET.HELLO == 0x01, "HELLO packet type")
+        assert(Protocol.PACKET.FRAME_DATA == 0x22, "FRAME_DATA packet type")
+        assert(Protocol.PACKET.SYNC_CHECK == 0x24, "SYNC_CHECK packet type")
+
+        add_test("Protocol module", true, "Protocol module complete")
+    end)
+
+    if not ok4 then
+        add_test("Protocol module", false, tostring(err4))
+    end
+
+    -- Test 5: Protocol encoding/decoding
+    local ok5, err5 = pcall(function()
+        local Protocol = require("src.network.protocol")
+
+        local proto = Protocol.new()
+        assert(proto ~= nil, "Should create protocol instance")
+
+        -- Test encoding methods
+        assert(type(proto.encode_header) == "function", "encode_header should exist")
+        assert(type(proto.decode_header) == "function", "decode_header should exist")
+        assert(type(proto.encode_int) == "function", "encode_int should exist")
+        assert(type(proto.decode_int) == "function", "decode_int should exist")
+        assert(type(proto.encode_string) == "function", "encode_string should exist")
+        assert(type(proto.decode_string) == "function", "decode_string should exist")
+
+        -- Test packet creation
+        assert(type(proto.create_hello) == "function", "create_hello should exist")
+        assert(type(proto.create_frame_data) == "function", "create_frame_data should exist")
+        assert(type(proto.create_sync_check) == "function", "create_sync_check should exist")
+
+        add_test("Protocol encoding", true, "Encoding/decoding methods available")
+    end)
+
+    if not ok5 then
+        add_test("Protocol encoding", false, tostring(err5))
+    end
+
+    -- Test 6: Adapters module includes spectator
+    local ok6, err6 = pcall(function()
+        local Adapters = require("src.adapters")
+
+        assert(Adapters.Spectator ~= nil, "Spectator should be in Adapters")
+        assert(Adapters.config.use_spectator ~= nil, "use_spectator config should exist")
+
+        add_test("Adapters integration", true, "Spectator integrated in Adapters")
+    end)
+
+    if not ok6 then
+        add_test("Adapters integration", false, tostring(err6))
     end
 
     -- Summary

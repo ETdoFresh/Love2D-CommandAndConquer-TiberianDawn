@@ -17,6 +17,7 @@ Adapters.HDGraphics = require("src.adapters.hd_graphics")
 Adapters.Controller = require("src.adapters.controller")
 Adapters.Hotkeys = require("src.adapters.hotkeys")
 Adapters.RemasteredAudio = require("src.adapters.remastered_audio")
+Adapters.Spectator = require("src.adapters.spectator")
 
 -- Configuration flags
 Adapters.config = {
@@ -24,6 +25,7 @@ Adapters.config = {
     use_controller = false,       -- Enable controller support
     use_custom_hotkeys = false,   -- Use rebindable hotkeys
     use_remastered_audio = false, -- Use remastered audio
+    use_spectator = false,        -- Enable spectator/observer mode
 }
 
 --[[
@@ -55,6 +57,10 @@ function Adapters.init(settings)
     if Adapters.config.use_remastered_audio then
         Adapters.RemasteredAudio.init()
     end
+
+    if Adapters.config.use_spectator then
+        Adapters.Spectator.init(settings.game)
+    end
 end
 
 --[[
@@ -64,6 +70,10 @@ end
 function Adapters.update(dt)
     if Adapters.config.use_controller then
         Adapters.Controller.update(dt)
+    end
+
+    if Adapters.config.use_spectator then
+        Adapters.Spectator.update(dt)
     end
 end
 
@@ -76,6 +86,7 @@ function Adapters.Debug_Dump()
     print(string.format("  Controller: %s", tostring(Adapters.config.use_controller)))
     print(string.format("  Custom Hotkeys: %s", tostring(Adapters.config.use_custom_hotkeys)))
     print(string.format("  Remastered Audio: %s", tostring(Adapters.config.use_remastered_audio)))
+    print(string.format("  Spectator Mode: %s", tostring(Adapters.config.use_spectator)))
 end
 
 return Adapters
