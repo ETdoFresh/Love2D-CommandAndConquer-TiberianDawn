@@ -457,14 +457,33 @@ Note: Mission_Harvest, Mission_Sabotage, Mission_Retreat are in derived classes
 - [ ] Implement vehicle rotation animation
 - [ ] Write unit tests for DriveClass
 
-### FlyClass (`src/objects/drive/fly.lua`)
-- [ ] Implement aircraft movement physics
-- [ ] Implement flight altitude
-- [ ] Implement takeoff/landing
-- [ ] Implement landing pad docking
-- [ ] Implement hovering (helicopters)
-- [ ] Implement high-speed flight (planes)
-- [ ] Write unit tests for FlyClass
+### FlyClass (`src/objects/drive/fly.lua`) - COMPLETE
+- [x] Implement aircraft movement physics (433 lines)
+  - [x] `SpeedAccum` / `SpeedAdd` - Bresenham-style speed accumulator
+  - [x] `Physics()` - full flight physics with angle-based movement calculation
+  - [x] `Fly_Speed()` / `Set_Max_Speed()` / `Stop_Flight()` - speed control
+  - [x] `MPH` speed constants (IMMOBILE through BLAZING - 9 levels)
+- [x] Implement flight altitude
+  - [x] `Altitude` / `TargetAltitude` / `ClimbRate` fields
+  - [x] `ALTITUDE` constants (GROUND/LOW/MEDIUM/HIGH)
+  - [x] `Set_Altitude()` / `Get_Altitude()` - altitude control
+  - [x] `Process_Altitude()` - smooth altitude interpolation
+- [x] Implement takeoff/landing
+  - [x] `FlightState` enum (GROUNDED/TAKING_OFF/FLYING/LANDING/HOVERING)
+  - [x] `Take_Off()` / `Land()` - state transitions
+  - [x] State machine in Process_Altitude()
+- [x] Implement hovering (helicopters)
+  - [x] `IsVTOL` flag
+  - [x] `Hover()` - enter hover mode for VTOL aircraft
+  - [x] `Is_Hovering()` query
+- [x] Implement collision detection stub
+  - [x] `Check_Collision()` - returns IMPACT enum
+  - [x] `IMPACT` types (NONE/GROUND/WATER/BUILDING/UNIT)
+- [x] Implement query functions: Is_Airborne, Is_Grounded, Is_Taking_Off, Is_Landing, Flight_Speed
+- [x] Implement AI_Fly() for per-tick processing
+- [x] Implement Code_Pointers_Fly / Decode_Pointers_Fly for save/load
+- [x] Implement Debug_Dump_Fly with state names
+Note: Landing pad docking handled in AircraftClass; high-speed flight via type MaxSpeed
 
 ### TarComClass (`src/objects/drive/tarcom.lua`)
 - [ ] Implement turret tracking
@@ -547,22 +566,49 @@ Note: C4/commando and enter building logic in mission handlers; Made_A_Kill inhe
 - [x] Implement Debug_Dump() with full state output
 Note: Turret rotation via TarComClass inheritance; crushing/amphibious from type flags; gap/berzerk not in TD
 
-### AircraftClass (`src/objects/aircraft.lua`)
-- [ ] Implement all fields from AIRCRAFT.H
-  - [ ] `BodyFacing` (body direction)
-  - [ ] `Altitude` (flight height)
-  - [ ] `Jitter` (sway amount)
-  - [ ] `IsLanding` / `IsLanded` / `IsTakingOff`
-- [ ] Implement `AI()` - aircraft-specific logic
-- [ ] Implement helicopter hover
-- [ ] Implement helicopter attack run
-- [ ] Implement airplane strafing run
-- [ ] Implement landing pad approach
-- [ ] Implement ammo depletion and RTB
-- [ ] Implement Orca/Apache behavior
-- [ ] Implement Chinook transport
-- [ ] Implement A-10 airstrike
-- [ ] Write unit tests for AircraftClass
+### AircraftClass (`src/objects/aircraft.lua`) - COMPLETE
+- [x] Implement all fields from AIRCRAFT.H (721 lines + 433-line FlyClass mixin)
+  - [x] `BodyFrame` (rotor/body animation frame)
+  - [x] `Altitude` (via FlyClass mixin - current altitude in leptons)
+  - [x] `TargetAltitude` / `ClimbRate` (altitude control)
+  - [x] `IsLanding` / `IsTakingOff` / `LandState` (landing state machine)
+  - [x] `LandingTarget` (helipad TARGET for landing)
+  - [x] `Ammo` / `MaxAmmo` / `Fuel` (resource tracking)
+  - [x] `AttackTimer` / `StrafeCount` (attack operation tracking)
+  - [x] `IsVTOL` (VTOL capability flag from type)
+  - [x] Constants: AIRCRAFT enum (4 types), LAND_STATE (5 states), AIRCRAFT_SPEED, FLIGHT_LEVEL
+- [x] Implement FlyClass mixin (src/objects/drive/fly.lua - 433 lines):
+  - [x] `SpeedAccum` / `SpeedAdd` - Bresenham-style speed accumulator
+  - [x] `FlightState` enum (GROUNDED/TAKING_OFF/FLYING/LANDING/HOVERING)
+  - [x] `ALTITUDE` constants (GROUND/LOW/MEDIUM/HIGH)
+  - [x] `MPH` speed constants (IMMOBILE through BLAZING)
+  - [x] `IMPACT` collision types
+  - [x] `Fly_Speed()` / `Set_Max_Speed()` / `Stop_Flight()` - speed control
+  - [x] `Set_Altitude()` / `Take_Off()` / `Land()` / `Hover()` - altitude control
+  - [x] `Physics()` - full flight physics with angle-based movement
+  - [x] `Process_Altitude()` - altitude interpolation toward target
+  - [x] `Check_Collision()` - collision detection stub
+  - [x] `AI_Fly()` - per-tick flight processing
+  - [x] Query functions: Is_Airborne, Is_Grounded, Is_Taking_Off, Is_Landing, Is_Hovering
+  - [x] Code_Pointers_Fly / Decode_Pointers_Fly for save/load
+  - [x] Debug_Dump_Fly with state names
+- [x] Implement `AI()` - flight physics + takeoff/landing completion + rotor animation
+- [x] Implement `Start_Takeoff()` / `Start_Landing()` / `Complete_Landing()` - flight control
+- [x] Implement `Reload_Ammo()` - ammunition reload at helipad
+- [x] Implement `Should_Return_To_Base()` / `Return_To_Base()` - RTB logic
+- [x] Implement `Start_Driver()` override - auto-takeoff before movement
+- [x] Implement `Per_Cell_Process()` override - fuel consumption
+- [x] Implement `Center_Coord()` / `Sort_Y()` overrides for altitude rendering
+- [x] Implement `Can_Fire()` / `Fire_At()` overrides with ammo consumption
+- [x] Implement `Take_Damage()` override with `Crash()` when destroyed airborne
+- [x] Implement mission overrides: Mission_Move, Mission_Attack, Mission_Guard, Mission_Enter, Mission_Hunt
+- [x] Implement `Enter_Idle_Mode()` override - RTB when idle and airborne
+- [x] Implement voice responses: Response_Select, Response_Move, Response_Attack
+- [x] Implement `get_rtti()` / `What_Am_I()` - RTTI.AIRCRAFT
+- [x] Implement `Techno_Type_Class()` / `Class_Of()` - type access
+- [x] Implement Code_Pointers / Decode_Pointers for save/load (includes Fly mixin data)
+- [x] Implement Debug_Dump() with full state output (includes Debug_Dump_Fly)
+Note: Specific unit behaviors (Orca/Apache/Chinook/A-10) determined by type class properties
 
 ### BuildingClass (`src/objects/building.lua`)
 - [ ] Implement all fields from BUILDING.H

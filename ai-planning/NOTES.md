@@ -210,3 +210,22 @@ Full ground vehicle implementation discovered during audit:
 - UNIT enum with 16 vehicle types (HTANK through GUNBOAT)
 - All timers: HarvestTimer, UnloadTimer, DeployTimer, AnimTimer
 - Full save/load serialization and Debug_Dump
+
+### AircraftClass + FlyClass - Complete (721 + 433 = 1154 lines)
+Full aircraft implementation discovered during audit:
+- FlyClass mixin provides core flight physics:
+  - Bresenham-style speed accumulator (SpeedAccum/SpeedAdd)
+  - FlightState state machine (GROUNDED/TAKING_OFF/FLYING/LANDING/HOVERING)
+  - Altitude control with smooth interpolation (Process_Altitude)
+  - Physics() with angle-based movement calculation
+  - VTOL support for helicopters (Hover mode)
+- AircraftClass provides game-level aircraft logic:
+  - Start_Takeoff/Start_Landing/Complete_Landing flight control
+  - Should_Return_To_Base/Return_To_Base RTB logic
+  - Ammo/MaxAmmo/Fuel resource tracking
+  - LandState state machine for landing sequences
+  - Mission overrides: Mission_Move (auto-takeoff), Mission_Attack, Mission_Guard, Mission_Enter, Mission_Hunt
+  - Crash() when destroyed while airborne
+  - Rotor animation via BodyFrame
+- Full save/load serialization with FlyClass mixin data
+- Unit-specific behaviors (Orca/Apache/Chinook/A-10) via type class properties
