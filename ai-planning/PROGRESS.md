@@ -33,13 +33,13 @@ This document tracks all implementation tasks for the Command & Conquer: Tiberia
 ## Phase 1: Base Classes & Infrastructure
 
 ### Class System Infrastructure
-- [ ] Verify `src/objects/class.lua` OOP system correctness
+- [x] Verify `src/objects/class.lua` OOP system correctness (85 tests pass)
 - [ ] Add strict type checking to class system
 - [ ] Implement `Class.assert_type()` for type validation
 - [ ] Add debug mode type checking toggle
-- [ ] Write unit tests for class inheritance
-- [ ] Write unit tests for mixin composition
-- [ ] Write unit tests for super() calls
+- [x] Write unit tests for class inheritance (test_class_oop.lua)
+- [x] Write unit tests for mixin composition (test_class_oop.lua)
+- [x] Write unit tests for super() calls (test_class_oop.lua)
 
 ### HeapClass Object Pools (`src/heap/`)
 - [ ] Implement `HeapClass` with fixed-size pools
