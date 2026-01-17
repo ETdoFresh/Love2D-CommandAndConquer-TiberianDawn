@@ -83,3 +83,28 @@ The class system has been verified to support:
 
 4. **Real game objects working**: TechnoClass with 5 mixins (Flasher, Stage, Cargo, Door,
    Crew) was tested via existing IPC `test_techno` command - all functionality verified.
+
+---
+
+## 2026-01-16: Phase 1 Core Systems Audit
+
+### Status Update
+Audited PROGRESS.md against actual codebase implementation. Found that most Phase 1
+core systems were already implemented but not tracked:
+
+**Already Complete (marked in PROGRESS.md):**
+- HeapClass object pools (`src/heap/heap.lua`, `src/heap/globals.lua`)
+- COORDINATE system (`src/core/coord.lua`) - full bit-packing, distance, direction
+- CELL system (`src/core/coord.lua`) - full bit-packing, adjacency, bounds
+- TARGET system (`src/core/target.lua`) - full RTTI encoding, validation
+- Random number generator (`src/core/random.lua`) - LCG implementation
+
+### Key Finding
+PROGRESS.md was significantly out of date - many tasks marked `[ ]` were already
+implemented. This caused confusion about what work remained for Phase 1.
+
+### Remaining Phase 1 Critical Path
+After auditing, the actual blocking tasks for Phase 1 completion are:
+1. Game loop integration - wire class AI() methods into main loop
+2. Remove ECS compatibility shims
+3. Base classes may need method stubs filled in
