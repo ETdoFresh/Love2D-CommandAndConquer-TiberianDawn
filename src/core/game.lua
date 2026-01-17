@@ -11,6 +11,7 @@ local Systems = require("src.systems")
 local Sidebar = require("src.ui.sidebar")
 local Radar = require("src.ui.radar")
 local Serialize = require("src.util.serialize")
+local Globals = require("src.heap.globals")
 
 local Game = {}
 Game.__index = Game
@@ -760,8 +761,23 @@ function Game:update(dt)
 end
 
 -- Game logic tick (15 FPS)
+-- This is the heart of the game simulation - runs at fixed 15 FPS
+-- matching the original C&C tick rate. All game objects get their
+-- AI() method called each tick.
 function Game:tick()
     self.tick_count = self.tick_count + 1
+
+    -- Process AI for all active objects in the class hierarchy.
+    -- This calls AI() on Buildings, Infantry, Units, Aircraft, Bullets, Anims
+    -- in the correct order matching the original C&C source.
+    Globals.Process_All_AI()
+
+    -- Process tiberium growth and spread (from Map/Grid)
+    if self.grid and self.grid.Logic then
+        self.grid:Logic()
+    end
+
+    -- Emit tick event for any listeners
     Events.emit(Events.EVENTS.GAME_TICK, self.tick_count)
 end
 

@@ -274,15 +274,15 @@ Note: Specific message handling (PICK_UP, ATTACH, etc.) done in derived TechnoCl
 - [ ] Write unit tests for display classes
 
 ### Game Loop Integration (`src/core/game.lua`)
-- [ ] Remove ECS world reference
-- [ ] Implement main game tick at 15 FPS
-- [ ] Implement AI() calls for all active objects
-- [ ] Implement object iteration order (match original)
-- [ ] Implement render loop at 60 FPS
-- [ ] Implement delta time accumulator for fixed timestep
+- [ ] Remove ECS world reference (deferred - shims still needed for rendering)
+- [x] Implement main game tick at 15 FPS (tick_accumulator exists)
+- [x] Implement AI() calls for all active objects (Globals.Process_All_AI())
+- [x] Implement object iteration order (match original) (Building→Infantry→Unit→Aircraft→Bullet→Anim)
+- [x] Implement render loop at 60 FPS (Love2D default)
+- [x] Implement delta time accumulator for fixed timestep (exists)
 - [ ] Implement frame interpolation for smooth rendering
-- [ ] Implement game pause/resume
-- [ ] Implement game speed adjustment
+- [x] Implement game pause/resume (exists)
+- [x] Implement game speed adjustment (game_speed multiplier exists)
 - [ ] Write integration tests for game loop
 
 ### Save/Load System (`src/io/`)

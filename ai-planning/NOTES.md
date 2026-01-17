@@ -118,3 +118,19 @@ Verified the following base classes are **fully implemented**:
 
 **Summary**: The entire Phase 1 base class chain (Abstract → Object → Mission → Radio) is complete.
 The ECS shim exists only for backward compatibility with game.lua until game loop migration.
+
+### Game Loop Integration - AI() Calls Implemented
+Wired `Globals.Process_All_AI()` into `Game:tick()` which now:
+1. Increments tick_count
+2. Calls `Globals.Process_All_AI()` - iterates all heaps in correct order:
+   - BUILDING → INFANTRY → UNIT → AIRCRAFT → BULLET → ANIM
+3. Calls `self.grid:Logic()` for tiberium growth/spread
+4. Emits GAME_TICK event
+
+**Key insight**: The `HeapClass` already had `Process_AI()` and `Globals` already had
+`Process_All_AI()` - the infrastructure was complete, just needed to be called from
+the game loop. This is a single-line change that activates the entire class hierarchy.
+
+**Current state**: Class AI() methods will now run at 15 FPS when objects are created
+via `Globals.Create_Object()` or `heap:Allocate()`. The ECS world.update() still runs
+for rendering compatibility, but actual game logic now flows through the class hierarchy.
