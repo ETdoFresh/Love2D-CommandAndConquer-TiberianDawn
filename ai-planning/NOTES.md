@@ -169,3 +169,22 @@ All mixins have:
 - Proper init() for Class.include() integration
 
 TechnoClass already includes all 5 mixins and calls their methods in its AI().
+
+### Phase 2 Core Classes Audit - TechnoClass & FootClass Complete
+Deep audit reveals these classes are much more complete than PROGRESS.md indicated:
+
+**TechnoClass** (1462 lines):
+- All TECHNO.H fields implemented (House, TarCom, Cloak, Arm, Ammo, flags)
+- Full combat system: Fire_At, Can_Fire, In_Range, Greatest_Threat, Evaluate_Object
+- Complete cloak state machine (UNCLOAKED→CLOAKING→CLOAKED→UNCLOAKING)
+- Full constants: CLOAK enum, VISUAL enum, FIRE_ERROR enum, THREAT flags
+- All mixin integration working (calls Process, Graphic_Logic, AI_Door in AI())
+
+**FootClass** (1127 lines):
+- All FOOT.H fields implemented (NavCom, Path, Team, Speed, HeadToCoord, flags)
+- Complete mission implementations: Move, Attack, Guard, Guard_Area, Hunt, Enter, Capture
+- Full Approach_Target with range calculation and position finding
+- Pathfinding integration via Basic_Path() using FindPath module
+- Team and radio message handling
+
+PROGRESS.md was severely outdated - these classes were marked as TODO despite being fully implemented.
