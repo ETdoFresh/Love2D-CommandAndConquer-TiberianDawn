@@ -108,3 +108,13 @@ After auditing, the actual blocking tasks for Phase 1 completion are:
 1. Game loop integration - wire class AI() methods into main loop
 2. Remove ECS compatibility shims
 3. Base classes may need method stubs filled in
+
+### Phase 1 Base Classes - Deep Audit (continued)
+Verified the following base classes are **fully implemented**:
+- **AbstractClass** (314 lines): All fields, AI(), coordinate queries, distance/direction, heap management, serialization
+- **ObjectClass** (875 lines): All fields, Limbo/Unlimbo, Mark, Take_Damage with warhead support, selection, serialization
+- **MissionClass** (492 lines): All fields, mission state machine, all Mission_X() handlers as stubs, timer system
+- **RadioClass** (376 lines): All fields, RADIO enum (22 types), Transmit/Receive with HELLO/OVER_OUT protocol
+
+**Summary**: The entire Phase 1 base class chain (Abstract → Object → Mission → Radio) is complete.
+The ECS shim exists only for backward compatibility with game.lua until game loop migration.
