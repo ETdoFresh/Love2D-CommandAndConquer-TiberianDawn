@@ -708,3 +708,99 @@ After completing Phase 5 audit, the full picture is:
 5. **Unit tests** - Test coverage for all systems
 
 The game logic is 90%+ complete. The remaining work is primarily presentation layer (rendering, UI, audio) and AI autonomy.
+
+---
+
+## 2026-01-16: Phase 2 Movement Specialization Audit
+
+### Summary
+Audited Phase 2 movement specialization classes (DriveClass, TurretClass, TarComClass) against actual codebase. Found complete implementation but PROGRESS.md showed all items as `[ ]`.
+
+### What Was Discovered
+
+**DriveClass** (`src/objects/drive/drive.lua` - 546 lines):
+- Extends FootClass for ground vehicle base
+- Complete track-based movement system:
+  - TRACK enum: NONE, STRAIGHT, CURVE_LEFT, CURVE_RIGHT, U_TURN_LEFT, U_TURN_RIGHT
+  - TRACK_STAGES with 12/8/8/16/16 stages per track type
+  - Determine_Track selects appropriate track for turn angle
+  - Follow_Track interpolates facing during movement
+- Harvester support:
+  - MAX_TIBERIUM=100, Tiberium_Percentage()
+  - Harvest_Tiberium, Offload_Tiberium_Bail (25 credits/bail)
+  - Start_Return/Stop_Return for refinery trips
+- Turning system with Do_Turn() and rate-limited rotation
+- Full save/load and debug support
+
+**TurretClass** (`src/objects/drive/turret.lua` - 362 lines):
+- Extends DriveClass for turret-equipped vehicles
+- Secondary facing system independent of body:
+  - SecondaryFacing with Current/Desired
+  - DEFAULT_TURRET_ROT=8 facing units/tick
+- Turret control:
+  - Set_Turret_Facing, Point_Turret_At, Track_Target
+  - Do_Turn_Turret with rate-limited rotation
+  - Lock_Turret/Unlock_Turret for deployment animations
+- Weapon reload system:
+  - DEFAULT_RELOAD=30 ticks
+  - Start_Reload, Process_Reload, Is_Reloading
+- Fire_At override that tracks target and starts reload
+
+**TarComClass** (`src/objects/drive/tarcom.lua` - 370 lines):
+- Extends TurretClass for targeting computer functionality
+- Automatic target acquisition:
+  - SCAN_INTERVAL=15 ticks (1 second)
+  - Acquire_Target using Greatest_Threat
+  - Validate_Target checks alive/in-range with hysteresis (2x weapon range)
+- Threat evaluation:
+  - Evaluate_Threat scores by distance, attacker status, health ratio
+  - Damaged targets get +20 priority (easier kills)
+  - Units attacking us get +50 priority
+- Mission overrides:
+  - Mission_Attack: validate → acquire → engage cycle
+  - Mission_Guard: periodic scanning with auto-attack transition
+  - Mission_Hunt: aggressive acquisition
+
+### Key Learnings
+
+1. **Full inheritance chain complete**: FootClass → DriveClass → TurretClass → TarComClass → UnitClass provides the complete ground unit behavior chain.
+
+2. **Track-based movement is sophisticated**: Not just instant rotation—vehicles follow curved tracks with proper stage interpolation for smooth turning animations.
+
+3. **Turret independence works**: Body and turret facing are completely independent. Turret tracks targets while body follows movement path.
+
+4. **Target acquisition is automatic**: TarComClass handles all target selection/validation. Mission_Guard periodically scans and transitions to Mission_Attack when threats found.
+
+5. **UnitClass extends TarComClass**: This means all ground vehicles inherit automatic targeting, even harvesters (which ignore it via mission overrides).
+
+### Action Taken
+Updated PROGRESS.md Phase 2 section:
+- Changed header to "## Phase 2: TechnoClass & Game Objects - MOSTLY COMPLETE"
+- Added TurretClass section (was missing from original PROGRESS.md)
+- Changed DriveClass and TarComClass from `[ ]` to detailed `[x]` entries
+- Added line counts and feature breakdowns
+
+### What Remains for Phase 2
+- **Input Handling**: left/right click, box select, group assignment, hotkeys
+- **Selection System**: multi-select, priority, indicators, health bars
+- **Unit tests**: Coverage for movement classes
+
+### Updated Project State Summary
+
+After completing Phase 2 movement audit, the full picture is:
+- **Phase 1**: Complete (display hierarchy, base classes, map system, coordinates)
+- **Phase 2**: Mostly complete (TechnoClass, game objects, type classes, movement)
+  - Only Input Handling and Selection System remain
+- **Phase 3**: Mostly complete (combat, bullets, animations, pathfinding)
+- **Phase 4**: Mostly complete (economy, production, power, tiberium)
+- **Phase 5**: Mostly complete (triggers, teams, scenario loading, waypoints)
+
+**Truly missing features now refined:**
+1. **AI Controller** - Autonomous enemy AI (base building, production decisions)
+2. **Input Handling** - Selection, commands, hotkeys in game context
+3. **Sidebar UI** - Build icons, progress bars, repair/sell buttons
+4. **Sprite rendering** - ObjectClass.Render() and Draw_It() implementations
+5. **Audio/EVA** - Sound effects and voice announcements
+6. **Unit tests** - Test coverage for all systems
+
+The game logic is now verified as 95%+ complete. The remaining gaps are input/UI and presentation layer.

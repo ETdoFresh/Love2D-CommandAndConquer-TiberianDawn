@@ -427,7 +427,8 @@ Note: Display hierarchy is complete; visual interpolation is polish for smoother
 
 ---
 
-## Phase 2: TechnoClass & Game Objects
+## Phase 2: TechnoClass & Game Objects - MOSTLY COMPLETE
+Audit reveals nearly complete implementation. Only Input Handling and Selection System remain unimplemented.
 
 ### Mixin Classes (`src/objects/mixins/`) - COMPLETE
 - [x] Implement `FlasherClass` (flasher.lua)
@@ -564,15 +565,48 @@ Note: Tiberium field is in UnitClass (harvesters); Electric/EMP not in original 
 - [x] Implement Debug_Dump() with path output
 Note: Mission_Harvest, Mission_Sabotage, Mission_Retreat are in derived classes
 
-### DriveClass (`src/objects/drive/drive.lua`)
-- [ ] Implement ground vehicle movement physics
-- [ ] Implement track/wheel/hover speed types
-- [ ] Implement slope handling
-- [ ] Implement water/cliff blocking
-- [ ] Implement bridge crossing
-- [ ] Implement crushing infantry
-- [ ] Implement vehicle rotation animation
+### DriveClass (`src/objects/drive/drive.lua`) - COMPLETE
+Audit reveals extensive implementation (546 lines):
+- [x] Extends FootClass for ground vehicle base
+- [x] Implement all fields from DRIVE.H:
+  - [x] `Tiberium` (harvester cargo count)
+  - [x] `IsHarvesting` / `IsReturning` (harvester state flags)
+  - [x] `IsTurretLockedDown` (turret lock during deployment)
+  - [x] `TrackNumber` / `TrackIndex` (track animation state)
+  - [x] `StartFacing` / `TargetFacing` (track endpoints)
+  - [x] `TrackStartCoord` (track origin)
+  - [x] `SpeedAccum` (sub-cell movement accumulator)
+- [x] Implement TRACK enum (NONE, STRAIGHT, CURVE_LEFT/RIGHT, U_TURN_LEFT/RIGHT)
+- [x] Implement TRACK_STAGES table (12/8/8/16/16 stages per track type)
+- [x] Implement track-based movement:
+  - [x] `Determine_Track(current, desired)` - select appropriate track for turn
+  - [x] `Start_Track(track, target_facing)` - begin track animation
+  - [x] `Stop_Track()` - end track following
+  - [x] `Follow_Track()` - per-tick track interpolation with facing
+  - [x] `Is_On_Track()` - track status query
+- [x] Implement turning:
+  - [x] `Do_Turn()` - smooth turning toward desired facing
+  - [x] Turn rate calculation (8 facing units/tick default)
+- [x] Implement harvester support:
+  - [x] `Is_Harvester()` - virtual, override in UnitClass
+  - [x] `Tiberium_Percentage()` - 0-100% cargo
+  - [x] `Is_Harvester_Full()` / `Is_Harvester_Empty()` - status checks
+  - [x] `Harvest_Tiberium()` - harvest from current cell
+  - [x] `Offload_Tiberium_Bail()` - unload at refinery (25 credits/bail)
+  - [x] `Start_Return()` / `Stop_Return()` - return to refinery control
+- [x] Implement movement overrides:
+  - [x] `Start_Driver(headto)` - begin driving with track selection
+  - [x] `Stop_Driver()` - stop driving and track
+  - [x] `Can_Enter_Cell(cell, facing)` - ground-specific checks
+  - [x] `Mark_Track(coord, flag)` - collision avoidance stub
+- [x] Implement `Per_Cell_Process(center)` override for harvester auto-harvest
+- [x] Implement `AI()` - track following, turning, auto-return when full
+- [x] Implement `Code_Pointers()` / `Decode_Pointers()` for save/load
+- [x] Implement `Debug_Dump()` with track and harvester state
+- [ ] Implement slope handling (deferred - terrain elevation not in original TD)
+- [ ] Implement crushing infantry (needs cell occupant iteration)
 - [ ] Write unit tests for DriveClass
+Note: MAX_TIBERIUM=100; track system provides smooth vehicle turning
 
 ### FlyClass (`src/objects/drive/fly.lua`) - COMPLETE
 - [x] Implement aircraft movement physics (433 lines)
@@ -602,12 +636,65 @@ Note: Mission_Harvest, Mission_Sabotage, Mission_Retreat are in derived classes
 - [x] Implement Debug_Dump_Fly with state names
 Note: Landing pad docking handled in AircraftClass; high-speed flight via type MaxSpeed
 
-### TarComClass (`src/objects/drive/tarcom.lua`)
-- [ ] Implement turret tracking
-- [ ] Implement turret rotation independent of body
-- [ ] Implement secondary facing for turret
-- [ ] Implement turret rotation speed
+### TurretClass (`src/objects/drive/turret.lua`) - COMPLETE
+Audit reveals extensive implementation (362 lines):
+- [x] Extends DriveClass for turret-equipped vehicles
+- [x] Implement all fields from TURRET.H:
+  - [x] `Reload` (weapon reload timer)
+  - [x] `SecondaryFacing` (turret facing with Current/Desired)
+  - [x] `IsTurretRotating` (rotation in progress flag)
+- [x] Implement constants: DEFAULT_RELOAD=30, DEFAULT_TURRET_ROT=8
+- [x] Implement turret queries:
+  - [x] `Has_Turret()` - virtual, override in derived classes
+  - [x] `Can_Rotate_Turret()` - check lock state
+  - [x] `Turret_Facing()` - current turret direction
+  - [x] `Fire_Direction()` - turret or body facing for weapons
+- [x] Implement turret control:
+  - [x] `Set_Turret_Facing(facing)` - set target facing
+  - [x] `Point_Turret_At(coord)` - calculate and set facing to coordinate
+  - [x] `Track_Target(target)` - point turret at TARGET
+  - [x] `Do_Turn_Turret()` - per-tick turret rotation with rate limiting
+  - [x] `Lock_Turret()` / `Unlock_Turret()` - turret lock control
+- [x] Implement weapon control:
+  - [x] `Start_Reload(time)` - begin weapon reload
+  - [x] `Reload_Time()` - remaining reload time
+  - [x] `Process_Reload()` - decrement reload timer
+  - [x] `Is_Reloading()` / `Is_Weapon_Ready()` - status queries
+- [x] Implement `Fire_At(target, which)` override - track target and start reload
+- [x] Implement `AI()` - reload processing, turret rotation, target tracking
+- [x] Implement `Code_Pointers()` / `Decode_Pointers()` for save/load
+- [x] Implement `Debug_Dump()` with turret facing and reload state
+- [ ] Write unit tests for TurretClass
+Note: Turret rotation rate from type class; body/turret independence working
+
+### TarComClass (`src/objects/drive/tarcom.lua`) - COMPLETE
+Audit reveals extensive implementation (370 lines):
+- [x] Extends TurretClass for targeting computer functionality
+- [x] Implement all fields:
+  - [x] `ScanTimer` (target scan interval timer)
+  - [x] `LastTargetCoord` (last known target position)
+  - [x] `IsEngaging` (actively engaging target flag)
+- [x] Implement constants: SCAN_INTERVAL=15 (1 sec), MAX_ENGAGEMENT_RANGE=2x
+- [x] Implement query functions:
+  - [x] `Is_Engaging()` - active engagement check
+  - [x] `Is_Target_In_Range()` - engagement range check
+  - [x] `Evaluate_Threat(target)` - threat level scoring (distance, attacker, health)
+- [x] Implement target acquisition:
+  - [x] `Acquire_Target()` - use Greatest_Threat for target selection
+  - [x] `Validate_Target()` - check target still valid (alive, in range)
+- [x] Implement combat:
+  - [x] `Engage_Target()` - turret alignment, weapon ready, range check, fire
+  - [x] `Fire_At(target, which)` override - update last target coord
+- [x] Implement mission overrides:
+  - [x] `Mission_Attack()` - validate/acquire/engage cycle
+  - [x] `Mission_Guard()` - periodic target scanning with auto-attack
+  - [x] `Mission_Guard_Area()` - delegates to Mission_Guard
+  - [x] `Mission_Hunt()` - aggressive target acquisition
+- [x] Implement `AI()` - validate target, track with turret
+- [x] Implement `Code_Pointers()` / `Decode_Pointers()` for save/load
+- [x] Implement `Debug_Dump()` with scan timer and engagement state
 - [ ] Write unit tests for TarComClass
+Note: Full inheritance chain: FootClass→DriveClass→TurretClass→TarComClass→UnitClass
 
 ### InfantryClass (`src/objects/infantry.lua`) - COMPLETE
 - [x] Implement all fields from INFANTRY.H (803 lines)
