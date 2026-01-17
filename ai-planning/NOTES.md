@@ -428,3 +428,86 @@ Updated PROGRESS.md Phase 3 section:
 - Minor gaps: Some Explosion_Damage edge cases may need testing
 - Integration testing: Full combat flow (unit fires → bullet travels → damage applied) needs end-to-end verification
 - Animation rendering: AnimClass Draw_It() is stubbed, needs sprite system integration
+
+---
+
+## 2026-01-16: Phase 4 Economy & Production Audit
+
+### Summary
+Audited Phase 4 in PROGRESS.md against actual codebase. Found that the entire economy and production backend is already implemented but PROGRESS.md still showed all items as `[ ]` (incomplete).
+
+### What Was Discovered
+
+**HouseClass** (`src/house/house.lua` - 1243 lines):
+- Complete faction/player management class
+- Economy: credits, tiberium, credits_capacity with proper spending order (tiberium first)
+- Power: power_output, power_drain, has_power with ratio calculations
+- Production: Build_Unit, Build_Infantry, Build_Aircraft, Build_Structure methods
+- Factory integration: infantry_factory, unit_factory, aircraft_factory, building_factory
+- Special weapons: ion_cannon, nuke, airstrike with charging timers
+- Diplomacy: allies/enemies tracking with is_ally, is_enemy, set_ally, set_enemy
+- Prerequisites: meets_prerequisites() using owned_building_types table
+- Entity management: units[], buildings[], aircraft[] lists
+- Events integration: Emits CREDITS_CHANGED, PRODUCTION_STARTED, PRODUCTION_COMPLETE, etc.
+- Full serialize/deserialize and Debug_Dump()
+
+**FactoryClass** (`src/production/factory.lua` - 605 lines):
+- Complete production queue implementation
+- 108-stage production matching original (STEP_COUNT=108)
+- Installment-based payment: Cost_Per_Tick() spreads cost over production
+- Power-based slowdown: AI() reduces production rate when power_ratio < 1.0
+- Multi-factory acceleration: More factories = faster production
+- Production states: Set(), Start(), Suspend(), Abandon(), Completed()
+- StageClass fields integrated: Stage, StageTimer, Rate with Graphic_Logic()
+- Special weapon production via Set_Special()
+- Full Code_Pointers/Decode_Pointers and Debug_Dump()
+
+**Tiberium System** (distributed across CellClass, Grid, UnitClass):
+- CellClass: has_tiberium(), harvest_tiberium(), grow_tiberium(), overlay_data stages
+- Grid.Logic(): Full growth/spread system with blossom tree support
+- UnitClass Mission_Harvest(): Complete 5-state harvester AI
+- UnitClass: Find_Tiberium() spiral search, Find_Refinery() with radio contact
+- HouseClass: Harvested(), Adjust_Capacity(), Silo_Redraw_Check()
+- BuildingClass: Mission_Harvest() for refinery processing
+
+**Power System** (distributed across HouseClass and BuildingClass):
+- BuildingTypeClass: PowerOutput, PowerDrain per building type
+- BuildingClass: Power_Output() with damage scaling, Power_Drain(), Has_Power()
+- HouseClass: update_power() sums all buildings, get_power_ratio()
+- Low power effects: FactoryClass slows production, radar disables
+
+### Key Learnings
+
+1. **PROGRESS.md pattern continues**: Phase 4 follows the same pattern as Phases 1-3 - extensive implementations existed but weren't tracked. The codebase is significantly more complete than documentation suggested.
+
+2. **Cross-cutting implementations**: Phase 4 systems are distributed across multiple files:
+   - Tiberium spans CellClass, Grid, UnitClass, HouseClass, BuildingClass
+   - Power spans BuildingClass, BuildingTypeClass, HouseClass, FactoryClass
+   - This reflects the original C&C architecture where systems are embedded in classes
+
+3. **Events system integration**: HouseClass emits events for all major state changes (CREDITS_CHANGED, PRODUCTION_STARTED, etc.), providing hooks for future EVA voice and UI systems.
+
+4. **Production system is complete**: The entire backend for unit/building production is functional:
+   - FactoryClass handles timing, cost, power effects
+   - HouseClass manages multiple factory types
+   - BuildingClass provides construction state machines
+   - What remains is UI (sidebar, progress bars)
+
+5. **Special weapons ready**: Ion cannon, nuke, and airstrike systems have charge tracking and availability management. Only the targeting/visual effects need implementation.
+
+### What Remains for Phase 4
+- **UI Layer**: Sidebar, build icons, progress bars, cursors (sell/repair)
+- **EVA Voice**: Audio trigger system using existing Events
+- **Visual Layer**: Building ghost/preview, construction animations
+- **Unit tests**: Backend systems need test coverage
+
+### Emerging Pattern
+The codebase appears to have a complete game logic layer but incomplete presentation layer. Core systems (combat, economy, production, pathfinding) are functional. What's missing is primarily:
+1. User interface (sidebar, menus)
+2. Rendering/sprites
+3. Audio
+4. Scenario loading
+
+This suggests the next major effort should focus on either:
+- Display hierarchy (GScreenClass, DisplayClass) to show what's already working
+- Scenario loading to test the complete systems with real game data
