@@ -188,3 +188,13 @@ Deep audit reveals these classes are much more complete than PROGRESS.md indicat
 - Team and radio message handling
 
 PROGRESS.md was severely outdated - these classes were marked as TODO despite being fully implemented.
+
+### InfantryClass - Complete (803 lines)
+Full infantry implementation discovered during audit:
+- Fear system: FEAR constants (NONE/ANXIOUS/SCARED/PANIC/MAXIMUM), Add_Fear, Reduce_Fear, Is_Panicking, Response_Panic
+- Prone system: Go_Prone, Get_Up, Clear_Prone with DO.LIE_DOWN/GET_UP animation transitions
+- DoType enum: 22 animation states (NOTHING through GESTURE2)
+- SubCell system: 5-position cell occupation (CENTER, NW, NE, SW, SE)
+- Mission overrides: Mission_Attack (with engineer capture special case), Mission_Guard (with idle animations)
+- All flags: IsProne, IsStoked, IsTechnician, IsBoxing
+- Full save/load serialization and Debug_Dump
