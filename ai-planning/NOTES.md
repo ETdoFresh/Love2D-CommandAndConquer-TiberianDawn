@@ -281,3 +281,47 @@ All type classes discovered implemented during Phase 2 audit:
   - IsCapturable, IsBaseDefense, IsHelipad, IsRadar
   - Factory Create() with all buildings (power, barracks, factories, defenses, etc.)
 Data matches original IDATA.CPP/UDATA.CPP/ADATA.CPP/BDATA.CPP patterns
+
+### Map System - Nearly Complete (~1,859 lines total)
+Discovered during Phase 1 map system audit:
+
+**CellClass** (`src/map/cell.lua` - 669 lines):
+- All CELL.H fields: template_type/icon, overlay/data, smudge/data, owner, flags, trigger, waypoint
+- FLAG constants: CENTER/NW/NE/SW/SE/VEHICLE/MONOLITH/BUILDING/WALL
+- Visibility per-player via is_mapped{}/is_visible{} tables
+- Tiberium: has_tiberium(), harvest_tiberium(), grow_tiberium(), get_tiberium_value()
+- Walls: has_wall(), place_wall(), damage_wall(), WALL_NEIGHBOR bitmask
+- Bridges: has_bridge(), place_bridge(), damage_bridge(), OVERLAY_BRIDGE types
+- Smudges: add_crater(), add_scorch(), SMUDGE constants
+- Infantry spots: is_spot_free(), get_free_spot()
+- Coordinate conversion: to_leptons(), to_pixels(), get_cell_number()
+- Full serialize/deserialize and Debug_Dump()
+- **Gap**: Object retrieval (Cell_Building, Cell_Unit) needs heap integration
+
+**Grid/MapClass** (`src/map/grid.lua` - 704 lines):
+- 64x64 configurable grid with Cell instances
+- Cell access: get_cell(), get_cell_by_number(), is_valid()
+- Coordinate conversion: lepton_to_cell(), cell_to_lepton(), pixel_to_cell()
+- Adjacency: get_adjacent(), get_neighbors()
+- Region queries: get_cells_in_rect(), get_cells_in_radius()
+- Building placement: can_place_building() with full C&C adjacency rules
+- Wall system: place_wall(), remove_wall(), update_wall_connections_area()
+- Full tiberium growth/spread via Logic():
+  - Forward/backward scan alternation (match original)
+  - Growth candidate tracking (max_tiberium_cells)
+  - Spread to adjacent cells from heavy tiberium or blossom trees
+  - Fast mode option for double growth rate
+- serialize/deserialize for save/load
+
+**LayerClass** (`src/map/layer.lua` - 486 lines):
+- LAYER_TYPE enum: GROUND/AIR/TOP
+- Dynamic object array with Y-coordinate sorting
+- Submit/Add/Sorted_Add/Remove
+- Sort() incremental, Full_Sort() complete
+- Static layer manager: Init_All, Get_Layer, Submit_To, Remove_From, Sort_All
+- Code_Pointers/Decode_Pointers for save/load
+- Debug_Dump with layer name
+
+The map system follows original C&C patterns closely. Main integration gap is
+Cell_Building/Cell_Unit/Cell_Techno object retrieval - currently cells store
+entity IDs but can't resolve them to actual objects without heap lookup.

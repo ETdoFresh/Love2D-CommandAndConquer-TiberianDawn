@@ -175,75 +175,112 @@ Note: Mission_X handlers are base stubs - overridden in FootClass, TechnoClass, 
 - [x] Implement `Debug_Dump()`
 Note: Specific message handling (PICK_UP, ATTACH, etc.) done in derived TechnoClass
 
-### CellClass (`src/map/cell.lua`)
-- [ ] Implement all fields from CELL.H
-  - [ ] `CellNumber` (CELL)
-  - [ ] `Overlay` (OverlayType)
-  - [ ] `OverlayData` (tiberium stage, wall health)
-  - [ ] `Smudge` (SmudgeType)
-  - [ ] `SmudgeData` (smudge variant)
-  - [ ] `Land` (LandType)
-  - [ ] `Owner` (HouseType)
-  - [ ] `OccupierPtr` (object linked list)
-  - [ ] `OccupyList` (16 infantry slots)
-  - [ ] `InfType` (infantry occupation bitfield)
-  - [ ] `Flag` (cell flags: Visible, Revealed, etc.)
-  - [ ] `Template` (TerrainType)
-  - [ ] `Icon` (terrain icon index)
-  - [ ] `TriggerPtr` (attached trigger)
-- [ ] Implement `Cell_Coord()` - center coordinate
-- [ ] Implement `Cell_Occupier()` - get occupying object
-- [ ] Implement `Is_Clear_To_Move(speed, check_units)` - pathfinding check
-- [ ] Implement `Is_Clear_To_Build(bib_coord)` - building placement check
-- [ ] Implement `Occupy_Unit(obj)` - add unit to cell
-- [ ] Implement `Occupy_Down(obj)` - mark cell occupied
-- [ ] Implement `Occupy_Up(obj)` - mark cell unoccupied
-- [ ] Implement `Get_Template_Info(x, y)` - terrain data
-- [ ] Implement `Spot_Index(coord)` - infantry position index
-- [ ] Implement `Closest_Free_Spot(coord)` - find free infantry spot
-- [ ] Implement `Is_Bridge_Here()` - bridge detection
-- [ ] Implement `Goodie_Check(obj)` - crate collection (no-op for TD)
-- [ ] Implement `Cell_Techno()` - get first techno in cell
-- [ ] Implement `Cell_Building()` - get building in cell
-- [ ] Implement `Cell_Terrain()` - get terrain in cell
-- [ ] Implement `Cell_Infantry(spot)` - get infantry at spot
-- [ ] Implement `Cell_Unit()` - get unit in cell
-- [ ] Implement `Adjacent_Cell(facing)` - get neighbor
-- [ ] Implement `Concrete_Calc()` - concrete coverage
-- [ ] Implement `Wall_Update()` - wall graphics update
-- [ ] Implement `Tiberium_Adjust()` - tiberium recalculation
-- [ ] Implement `Reduce_Tiberium(amount)` - harvest tiberium
-- [ ] Implement `Reduce_Wall(damage)` - damage wall
-- [ ] Implement `Incoming()` - threat tracking
-- [ ] Implement `Redraw_Objects()` - mark for redraw
+### CellClass (`src/map/cell.lua`) - MOSTLY COMPLETE
+Audit reveals extensive implementation (669 lines):
+- [x] Implement all fields from CELL.H
+  - [x] `CellNumber` (CELL) via `get_cell_number()`, x/y fields
+  - [x] `Overlay` (OverlayType) - overlay field
+  - [x] `OverlayData` (tiberium stage, wall health) - overlay_data field
+  - [x] `Smudge` (SmudgeType) - smudge field with SMUDGE constants
+  - [x] `SmudgeData` (smudge variant) - smudge_data field
+  - [ ] `Land` (LandType) - missing, terrain passability uses template_type
+  - [x] `Owner` (HouseType) - owner field
+  - [x] `OccupierPtr` (object linked list) - occupier field
+  - [x] `OccupyList` via FLAG (CENTER/NW/NE/SW/SE/VEHICLE/MONOLITH/BUILDING/WALL)
+  - [x] `InfType` - infantry_type field
+  - [x] `Flag` (cell flags) - flags bitfield
+  - [x] `Template` (TerrainType) - template_type field
+  - [x] `Icon` (terrain icon index) - template_icon field
+  - [x] `TriggerPtr` - trigger field
+  - [x] `IsMapped`/`IsVisible` per-player via tables
+  - [x] `IsWaypoint` - waypoint field
+  - [x] `IsFlagged` (CTF) - has_flag/flag_owner fields
+- [x] Implement `Cell_Coord()` - `to_leptons()` returns center coordinate
+- [ ] Implement `Cell_Occupier()` - needs object resolution from heap
+- [x] Implement `Is_Clear_To_Move()` - `is_passable(locomotor, terrain_type)`
+- [x] Implement `Is_Clear_To_Build()` - in Grid.can_place_building()
+- [ ] Implement `Occupy_Down(obj)` / `Occupy_Up(obj)` - needs object integration
+- [x] Implement `Get_Template_Info()` - template_type/template_icon accessible
+- [x] Implement `Spot_Index(coord)` - FLAG constants define positions
+- [x] Implement `Closest_Free_Spot()` - `get_free_spot()` finds free infantry spot
+- [x] Implement `Is_Bridge_Here()` - `has_bridge()` with OVERLAY_BRIDGE constants
+- [x] Implement `Goodie_Check()` - no-op for TD (crates not in original)
+- [ ] Implement `Cell_Techno()` - needs heap integration
+- [ ] Implement `Cell_Building()` - needs heap integration
+- [x] Implement `Cell_Terrain()` - template_type provides terrain
+- [ ] Implement `Cell_Infantry(spot)` - needs heap integration
+- [ ] Implement `Cell_Unit()` - needs heap integration
+- [x] Implement `Adjacent_Cell(facing)` - in Grid.get_adjacent()
+- [x] Implement `Concrete_Calc()` - wall_frame calculation exists
+- [x] Implement `Wall_Update()` - Grid.update_wall_connections()
+- [x] Implement `Tiberium_Adjust()` - `grow_tiberium()`, Grid.Logic()
+- [x] Implement `Reduce_Tiberium()` - `harvest_tiberium(amount)`
+- [x] Implement `Reduce_Wall()` - `damage_wall(damage)`
+- [ ] Implement `Incoming()` - threat tracking missing
+- [x] Implement `Redraw_Objects()` - handled by rendering system
+- [x] Implement serialize/deserialize for save/load
+- [x] Implement Debug_Dump() with flag names
 - [ ] Write unit tests for CellClass
+Note: Object retrieval (Cell_Building, Cell_Unit, etc.) needs Globals heap integration
 
-### MapClass (`src/map/map.lua`)
-- [ ] Implement 64x64 cell grid
-- [ ] Implement `Cell_Ptr(cell)` - get CellClass by CELL
-- [ ] Implement `Coord_Cell(coord)` - coordinate to cell
-- [ ] Implement `Cell_Coord(cell)` - cell to coordinate
-- [ ] Implement `In_Radar(cell)` - cell in playable area
-- [ ] Implement `Close_Object(coord)` - find nearest object
+### MapClass (`src/map/grid.lua`) - MOSTLY COMPLETE
+Note: Named `Grid` in implementation. Audit reveals extensive implementation (704 lines):
+- [x] Implement 64x64 cell grid (configurable via Constants.MAP_CELL_W/H)
+- [x] Implement `Cell_Ptr(cell)` - `get_cell(x,y)` and `get_cell_by_number()`
+- [x] Implement `Coord_Cell(coord)` - `lepton_to_cell(lx, ly)`
+- [x] Implement `Cell_Coord(cell)` - `cell_to_lepton(cx, cy)`
+- [x] Implement `In_Radar(cell)` - `is_valid(x, y)` bounds check
+- [ ] Implement `Close_Object(coord)` - find nearest object (needs heap)
 - [ ] Implement `Nearby_Location(coord, speed)` - find passable cell
-- [ ] Implement `Cell_Shadow(cell)` - calculate shroud
-- [ ] Implement `Place_Down(cell, obj)` - place object
-- [ ] Implement `Pick_Up(cell, obj)` - remove object
-- [ ] Implement `Overlap_Down(cell, obj)` - render overlap
-- [ ] Implement `Overlap_Up(cell, obj)` - clear overlap
-- [ ] Implement map boundary handling
-- [ ] Implement map size/bounds storage
-- [ ] Write unit tests for MapClass
+- [ ] Implement `Cell_Shadow(cell)` - calculate shroud (in shroud.lua)
+- [x] Implement `Place_Down(cell, obj)` - `place_building()` for buildings
+- [x] Implement `Pick_Up(cell, obj)` - `remove_building()` for buildings
+- [x] Implement `Overlap_Down(cell, obj)` - Cell.add_overlapper()
+- [x] Implement `Overlap_Up(cell, obj)` - Cell.remove_overlapper()
+- [x] Implement map boundary handling - `is_valid()` bounds check
+- [x] Implement map size/bounds storage - width/height fields
+- [x] Implement `get_adjacent(x, y, direction)` - 8-directional neighbor
+- [x] Implement `get_neighbors(x, y)` - all 8 adjacent cells
+- [x] Implement `get_cells_in_rect()` - rectangular region
+- [x] Implement `get_cells_in_radius()` - circular region
+- [x] Implement `set_terrain()` / `set_overlay()` - cell modification
+- [x] Implement `clear_visibility()` / `reveal_area()` - visibility control
+- [x] Implement `can_place_building()` - full adjacency rules from original
+- [x] Implement `can_place_building_type()` - building-specific rules
+- [x] Implement wall system: `place_wall()`, `remove_wall()`, `update_wall_connections_area()`
+- [x] Implement tiberium system via `Logic()`:
+  - [x] Tiberium growth (stage increase)
+  - [x] Tiberium spread (to adjacent cells)
+  - [x] Blossom tree spawning (terrain_object.is_tiberium_spawn)
+  - [x] Forward/backward scan alternation (match original)
+  - [x] Growth/spread rate options (normal/fast)
+- [x] Implement `iterate()` - cell iteration
+- [x] Implement `serialize()` / `deserialize()` - save/load
+- [ ] Write unit tests for MapClass/Grid
+Note: Close_Object and Nearby_Location need heap integration for object queries
 
-### LayerClass (`src/map/layer.lua`)
-- [ ] Implement `LAYER_GROUND` for ground objects
-- [ ] Implement `LAYER_AIR` for aircraft
-- [ ] Implement `LAYER_TOP` for effects
-- [ ] Implement `Add(obj)` - add object to layer
-- [ ] Implement `Remove(obj)` - remove from layer
-- [ ] Implement `Sort()` - sort by Y coordinate
-- [ ] Implement `Sort_Y(obj)` - get sort key
-- [ ] Implement layer rendering order
+### LayerClass (`src/map/layer.lua`) - COMPLETE
+Audit reveals extensive implementation (486 lines):
+- [x] Implement LAYER_TYPE enum (NONE=-1, GROUND=0, AIR=1, TOP=2)
+- [x] Implement `Submit(obj, sort)` - add object (optionally sorted)
+- [x] Implement `Add(obj)` - add object unsorted
+- [x] Implement `Sorted_Add(obj)` - add in Y-sorted position
+- [x] Implement `Remove(obj)` - remove from layer
+- [x] Implement `Sort()` - incremental bubble sort pass
+- [x] Implement `Full_Sort()` - complete insertion sort
+- [x] Implement `Compare(a, b)` - Y coordinate comparison
+- [x] Implement `Get_Sort_Y(obj)` - extract sort key from Coord
+- [x] Implement `Count()`, `Is_Empty()`, `Get(index)`, `Iterate()`, `Get_All()`
+- [x] Implement static layer manager:
+  - [x] `LayerClass.Layers[]` array (3 layers)
+  - [x] `Init_All()` - initialize all layers
+  - [x] `Get_Layer(type)` - get layer by type
+  - [x] `Submit_To(obj, type, sort)` - submit to specific layer
+  - [x] `Remove_From(obj, type)` - remove from specific layer
+  - [x] `Sort_All()` - sort all layers
+  - [x] `Clear_All()` - clear all layers
+- [x] Implement `Code_Pointers()` / `Decode_Pointers()` for save/load
+- [x] Implement `Debug_Dump(layer_type)`
 - [ ] Write unit tests for LayerClass
 
 ### Display Hierarchy (`src/display/`)
