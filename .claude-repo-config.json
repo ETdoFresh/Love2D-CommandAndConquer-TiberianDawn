@@ -4,6 +4,12 @@
     {
       "Title": "PLAN.md",
       "PromptText": "Analyze Repo and read @PLAN.md and determine the next set of tasks to put on todo list to ensure we are creating a faithful and accurate implementation of c\u0026c in love2d. Implement the next set of tasks."
+    },
+    {
+      "Title": "PLAN/PROGRESS.md",
+      "PromptText": "Review the current project state:\r\n1. Read @ai-planning/PLAN.md for context and decisions\r\n2. Read @ai-planning/PROGRESS.md for the task list\r\n3. Check recent commits for context and momentum:\r\n   git log -10 --format=\u0022=== %s ===%n%b\u0022\r\n4. Scan the codebase to understand what\u0027s actually implemented\r\n\r\nThen:\r\n- Identify the single most important next task (not necessarily in order)\r\n- Consider dependencies: what unblocks the most other work?\r\n- Consider current state: what\u0027s partially done that should be finished?\r\n- Consider recent commits: continue momentum on related work if sensible\r\n- Mark that task as [~] in PROGRESS.md\r\n- Execute the task completely\r\n- Mark it [x] when done and note any learnings in ai-planning/NOTES.md\r\n\r\nDo NOT batch multiple tasks. Complete one task fully before stopping.\r\n"
     }
-  ]
+  ],
+  "TaskBranchPrefix": null,
+  "JobBranchPrefix": null
 }
