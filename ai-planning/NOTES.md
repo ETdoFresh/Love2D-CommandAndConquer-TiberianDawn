@@ -153,3 +153,19 @@ Also added RTTI methods (`get_rtti()`, `What_Am_I()`) to all game object classes
 - **Fix**: MissionClass:AI() now directly calls `AbstractClass.AI(self)` instead of Class.super
 
 **Verification**: 28 heap tests pass, 42 OOP tests pass, game loads correctly.
+
+### Phase 2 Mixin Classes Audit - All Complete
+Audited all 5 mixin classes in `src/objects/mixins/` against PROGRESS.md requirements:
+- **FlasherClass**: FlashCount, Start_Flash(), Process(), Is_Flashing() + per-player flash
+- **StageClass**: Rate, Stage, Timer, Set_Rate(), Set_Stage(), Graphic_Logic()
+- **CargoClass**: CargoHold (linked list), Attach(), Detach_Object(), How_Many()
+- **DoorClass**: Complete state machine (CLOSED→OPENING→OPEN→CLOSING), AI_Door()
+- **CrewClass**: Crew_Type(), Made_A_Kill(), rank system (ROOKIE/VETERAN/ELITE)
+
+All mixins have:
+- Complete implementations matching original C++ behavior
+- Save/load serialization (Code_Pointers/Decode_Pointers)
+- Debug_Dump() support
+- Proper init() for Class.include() integration
+
+TechnoClass already includes all 5 mixins and calls their methods in its AI().

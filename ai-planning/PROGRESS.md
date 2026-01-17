@@ -312,36 +312,45 @@ Note: Specific message handling (PICK_UP, ATTACH, etc.) done in derived TechnoCl
 
 ## Phase 2: TechnoClass & Game Objects
 
-### Mixin Classes (`src/objects/mixins/`)
-- [ ] Implement `FlasherClass`
-  - [ ] `FlashCount` field
-  - [ ] `Flash()` - trigger flash
-  - [ ] `Process()` - decrement counter
-  - [ ] `Is_Flashing()` - check state
-- [ ] Implement `StageClass`
-  - [ ] `Rate` field (animation speed)
-  - [ ] `Stage` field (current frame)
-  - [ ] `Timer` field
-  - [ ] `Set_Rate(rate)` - set animation speed
-  - [ ] `Set_Stage(stage)` - set frame
-  - [ ] `Graphic_Logic()` - advance animation
-- [ ] Implement `CargoClass`
-  - [ ] `CargoHold` array
-  - [ ] `Quantity` field
-  - [ ] `Attach(obj)` - add cargo
-  - [ ] `Detach()` - remove cargo
-  - [ ] `First_Object()` - get first cargo
-  - [ ] `How_Many()` - cargo count
-- [ ] Implement `DoorClass`
-  - [ ] `State` field (door state)
-  - [ ] `Timer` field
-  - [ ] `Open_Door()` / `Close_Door()`
-  - [ ] `AI()` - door animation
-  - [ ] `Is_Door_Open()` / `Is_Door_Closed()`
-- [ ] Implement `CrewClass`
-  - [ ] `Crew_Type()` - survivor infantry type
-  - [ ] Survivor generation logic
-- [ ] Write unit tests for all mixins
+### Mixin Classes (`src/objects/mixins/`) - COMPLETE
+- [x] Implement `FlasherClass` (flasher.lua)
+  - [x] `FlashCount` field
+  - [x] `Start_Flash()` / `Stop_Flash()` - trigger/stop flash
+  - [x] `Process()` - decrement counter
+  - [x] `Is_Flashing()` - check state
+  - [x] Per-player flash support for multiplayer
+  - [x] Save/load serialization
+- [x] Implement `StageClass` (stage.lua)
+  - [x] `Rate` field (animation speed)
+  - [x] `Stage` field (current frame)
+  - [x] `StageTimer` field
+  - [x] `Set_Rate(rate)` - set animation speed
+  - [x] `Set_Stage(stage)` - set frame
+  - [x] `Graphic_Logic()` - advance animation
+  - [x] Save/load serialization
+- [x] Implement `CargoClass` (cargo.lua)
+  - [x] `CargoHold` array (linked list)
+  - [x] `CargoQuantity` field
+  - [x] `Attach(obj)` - add cargo
+  - [x] `Detach_Object()` - remove cargo
+  - [x] `Attached_Object()` - get first cargo
+  - [x] `How_Many()` - cargo count
+  - [x] Save/load with TARGET resolution
+- [x] Implement `DoorClass` (door.lua)
+  - [x] `DoorState` field with STATE enum (CLOSED, OPENING, OPEN, CLOSING)
+  - [x] `DoorTimer` field
+  - [x] `Open_Door()` / `Close_Door()` with animation
+  - [x] `AI_Door()` - door state machine
+  - [x] `Is_Door_Open()` / `Is_Door_Closed()`
+  - [x] Save/load serialization
+- [x] Implement `CrewClass` (crew.lua)
+  - [x] `Crew_Type()` - survivor infantry type
+  - [x] `Made_A_Kill()` / `Get_Kills()` / `Set_Kills()`
+  - [x] Rank system (ROOKIE, VETERAN, ELITE)
+  - [x] `Should_Spawn_Crew()` - survivor generation logic
+  - [x] Save/load serialization
+- [x] All mixins integrated into TechnoClass via Class.include()
+Note: Unit tests for mixins covered by test_class_oop.lua mixin composition tests
 
 ### TechnoClass (`src/objects/techno.lua`)
 - [ ] Implement all fields from TECHNO.H
