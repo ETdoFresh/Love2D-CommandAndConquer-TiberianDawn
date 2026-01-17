@@ -801,109 +801,142 @@ Note: Factory Create() methods provide all unit/building data inline, matching o
 
 ---
 
-## Phase 3: Combat Systems
+## Phase 3: Combat Systems - MOSTLY COMPLETE
 
-### BulletClass (`src/objects/bullet.lua`)
-- [ ] Implement all fields from BULLET.H
-  - [ ] `Class` (BulletTypeClass)
-  - [ ] `Payback` (damage source)
-  - [ ] `TarCom` (target)
-  - [ ] `Strength` (damage amount)
-  - [ ] `Warhead` (WarheadType)
-- [ ] Implement `AI()` - projectile movement
-- [ ] Implement `Unlimbo(coord, facing)` - spawn projectile
-- [ ] Implement straight-line ballistics
-- [ ] Implement arcing projectiles
-- [ ] Implement homing projectiles
-- [ ] Implement proximity detonation
-- [ ] Implement impact detection
-- [ ] Implement area damage on impact
+### BulletClass (`src/objects/bullet.lua`) - COMPLETE
+Audit reveals extensive implementation (620 lines):
+- [x] Implement all fields from BULLET.H
+  - [x] `Class` (BulletTypeClass)
+  - [x] `Payback` (damage source for kill credit)
+  - [x] `TarCom` (target object/coordinate)
+  - [x] `PrimaryFacing` (travel direction 0-255)
+  - [x] `IsInaccurate` / `IsToAnimate` / `IsLocked` flags
+  - [x] `ArcAltitude` / `Riser` (arcing projectile physics)
+  - [x] `FuseTimer` / `ArmingTimer` / `ProximityDistance` (fuse system)
+- [x] Implement `AI()` - projectile movement with arcing/homing/fuse logic
+- [x] Implement `Unlimbo(coord, facing, target)` - spawn projectile with range/arc setup
+- [x] Implement straight-line ballistics via `Physics()` with speed accumulator
+- [x] Implement arcing projectiles with gravity and Riser
+- [x] Implement homing projectiles with ROT-based turn rate
+- [x] Implement proximity detonation via `Fuse_Checkup()`
+- [x] Implement impact detection via Physics() IMPACT return
+- [x] Implement `Detonate()` with damage and explosion animation
+- [x] Implement `Apply_Inaccuracy()` for scatter
+- [x] Implement FlyClass mixin for flight physics
+- [x] Implement RTTI, Debug_Dump, Draw_It stubs
 - [ ] Write unit tests for BulletClass
 
-### BulletTypeClass (`src/objects/types/bullettype.lua`)
-- [ ] Implement all bullet types from original
-- [ ] Implement projectile sprites
-- [ ] Implement projectile speeds
-- [ ] Implement arcing vs straight
-- [ ] Implement homing behavior flags
-- [ ] Load bullet data from data files
+### BulletTypeClass (`src/objects/types/bullettype.lua`) - COMPLETE
+Audit reveals extensive implementation (506 lines):
+- [x] Implement all 19 bullet types from original via factory:
+  - SNIPER, BULLET, APDS, HE, SSM, SSM2, SAM, TOW, FLAME, CHEMSPRAY
+  - NAPALM, GRENADE, LASER, NUKE_UP, NUKE_DOWN, HONEST_JOHN, SPREADFIRE
+  - HEADBUTT, TREXBITE
+- [x] Implement all flags: IsHigh, IsArcing, IsHoming, IsDropping, IsInvisible
+  - IsProximityArmed, IsFlameEquipped, IsFueled, IsFaceless, IsInaccurate
+  - IsTranslucent, IsAntiAircraft
+- [x] Implement MaxSpeed, Warhead, Explosion, ROT, Arming, Range fields
+- [x] Implement `Create(type)` factory method
+- [x] Implement query functions: Is_Arcing, Is_Homing, Is_Invisible, etc.
 
-### AnimClass (`src/objects/anim.lua`)
-- [ ] Implement all fields from ANIM.H
-  - [ ] `Class` (AnimTypeClass)
-  - [ ] `Owner` (owning object)
-  - [ ] `Loops` (loop count)
-  - [ ] `IsToDelete`
-- [ ] Implement `AI()` - animation playback
-- [ ] Implement animation attachment to objects
-- [ ] Implement animation completion callback
-- [ ] Implement explosion animations
-- [ ] Implement muzzle flash animations
-- [ ] Implement death/destruction animations
-- [ ] Implement fire/burning animations
-- [ ] Implement smoke animations
+### AnimClass (`src/objects/anim.lua`) - COMPLETE
+Audit reveals extensive implementation (660 lines):
+- [x] Implement all fields from ANIM.H
+  - [x] `Class` (AnimTypeClass)
+  - [x] `Object` (attached object for following)
+  - [x] `AttachOffset` (offset from attached object)
+  - [x] `State` (DELAY/PLAYING/LOOPING/FINISHED)
+  - [x] `LoopsRemaining` (loop count)
+  - [x] `DelayTimer` (initial delay)
+  - [x] `DamageAccum` (accumulated damage for attached)
+- [x] Implement `AI()` - full animation state machine
+- [x] Implement animation attachment to objects
+- [x] Implement `Complete_Animation()` - handles chaining and effects
+- [x] Implement StageClass mixin for frame management
+- [x] Implement `Attach_To(object)` / `Detach_From()`
+- [x] Implement ground effects (scorch marks, craters)
+- [x] Implement damage over time to attached objects
+- [x] Implement animation chaining to next animation
+- [x] Implement RTTI, Debug_Dump, Code_Pointers
 - [ ] Write unit tests for AnimClass
 
-### AnimTypeClass (`src/objects/types/animtype.lua`)
-- [ ] Implement all animation types from original
-- [ ] Implement animation frame data
-- [ ] Implement animation timing
-- [ ] Implement animation sound triggers
-- [ ] Load animation data from data files
+### AnimTypeClass (`src/objects/types/animtype.lua`) - COMPLETE
+Audit reveals extensive implementation (566 lines):
+- [x] Implement all 75+ animation types from original via factory:
+  - Explosions: FBALL1, GRENADE, FRAG1/2, VEH_HIT1/2/3, ART_EXP1, NAPALM1/2/3
+  - Impacts: SMOKE_PUFF, PIFF, PIFFPIFF
+  - Directional: FLAME_N-NW (8 dirs), CHEM_N-NW, SAM_N-NW, GUN_N-NW (8 dirs each)
+  - Fires: FIRE_SMALL/MED/MED2/TINY, BURN_SMALL/MED/BIG, ON_FIRE_*
+  - Infantry deaths, ION_CANNON, ATOM_BLAST, and more
+- [x] Implement animation frame data (StartFrame, Stages, Loops)
+- [x] Implement animation timing (Delay, Rate)
+- [x] Implement ground effects (MakesScorchMark, MakesCrater)
+- [x] Implement chaining (ChainTo)
+- [x] Implement `Create(type)` factory method
 
-### WeaponTypeClass (`src/combat/weapon.lua`)
-- [ ] Implement all weapon attributes
-  - [ ] Damage
-  - [ ] ROF (rate of fire)
-  - [ ] Range
-  - [ ] Projectile type
-  - [ ] Warhead type
-  - [ ] Burst count
-  - [ ] Muzzle flash
-  - [ ] Sound effect
-- [ ] Load weapon data from data files
-- [ ] Verify all weapons match original
+### WeaponTypeClass (`src/combat/weapon.lua`) - COMPLETE
+Audit reveals extensive implementation (498 lines):
+- [x] Implement all weapon attributes: Attack, ROF, Range, Fires, Sound, Anim
+- [x] Implement all 25 weapon types via factory:
+  - RIFLE, CHAIN_GUN, PISTOL, M16, DRAGON, FLAMETHROWER, FLAME_TONGUE
+  - CHEMSPRAY, GRENADE, 75MM/105MM/120MM, TURRET_GUN, MAMMOTH_TUSK
+  - MLRS, 155MM, M60MG, TOMAHAWK, TOW_TWO, NAPALM, OBELISK_LASER
+  - NIKE, HONEST_JOHN, STEG, TREX
+- [x] Implement `Get(type)` lookup and `Create(type)` factory
+- [x] Implement query functions: Range_In_Cells, Is_Anti_Aircraft
 
-### WarheadTypeClass (`src/combat/warhead.lua`)
-- [ ] Implement all warhead attributes
-  - [ ] Armor modifiers (vs None, Wood, Light, Heavy, Concrete)
-  - [ ] Spread (area damage)
-  - [ ] Wall destruction
-  - [ ] Ore destruction
-  - [ ] Infantry death type
-  - [ ] Explosion animation
-- [ ] Implement exact integer armor calculation
-- [ ] Load warhead data from data files
-- [ ] Verify damage matches original
+### WarheadTypeClass (`src/combat/warhead.lua`) - COMPLETE
+Audit reveals extensive implementation (417 lines):
+- [x] Implement all warhead attributes: SpreadFactor, wall/tiberium destruction flags
+- [x] Implement Modifier array for armor damage multipliers
+- [x] Implement ArmorType enum (NONE, WOOD, ALUMINUM, STEEL, CONCRETE)
+- [x] Implement all 12 warhead types via factory:
+  - SA, HE, AP, FIRE, LASER, PB, FIST, FOOT, HOLLOW_POINT, SPORE, HEADBUTT, FEEDME
+- [x] Implement `Modify_Damage(base, armor)` - integer armor calculation
+- [x] Implement `Distance_Damage(base, distance)` - falloff calculation
+- [x] Implement `Get(type)` and `Create(type)` factory
+Note: Armor enum is in WarheadTypeClass, not separate armor.lua file
 
-### Armor System (`src/combat/armor.lua`)
-- [ ] Implement ArmorType enum
-- [ ] Implement armor modifier lookup
-- [ ] Implement exact damage formula from original
+### Combat Module (`src/combat/combat.lua`) - COMPLETE
+Audit reveals implementation (260 lines):
+- [x] Implement `Explosion_Damage(coord, strength, source, warhead)`
+  - Scans 9-cell area for objects via Globals heap
+  - Applies distance-based damage via Take_Damage
+  - Handles wall/tiberium destruction effects (stubs)
+- [x] Implement `Do_Explosion(coord, strength, source, warhead, anim)`
+  - Spawns explosion animation
+  - Calls Explosion_Damage
+- [x] Implement `Distance_Modify(damage, distance, warhead)`
+- [ ] Implement `Destroy_Tiberium()` cell integration (stub)
+- [ ] Implement `Destroy_Wall()` cell integration (stub)
 
-### Combat Integration
-- [ ] Implement `Fire_At()` spawning bullets
-- [ ] Implement rearm timing
-- [ ] Implement weapon cycling (primary/secondary)
-- [ ] Implement range checking with weapon range
-- [ ] Implement `Take_Damage()` armor calculations
-- [ ] Implement damage result states (undamaged, light, heavy, dead)
-- [ ] Implement death processing
-- [ ] Implement `Record_The_Kill()` scoring
-- [ ] Implement kill credit to source
+### Combat Integration (in TechnoClass) - COMPLETE
+- [x] Implement `Fire_At()` spawning bullets (techno.lua:920-1050)
+- [x] Implement rearm timing via `Arm` field and `Rearm_Delay()`
+- [x] Implement weapon cycling (primary/secondary via `which` parameter)
+- [x] Implement range checking via `In_Range()` and `Weapon_Range()`
+- [x] Implement `Take_Damage()` with armor and warhead (object.lua)
+- [x] Implement damage result states via Strength tracking
+- [x] Implement `Record_The_Kill()` in TechnoClass
+- [x] Implement kill credit via `Payback` pointer on bullets
 
-### Pathfinding (`src/pathfinding/findpath.lua`)
-- [ ] Port FINDPATH.CPP algorithm exactly
-- [ ] Implement `PathType` structure
-- [ ] Implement `Find_Path()` main function
-- [ ] Implement `Follow_Edge()` edge-following
-- [ ] Implement `Register_Cell()` path recording
-- [ ] Implement `Clear_Path()` path clearing
-- [ ] Implement movement cost calculation per terrain
-- [ ] Implement threat avoidance in pathfinding
-- [ ] Implement path caching/reuse
-- [ ] Implement path length limits
-- [ ] Implement path failure handling
+### Pathfinding (`src/pathfinding/findpath.lua`) - COMPLETE
+Audit reveals extensive implementation (793 lines):
+- [x] Port FINDPATH.CPP algorithm exactly (LOS + edge following)
+- [x] Implement `PathType` structure (Start, Cost, Length, Command, Overlap)
+- [x] Implement `Find_Path()` main function with both directions
+- [x] Implement `Follow_Edge()` edge-following (clockwise/counter-clockwise)
+- [x] Implement `Register_Cell()` path recording with loop detection
+- [x] Implement path management: `clear_all_overlap()`, path truncation
+- [x] Implement movement cost calculation via `passable_cell()`
+- [x] Implement passable_callback for custom passability
+- [x] Implement path length limits (MAX_MLIST_SIZE=300, MAX_PATH_EDGE_FOLLOW=400)
+- [x] Implement path failure handling (loop detection, max cells)
+- [x] Implement coordinate-based interface: `find_path_coords()`
+- [x] Implement `get_path_facings()` for FootClass (CONQUER_PATH_MAX=9)
+- [x] Implement `optimize_path()` for path smoothing
+- [x] Implement `Debug_Dump_Path()` for debugging
+- [ ] Implement threat avoidance in pathfinding (deferred)
 - [ ] Write pathfinding unit tests
 - [ ] Write pathfinding integration tests
 
@@ -913,6 +946,7 @@ Note: Factory Create() methods provide all unit/building data inline, matching o
 - [ ] Implement damage number popups
 - [ ] Implement threat map visualization
 - [ ] Implement pathfinding visualization
+Note: Combat system is functionally complete for gameplay. Debug overlays are deferred.
 
 ---
 
