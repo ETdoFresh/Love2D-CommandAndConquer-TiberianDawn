@@ -4,6 +4,11 @@
 
 ### Completed
 - Deleted `src/ecs/` directory (5 files: entity.lua, component.lua, system.lua, world.lua, init.lua)
+- Deleted `src/systems/` directory (17 files, ~333KB of legacy code):
+  - ai_system.lua, aircraft_system.lua, animation_system.lua, audio_system.lua
+  - cloak_system.lua, combat_system.lua, fog_system.lua, harvest_system.lua
+  - movement_system.lua, power_system.lua, production_system.lua, render_system.lua
+  - selection_system.lua, special_weapons.lua, turret_system.lua, init.lua
 - Updated `src/init.lua` to remove ECS and Systems exports
 - Confirmed `src/components/` was already removed previously
 
@@ -26,11 +31,9 @@
    - HeapClass pools in `src/heap/`
 
 5. **Files still referencing deleted ECS**:
-   - `src/core/game.lua` - requires major refactor
-   - `src/systems/*.lua` - 16 files scheduled for deletion
-   - Various systems that passed `world` reference
+   - `src/core/game.lua` - requires major refactor (next priority)
 
 ### Next Steps (per PROGRESS.md)
-1. Delete `src/systems/` directory entirely
-2. Update `main.lua` to remove ECS requires (already clean)
-3. Update `src/core/game.lua` to remove ECS dependencies
+1. ~~Delete `src/systems/` directory entirely~~ DONE
+2. Update `main.lua` to remove ECS requires (check if needed)
+3. Update `src/core/game.lua` to remove ECS dependencies (major task)

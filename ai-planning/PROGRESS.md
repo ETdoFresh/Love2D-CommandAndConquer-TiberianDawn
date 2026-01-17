@@ -15,7 +15,7 @@ This document tracks all implementation tasks for the Command & Conquer: Tiberia
 ### Legacy Code Removal
 - [x] Delete `src/ecs/` directory entirely
 - [x] Delete `src/components/` directory entirely (already removed)
-- [ ] Delete `src/systems/` directory entirely
+- [x] Delete `src/systems/` directory entirely
 - [ ] Audit remaining files against original C++ structure
 - [ ] Remove any orphaned files not matching original structure
 - [ ] Update `main.lua` to remove ECS requires
