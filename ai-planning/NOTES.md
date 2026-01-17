@@ -322,6 +322,30 @@ Discovered during Phase 1 map system audit:
 - Code_Pointers/Decode_Pointers for save/load
 - Debug_Dump with layer name
 
-The map system follows original C&C patterns closely. Main integration gap is
-Cell_Building/Cell_Unit/Cell_Techno object retrieval - currently cells store
-entity IDs but can't resolve them to actual objects without heap lookup.
+The map system follows original C&C patterns closely.
+
+### Cell Object Retrieval - Now Complete
+Implemented full Cell→Object integration via TARGET values:
+
+**Storage**: Cell.occupier and Cell.overlappers now store TARGET values (32-bit packed RTTI + heap index), not raw entity IDs. This matches the original C&C's OccupierPtr pattern but uses Lua's number type for the packed TARGET.
+
+**Resolution**: Added Cell methods that resolve TARGETs via Globals.Target_To_Object():
+- `Cell_Occupier()` - main occupier (building/vehicle)
+- `Cell_Building()`, `Cell_Unit()`, `Cell_Infantry(spot)`, `Cell_Aircraft()` - type-specific
+- `Cell_Techno()` - any combat-capable object (all 4 techno types)
+- `Cell_Find_Object(rtti)` - generic lookup by RTTI type
+- `Iterate_Overlappers()` - iterator for all overlapping objects
+
+**Registration**: Added `Occupy_Down(obj)` / `Occupy_Up(obj)` for object registration:
+- Buildings: Set BUILDING flag, store as occupier, track owner
+- Vehicles: Set VEHICLE flag, store as occupier
+- Infantry: Set subcell flag (CENTER/NW/NE/SW/SE), add to overlappers
+- Aircraft: Add to overlappers (only when grounded)
+
+**Circular Dependency**: Used lazy require pattern for Globals to avoid circular dependency (Globals requires game object classes which could require Cell).
+
+This integration enables:
+- Pathfinding to check for unit occupancy
+- Combat targeting to find objects in cells
+- Building placement to check for existing units
+- All game object interactions with the map

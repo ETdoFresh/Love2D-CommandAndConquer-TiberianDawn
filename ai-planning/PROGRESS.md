@@ -196,20 +196,25 @@ Audit reveals extensive implementation (669 lines):
   - [x] `IsWaypoint` - waypoint field
   - [x] `IsFlagged` (CTF) - has_flag/flag_owner fields
 - [x] Implement `Cell_Coord()` - `to_leptons()` returns center coordinate
-- [ ] Implement `Cell_Occupier()` - needs object resolution from heap
+- [x] Implement `Cell_Occupier()` - resolves TARGET to object via Globals.Target_To_Object()
 - [x] Implement `Is_Clear_To_Move()` - `is_passable(locomotor, terrain_type)`
 - [x] Implement `Is_Clear_To_Build()` - in Grid.can_place_building()
-- [ ] Implement `Occupy_Down(obj)` / `Occupy_Up(obj)` - needs object integration
+- [x] Implement `Occupy_Down(obj)` / `Occupy_Up(obj)` - full implementation with type-specific handling
+- [x] Implement `Overlap_Down(obj)` / `Overlap_Up(obj)` - render overlap management
 - [x] Implement `Get_Template_Info()` - template_type/template_icon accessible
 - [x] Implement `Spot_Index(coord)` - FLAG constants define positions
 - [x] Implement `Closest_Free_Spot()` - `get_free_spot()` finds free infantry spot
 - [x] Implement `Is_Bridge_Here()` - `has_bridge()` with OVERLAY_BRIDGE constants
 - [x] Implement `Goodie_Check()` - no-op for TD (crates not in original)
-- [ ] Implement `Cell_Techno()` - needs heap integration
-- [ ] Implement `Cell_Building()` - needs heap integration
+- [x] Implement `Cell_Techno()` - resolves any RTTI (Building/Unit/Infantry/Aircraft)
+- [x] Implement `Cell_Building()` - resolves to BuildingClass
 - [x] Implement `Cell_Terrain()` - template_type provides terrain
-- [ ] Implement `Cell_Infantry(spot)` - needs heap integration
-- [ ] Implement `Cell_Unit()` - needs heap integration
+- [x] Implement `Cell_Infantry(spot)` - resolves to InfantryClass with optional spot filter
+- [x] Implement `Cell_Unit()` - resolves to UnitClass
+- [x] Implement `Cell_Aircraft()` - resolves to AircraftClass
+- [x] Implement `Cell_Find_Object(rtti)` - find any object type by RTTI
+- [x] Implement `Iterate_Overlappers()` - iterator for all overlapping objects
+- [x] Implement `Object_Count()` - count objects in cell
 - [x] Implement `Adjacent_Cell(facing)` - in Grid.get_adjacent()
 - [x] Implement `Concrete_Calc()` - wall_frame calculation exists
 - [x] Implement `Wall_Update()` - Grid.update_wall_connections()
@@ -218,10 +223,10 @@ Audit reveals extensive implementation (669 lines):
 - [x] Implement `Reduce_Wall()` - `damage_wall(damage)`
 - [ ] Implement `Incoming()` - threat tracking missing
 - [x] Implement `Redraw_Objects()` - handled by rendering system
-- [x] Implement serialize/deserialize for save/load
-- [x] Implement Debug_Dump() with flag names
+- [x] Implement serialize/deserialize for save/load (includes TARGET-based occupier/overlappers)
+- [x] Implement Debug_Dump() with flag names and TARGET resolution
 - [ ] Write unit tests for CellClass
-Note: Object retrieval (Cell_Building, Cell_Unit, etc.) needs Globals heap integration
+Note: Object retrieval now fully integrated with Globals heap via TARGET values
 
 ### MapClass (`src/map/grid.lua`) - MOSTLY COMPLETE
 Note: Named `Grid` in implementation. Audit reveals extensive implementation (704 lines):

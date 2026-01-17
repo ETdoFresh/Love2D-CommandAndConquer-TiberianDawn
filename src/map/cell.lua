@@ -4,6 +4,7 @@
 ]]
 
 local Constants = require("src.core.constants")
+local Target = require("src.core.target")
 
 -- LuaJIT bit operations (compatible with Love2D)
 local bit = bit or bit32 or require("bit")
@@ -57,9 +58,9 @@ function Cell.new(x, y)
     -- Occupancy flags
     self.flags = 0
 
-    -- References to occupying objects
-    self.occupier = nil     -- Main occupier entity ID
-    self.overlappers = {}   -- Entities overlapping this cell
+    -- References to occupying objects (stored as TARGET values for heap resolution)
+    self.occupier = Target.TARGET_NONE  -- Main occupier TARGET (building/vehicle)
+    self.overlappers = {}               -- TARGET values of objects overlapping this cell
 
     -- Trigger reference
     self.trigger = nil
@@ -427,24 +428,383 @@ function Cell:can_receive_tiberium()
     return true
 end
 
--- Add overlapper
-function Cell:add_overlapper(entity_id)
-    for _, id in ipairs(self.overlappers) do
-        if id == entity_id then
+--============================================================================
+-- Object Retrieval Functions
+-- Reference: CELL.H Cell_Occupier(), Cell_Building(), Cell_Unit(), etc.
+-- These functions resolve TARGET values to actual objects via the Globals heap
+--============================================================================
+
+-- Lazy require to avoid circular dependency (Globals requires game object classes)
+local _Globals = nil
+local function get_Globals()
+    if not _Globals then
+        _Globals = require("src.heap.globals")
+    end
+    return _Globals
+end
+
+--[[
+    Get the main occupying object in this cell.
+    Port of Cell_Occupier() from CELL.CPP
+
+    @return ObjectClass or nil
+]]
+function Cell:Cell_Occupier()
+    if self.occupier == Target.TARGET_NONE or self.occupier == 0 then
+        return nil
+    end
+    return get_Globals().Target_To_Object(self.occupier)
+end
+
+--[[
+    Get the building in this cell.
+    Port of Cell_Building() from CELL.CPP
+
+    @return BuildingClass or nil
+]]
+function Cell:Cell_Building()
+    -- Check occupier first
+    local occupier = self:Cell_Occupier()
+    if occupier and occupier:get_rtti() == Target.RTTI.BUILDING then
+        return occupier
+    end
+
+    -- Check overlappers
+    for _, target in ipairs(self.overlappers) do
+        if target ~= Target.TARGET_NONE and target ~= 0 then
+            local obj = get_Globals().Target_To_Object(target)
+            if obj and obj:get_rtti() == Target.RTTI.BUILDING then
+                return obj
+            end
+        end
+    end
+
+    return nil
+end
+
+--[[
+    Get the unit (vehicle) in this cell.
+    Port of Cell_Unit() from CELL.CPP
+
+    @return UnitClass or nil
+]]
+function Cell:Cell_Unit()
+    -- Check occupier first
+    local occupier = self:Cell_Occupier()
+    if occupier and occupier:get_rtti() == Target.RTTI.UNIT then
+        return occupier
+    end
+
+    -- Check overlappers
+    for _, target in ipairs(self.overlappers) do
+        if target ~= Target.TARGET_NONE and target ~= 0 then
+            local obj = get_Globals().Target_To_Object(target)
+            if obj and obj:get_rtti() == Target.RTTI.UNIT then
+                return obj
+            end
+        end
+    end
+
+    return nil
+end
+
+--[[
+    Get infantry in this cell (optionally at specific subcell spot).
+    Port of Cell_Infantry() from CELL.CPP
+
+    @param spot - Optional FLAG.CENTER/NW/NE/SW/SE to get infantry at specific spot
+    @return InfantryClass or nil
+]]
+function Cell:Cell_Infantry(spot)
+    -- If spot specified, only check infantry at that spot
+    -- (In original C&C, infantry are indexed by subcell position)
+
+    -- Check overlappers for infantry
+    for _, target in ipairs(self.overlappers) do
+        if target ~= Target.TARGET_NONE and target ~= 0 then
+            local obj = get_Globals().Target_To_Object(target)
+            if obj and obj:get_rtti() == Target.RTTI.INFANTRY then
+                -- If specific spot requested, check if infantry is at that spot
+                if spot then
+                    -- Infantry have an Occupy field indicating their subcell
+                    if obj.Occupy and obj.Occupy == spot then
+                        return obj
+                    end
+                else
+                    -- Return first infantry found
+                    return obj
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+--[[
+    Get aircraft in this cell.
+    Port of Cell_Aircraft() from original (though rarely used - aircraft are usually airborne)
+
+    @return AircraftClass or nil
+]]
+function Cell:Cell_Aircraft()
+    -- Check overlappers for aircraft
+    for _, target in ipairs(self.overlappers) do
+        if target ~= Target.TARGET_NONE and target ~= 0 then
+            local obj = get_Globals().Target_To_Object(target)
+            if obj and obj:get_rtti() == Target.RTTI.AIRCRAFT then
+                return obj
+            end
+        end
+    end
+
+    return nil
+end
+
+--[[
+    Get first TechnoClass (combat-capable object) in this cell.
+    Port of Cell_Techno() from CELL.CPP
+
+    @return TechnoClass or nil (Infantry, Unit, Building, or Aircraft)
+]]
+function Cell:Cell_Techno()
+    -- Check occupier first
+    local occupier = self:Cell_Occupier()
+    if occupier then
+        local rtti = occupier:get_rtti()
+        if rtti == Target.RTTI.BUILDING or rtti == Target.RTTI.UNIT or
+           rtti == Target.RTTI.INFANTRY or rtti == Target.RTTI.AIRCRAFT then
+            return occupier
+        end
+    end
+
+    -- Check overlappers for any techno
+    for _, target in ipairs(self.overlappers) do
+        if target ~= Target.TARGET_NONE and target ~= 0 then
+            local obj = get_Globals().Target_To_Object(target)
+            if obj then
+                local rtti = obj:get_rtti()
+                if rtti == Target.RTTI.BUILDING or rtti == Target.RTTI.UNIT or
+                   rtti == Target.RTTI.INFANTRY or rtti == Target.RTTI.AIRCRAFT then
+                    return obj
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+--[[
+    Find an object of specific RTTI type in this cell.
+    Port of Cell_Find_Object() from CELL.CPP
+
+    @param rtti - RTTI type to search for
+    @return ObjectClass or nil
+]]
+function Cell:Cell_Find_Object(rtti)
+    -- Check occupier first
+    local occupier = self:Cell_Occupier()
+    if occupier and occupier:get_rtti() == rtti then
+        return occupier
+    end
+
+    -- Check overlappers
+    for _, target in ipairs(self.overlappers) do
+        if target ~= Target.TARGET_NONE and target ~= 0 then
+            local obj = get_Globals().Target_To_Object(target)
+            if obj and obj:get_rtti() == rtti then
+                return obj
+            end
+        end
+    end
+
+    return nil
+end
+
+--============================================================================
+-- Occupy/Overlap Management
+-- Reference: CELL.H Occupy_Down(), Occupy_Up(), Overlap_Down(), Overlap_Up()
+--============================================================================
+
+--[[
+    Mark cell as occupied by an object.
+    Port of Occupy_Down() from CELL.CPP
+
+    Sets the appropriate flag based on object type and stores the object TARGET.
+
+    @param object - ObjectClass to occupy this cell
+]]
+function Cell:Occupy_Down(object)
+    if not object then return end
+
+    local target = object:As_Target()
+    local rtti = object:get_rtti()
+
+    -- Set appropriate flag based on object type
+    if rtti == Target.RTTI.BUILDING then
+        self:set_flag(Cell.FLAG.BUILDING)
+        self.occupier = target
+        self.owner = object.House or -1
+
+    elseif rtti == Target.RTTI.UNIT then
+        self:set_flag(Cell.FLAG.VEHICLE)
+        self.occupier = target
+
+    elseif rtti == Target.RTTI.INFANTRY then
+        -- Infantry occupy a subcell position
+        local spot = object.Occupy or Cell.FLAG.CENTER
+        self:set_flag(spot)
+        -- Infantry are added as overlappers, not main occupier
+        self:add_overlapper(target)
+
+    elseif rtti == Target.RTTI.AIRCRAFT then
+        -- Aircraft on ground (landed)
+        self:add_overlapper(target)
+
+    else
+        -- Other object types go in overlappers
+        self:add_overlapper(target)
+    end
+end
+
+--[[
+    Clear cell occupancy for an object.
+    Port of Occupy_Up() from CELL.CPP
+
+    @param object - ObjectClass leaving this cell
+]]
+function Cell:Occupy_Up(object)
+    if not object then return end
+
+    local target = object:As_Target()
+    local rtti = object:get_rtti()
+
+    -- Clear appropriate flag based on object type
+    if rtti == Target.RTTI.BUILDING then
+        self:clear_flag(Cell.FLAG.BUILDING)
+        if self.occupier == target then
+            self.occupier = Target.TARGET_NONE
+        end
+
+    elseif rtti == Target.RTTI.UNIT then
+        self:clear_flag(Cell.FLAG.VEHICLE)
+        if self.occupier == target then
+            self.occupier = Target.TARGET_NONE
+        end
+
+    elseif rtti == Target.RTTI.INFANTRY then
+        -- Infantry clear their subcell position
+        local spot = object.Occupy or Cell.FLAG.CENTER
+        self:clear_flag(spot)
+        self:remove_overlapper(target)
+
+    elseif rtti == Target.RTTI.AIRCRAFT then
+        self:remove_overlapper(target)
+
+    else
+        self:remove_overlapper(target)
+    end
+end
+
+--[[
+    Add an object to the overlap list (for rendering/collision, not blocking).
+    Port of Overlap_Down() from CELL.CPP
+
+    Objects that render across cell boundaries use overlap.
+
+    @param object - ObjectClass overlapping this cell
+]]
+function Cell:Overlap_Down(object)
+    if not object then return end
+    local target = object:As_Target()
+    self:add_overlapper(target)
+end
+
+--[[
+    Remove an object from the overlap list.
+    Port of Overlap_Up() from CELL.CPP
+
+    @param object - ObjectClass no longer overlapping this cell
+]]
+function Cell:Overlap_Up(object)
+    if not object then return end
+    local target = object:As_Target()
+    self:remove_overlapper(target)
+end
+
+--============================================================================
+-- Internal Overlapper Management (uses TARGET values)
+--============================================================================
+
+-- Add overlapper by TARGET value
+function Cell:add_overlapper(target)
+    if target == Target.TARGET_NONE or target == 0 then
+        return
+    end
+    for _, t in ipairs(self.overlappers) do
+        if t == target then
             return -- Already added
         end
     end
-    table.insert(self.overlappers, entity_id)
+    table.insert(self.overlappers, target)
 end
 
--- Remove overlapper
-function Cell:remove_overlapper(entity_id)
-    for i, id in ipairs(self.overlappers) do
-        if id == entity_id then
+-- Remove overlapper by TARGET value
+function Cell:remove_overlapper(target)
+    for i, t in ipairs(self.overlappers) do
+        if t == target then
             table.remove(self.overlappers, i)
             return
         end
     end
+end
+
+--[[
+    Get all objects overlapping this cell.
+    Returns iterator for all overlapping objects.
+
+    @return iterator function
+]]
+function Cell:Iterate_Overlappers()
+    local Globals = get_Globals()
+    local i = 0
+    local overlappers = self.overlappers
+
+    return function()
+        while true do
+            i = i + 1
+            if i > #overlappers then
+                return nil
+            end
+            local target = overlappers[i]
+            if target and target ~= Target.TARGET_NONE and target ~= 0 then
+                local obj = Globals.Target_To_Object(target)
+                if obj then
+                    return obj
+                end
+            end
+        end
+    end
+end
+
+--[[
+    Get count of objects in this cell (occupier + overlappers).
+]]
+function Cell:Object_Count()
+    local count = 0
+
+    if self.occupier ~= Target.TARGET_NONE and self.occupier ~= 0 then
+        count = count + 1
+    end
+
+    for _, target in ipairs(self.overlappers) do
+        if target ~= Target.TARGET_NONE and target ~= 0 then
+            count = count + 1
+        end
+    end
+
+    return count
 end
 
 -- Get cell number (for serialization)
@@ -465,6 +825,7 @@ function Cell:to_pixels()
 end
 
 -- Serialize cell state
+-- Note: occupier and overlappers are TARGET values that can be serialized directly
 function Cell:serialize()
     return {
         x = self.x,
@@ -478,7 +839,11 @@ function Cell:serialize()
         owner = self.owner,
         flags = self.flags,
         is_mapped = self.is_mapped,
-        waypoint = self.waypoint
+        waypoint = self.waypoint,
+        -- Object references (stored as TARGET values)
+        occupier = self.occupier,
+        overlappers = self.overlappers,
+        infantry_type = self.infantry_type,
     }
 end
 
@@ -496,6 +861,10 @@ function Cell:deserialize(data)
     self.waypoint = data.waypoint
     self.is_bridge = data.is_bridge or false
     self.bridge_health = data.bridge_health or 0
+    -- Object references (TARGET values are numbers, serializable directly)
+    self.occupier = data.occupier or Target.TARGET_NONE
+    self.overlappers = data.overlappers or {}
+    self.infantry_type = data.infantry_type or -1
 end
 
 -- Bridge overlay types (from original C&C)
@@ -650,12 +1019,29 @@ function Cell:Debug_Dump()
         print(string.format("  Smudge: type=%s%d", smudge_name, (self.smudge % 6) + 1))
     end
 
-    -- References
-    if self.occupier then
-        print(string.format("  Occupier: %s", tostring(self.occupier)))
+    -- Object references (with TARGET resolution)
+    if self.occupier and self.occupier ~= Target.TARGET_NONE and self.occupier ~= 0 then
+        local rtti = Target.Get_RTTI(self.occupier)
+        local id = Target.Get_ID(self.occupier)
+        local rtti_name = Target.RTTI_NAME[rtti] or "?"
+        local obj = self:Cell_Occupier()
+        local obj_str = obj and tostring(obj) or "nil"
+        print(string.format("  Occupier: TARGET=0x%08X (RTTI=%s ID=%d) -> %s",
+            self.occupier, rtti_name, id, obj_str))
     end
     if #self.overlappers > 0 then
-        print(string.format("  Overlappers: %d entities", #self.overlappers))
+        print(string.format("  Overlappers: %d objects", #self.overlappers))
+        for i, target in ipairs(self.overlappers) do
+            if target ~= Target.TARGET_NONE and target ~= 0 then
+                local rtti = Target.Get_RTTI(target)
+                local id = Target.Get_ID(target)
+                local rtti_name = Target.RTTI_NAME[rtti] or "?"
+                local obj = get_Globals().Target_To_Object(target)
+                local obj_str = obj and tostring(obj) or "nil"
+                print(string.format("    [%d] TARGET=0x%08X (RTTI=%s ID=%d) -> %s",
+                    i, target, rtti_name, id, obj_str))
+            end
+        end
     end
     if self.trigger then
         print(string.format("  Trigger: %s", tostring(self.trigger)))
