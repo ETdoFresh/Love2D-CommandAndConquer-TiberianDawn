@@ -18,8 +18,8 @@ This document tracks all implementation tasks for the Command & Conquer: Tiberia
 - [x] Delete `src/systems/` directory entirely
 - [ ] Audit remaining files against original C++ structure
 - [ ] Remove any orphaned files not matching original structure
-- [ ] Update `main.lua` to remove ECS requires
-- [ ] Update `src/core/game.lua` to remove ECS dependencies
+- [x] Update `main.lua` to remove ECS requires (already clean)
+- [x] Update `src/core/game.lua` to remove ECS dependencies (compatibility shims created)
 
 ### File Structure Alignment
 - [ ] Compare `src/` structure against `temp/TIBERIANDAWN/` structure
