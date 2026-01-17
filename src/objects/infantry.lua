@@ -92,6 +92,25 @@ InfantryClass.SUBCELL = {
 InfantryClass.INFANTRY_SPEED = 3    -- Base movement speed in leptons/tick
 
 --============================================================================
+-- RTTI (Runtime Type Information)
+--============================================================================
+
+--[[
+    Get the RTTI type for InfantryClass.
+    Used for TARGET encoding and heap lookup.
+]]
+function InfantryClass:get_rtti()
+    return Target.RTTI.INFANTRY
+end
+
+--[[
+    Get the object type identifier (same as RTTI for classes).
+]]
+function InfantryClass:What_Am_I()
+    return Target.RTTI.INFANTRY
+end
+
+--============================================================================
 -- Constructor
 --============================================================================
 

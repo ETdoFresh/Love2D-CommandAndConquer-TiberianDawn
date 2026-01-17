@@ -63,6 +63,18 @@ UnitClass.UNLOAD_DELAY = 8          -- Ticks between unload operations
 UnitClass.DEPLOY_TIME = 30          -- Ticks to deploy MCV
 
 --============================================================================
+-- RTTI (Runtime Type Information)
+--============================================================================
+
+function UnitClass:get_rtti()
+    return Target.RTTI.UNIT
+end
+
+function UnitClass:What_Am_I()
+    return Target.RTTI.UNIT
+end
+
+--============================================================================
 -- Constructor
 --============================================================================
 

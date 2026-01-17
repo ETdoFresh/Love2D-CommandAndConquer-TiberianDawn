@@ -45,6 +45,18 @@ AnimClass.STATE = {
 AnimClass.DAMAGE_THRESHOLD = 256
 
 --============================================================================
+-- RTTI (Runtime Type Information)
+--============================================================================
+
+function AnimClass:get_rtti()
+    return Target.RTTI.ANIM
+end
+
+function AnimClass:What_Am_I()
+    return Target.RTTI.ANIM
+end
+
+--============================================================================
 -- Constructor
 --============================================================================
 

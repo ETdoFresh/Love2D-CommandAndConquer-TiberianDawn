@@ -157,10 +157,14 @@ end
 function Game:init()
     self.state = Game.STATE.LOADING
 
+    -- Initialize object heaps for the class hierarchy
+    -- This must be done early, before any game objects are created
+    Globals.Init_All_Heaps()
+
     -- Load saved campaign progress
     self:load_campaign_progress()
 
-    -- Create ECS world
+    -- Create ECS world (still used for rendering during migration)
     self.world = ECS.World.new()
 
     -- Create map

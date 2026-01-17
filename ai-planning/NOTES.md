@@ -134,3 +134,22 @@ the game loop. This is a single-line change that activates the entire class hier
 **Current state**: Class AI() methods will now run at 15 FPS when objects are created
 via `Globals.Create_Object()` or `heap:Allocate()`. The ECS world.update() still runs
 for rendering compatibility, but actual game logic now flows through the class hierarchy.
+
+### Heap Initialization - Complete
+Added `Globals.Init_All_Heaps()` which registers all 6 game object heaps:
+- BUILDING, INFANTRY, UNIT, AIRCRAFT, BULLET, ANIM
+- Pool sizes from HeapClass.LIMITS (matching original C&C)
+- Called from Game:init() before any objects can be created
+
+Also added RTTI methods (`get_rtti()`, `What_Am_I()`) to all game object classes:
+- InfantryClass, UnitClass, BuildingClass, AircraftClass, BulletClass, AnimClass
+- Required for TARGET encoding and heap lookup
+
+**Critical Bug Fix**: Fixed infinite recursion in AI() chain:
+- `MissionClass:AI()` was using `Class.super(self, "AI")`
+- Class.super walks parent chain from *instance's class*, not calling class
+- When an InfantryClass instance called AI(), Class.super found TechnoClass.AI (not ObjectClass.AI)
+- This caused: TechnoClass → RadioClass → MissionClass → TechnoClass (loop!)
+- **Fix**: MissionClass:AI() now directly calls `AbstractClass.AI(self)` instead of Class.super
+
+**Verification**: 28 heap tests pass, 42 OOP tests pass, game loads correctly.

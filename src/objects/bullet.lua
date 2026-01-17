@@ -44,6 +44,18 @@ BulletClass.AA_DAMAGE_BONUS = 0.50
 BulletClass.TOW_AA_DAMAGE_BONUS = 0.33
 
 --============================================================================
+-- RTTI (Runtime Type Information)
+--============================================================================
+
+function BulletClass:get_rtti()
+    return Target.RTTI.BULLET
+end
+
+function BulletClass:What_Am_I()
+    return Target.RTTI.BULLET
+end
+
+--============================================================================
 -- Constructor
 --============================================================================
 

@@ -78,6 +78,18 @@ BuildingClass.REPAIR_RATE = 2       -- Health per repair tick
 BuildingClass.REPAIR_COST = 1       -- Credits per repair tick
 
 --============================================================================
+-- RTTI (Runtime Type Information)
+--============================================================================
+
+function BuildingClass:get_rtti()
+    return Target.RTTI.BUILDING
+end
+
+function BuildingClass:What_Am_I()
+    return Target.RTTI.BUILDING
+end
+
+--============================================================================
 -- Constructor
 --============================================================================
 

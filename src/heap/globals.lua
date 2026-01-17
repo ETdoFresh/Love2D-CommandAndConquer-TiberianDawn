@@ -201,11 +201,86 @@ function Globals.Decode_All_Heaps(data)
 end
 
 --============================================================================
+-- Heap Initialization
+--============================================================================
+
+-- Track initialization state
+Globals._initialized = false
+
+--[[
+    Initialize all game object heaps.
+    This must be called once during game initialization, before any
+    objects are created.
+
+    The heaps are created with the pool limits from the original game
+    (see HeapClass.LIMITS).
+]]
+function Globals.Init_All_Heaps()
+    if Globals._initialized then
+        return  -- Already initialized
+    end
+
+    -- Lazy require to avoid circular dependencies during module loading
+    local InfantryClass = require("src.objects.infantry")
+    local UnitClass = require("src.objects.unit")
+    local BuildingClass = require("src.objects.building")
+    local AircraftClass = require("src.objects.aircraft")
+    local BulletClass = require("src.objects.bullet")
+    local AnimClass = require("src.objects.anim")
+
+    -- Register heaps in the order used by Process_All_AI()
+    -- This matches the original C&C processing order
+    Globals.Register_Heap(Target.RTTI.BUILDING, BuildingClass, HeapClass.LIMITS.BUILDINGS)
+    Globals.Register_Heap(Target.RTTI.INFANTRY, InfantryClass, HeapClass.LIMITS.INFANTRY)
+    Globals.Register_Heap(Target.RTTI.UNIT, UnitClass, HeapClass.LIMITS.UNITS)
+    Globals.Register_Heap(Target.RTTI.AIRCRAFT, AircraftClass, HeapClass.LIMITS.AIRCRAFT)
+    Globals.Register_Heap(Target.RTTI.BULLET, BulletClass, HeapClass.LIMITS.BULLETS)
+    Globals.Register_Heap(Target.RTTI.ANIM, AnimClass, HeapClass.LIMITS.ANIMS)
+
+    Globals._initialized = true
+
+    print(string.format("Globals.Init_All_Heaps(): Initialized %d heaps",
+        Globals.Get_Heap_Count()))
+end
+
+--[[
+    Check if heaps have been initialized.
+]]
+function Globals.Is_Initialized()
+    return Globals._initialized
+end
+
+--[[
+    Get the count of registered heaps.
+]]
+function Globals.Get_Heap_Count()
+    local count = 0
+    for _ in pairs(Globals.heaps) do
+        count = count + 1
+    end
+    return count
+end
+
+--[[
+    Reset all heaps (for testing or new game).
+    Clears all objects and returns them to the free list.
+]]
+function Globals.Reset_All_Heaps()
+    for rtti, heap in pairs(Globals.heaps) do
+        -- Free all active objects
+        for obj in heap:Active_Objects() do
+            heap:Free(obj)
+        end
+    end
+end
+
+--============================================================================
 -- Debug Support
 --============================================================================
 
 function Globals.Debug_Dump()
     print("=== Global Heaps ===")
+    print(string.format("Initialized: %s", tostring(Globals._initialized)))
     print(string.format("Total Active: %d", Globals.Total_Active_Count()))
 
     for rtti, heap in pairs(Globals.heaps) do

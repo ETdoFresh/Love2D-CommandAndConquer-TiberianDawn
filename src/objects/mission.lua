@@ -15,6 +15,7 @@
 
 local Class = require("src.objects.class")
 local ObjectClass = require("src.objects.object")
+local AbstractClass = require("src.objects.abstract")
 local Constants = require("src.core.constants")
 
 -- Create MissionClass extending ObjectClass
@@ -227,8 +228,10 @@ end
     Handles mission timing and dispatch.
 ]]
 function MissionClass:AI()
-    -- Call parent AI
-    Class.super(self, "AI")
+    -- Call parent AI (ObjectClass doesn't define AI, so call AbstractClass directly)
+    -- Note: Can't use Class.super here because it starts from instance's class
+    -- and would find TechnoClass.AI before AbstractClass.AI, causing infinite recursion
+    AbstractClass.AI(self)
 
     -- Skip if not active or in limbo
     if not self.IsActive or self.IsInLimbo then

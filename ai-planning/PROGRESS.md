@@ -41,7 +41,7 @@ This document tracks all implementation tasks for the Command & Conquer: Tiberia
 - [x] Write unit tests for mixin composition (test_class_oop.lua)
 - [x] Write unit tests for super() calls (test_class_oop.lua)
 
-### HeapClass Object Pools (`src/heap/`)
+### HeapClass Object Pools (`src/heap/`) - COMPLETE
 - [x] Implement `HeapClass` with fixed-size pools (heap.lua)
 - [x] Implement pool allocation with hard error on exhaustion
 - [x] Implement pool deallocation (return to pool)
@@ -50,8 +50,10 @@ This document tracks all implementation tasks for the Command & Conquer: Tiberia
 - [x] Implement pool iteration (`For_Each()`) (Active_Objects())
 - [x] Define pool limits for all object types (LIMITS table)
 - [x] Implement `globals.lua` with global object arrays
-- [x] Write unit tests for HeapClass (test_class_hierarchy.lua)
-Note: Individual heaps are created lazily via Globals.Register_Heap() when game initializes
+- [x] Implement `Init_All_Heaps()` in globals.lua
+- [x] Initialize heaps in Game:init()
+- [x] Add RTTI to all game object classes (Infantry, Unit, Building, Aircraft, Bullet, Anim)
+- [x] Write unit tests for HeapClass (test_class_hierarchy.lua, test_heaps.lua)
 
 ### COORDINATE System (`src/core/coord.lua`) - COMPLETE
 - [x] Implement COORDINATE bit-packing (32-bit with cell + lepton)

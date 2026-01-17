@@ -64,6 +64,18 @@ AircraftClass.AIRCRAFT_SPEED = {
 }
 
 --============================================================================
+-- RTTI (Runtime Type Information)
+--============================================================================
+
+function AircraftClass:get_rtti()
+    return Target.RTTI.AIRCRAFT
+end
+
+function AircraftClass:What_Am_I()
+    return Target.RTTI.AIRCRAFT
+end
+
+--============================================================================
 -- Constructor
 --============================================================================
 
