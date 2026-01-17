@@ -20,14 +20,11 @@ local Src = {
         Serialize = require("src.util.serialize")
     },
 
-    -- ECS
-    ECS = require("src.ecs"),
-
     -- Map
     Map = require("src.map"),
 
-    -- Systems
-    Systems = require("src.systems"),
+    -- NOTE: ECS and Systems removed per PLAN.md Phase 0 migration
+    -- Game object hierarchy now uses src/objects/ class system
 
     -- UI
     UI = require("src.ui"),

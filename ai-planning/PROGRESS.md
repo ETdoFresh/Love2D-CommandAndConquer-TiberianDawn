@@ -13,8 +13,8 @@ This document tracks all implementation tasks for the Command & Conquer: Tiberia
 ## Phase 0: Migration & Cleanup
 
 ### Legacy Code Removal
-- [ ] Delete `src/ecs/` directory entirely
-- [ ] Delete `src/components/` directory entirely
+- [x] Delete `src/ecs/` directory entirely
+- [x] Delete `src/components/` directory entirely (already removed)
 - [ ] Delete `src/systems/` directory entirely
 - [ ] Audit remaining files against original C++ structure
 - [ ] Remove any orphaned files not matching original structure
