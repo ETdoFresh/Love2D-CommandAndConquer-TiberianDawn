@@ -29,6 +29,78 @@ A faithful port of Command & Conquer: Tiberian Dawn to Love2D, recreating the or
 
 **Note**: All deviations are implemented in separate adapter modules, keeping the core game classes faithful to the original.
 
+### Priority & Scope Decisions
+| Feature | Priority | Notes |
+|---------|----------|-------|
+| HD Graphics | Separate pack | Optional download, classic-only works standalone |
+| Controller Support | Nice-to-have | After core game functional |
+| Spectator Mode | Deferred | Post-launch feature |
+| Crates/Powerups | Skip | Not in original TD (Red Alert feature) |
+| Veterancy | Skip | Not in original TD |
+
+---
+
+## Implementation Decisions
+
+These decisions were made during spec review to ensure consistency across all phases.
+
+### Architecture & Code Structure
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| OOP System | Custom metatables | No external dependencies, full control |
+| Type Safety | Strict metatable enforcement | COORDINATE/CELL/TARGET types with validation |
+| Pool Overflow | Hard errors | Match original behavior, fail fast |
+| File Structure | Match original C++ | Files should mirror `temp/TIBERIANDAWN/` structure |
+| Error Handling | Crash loudly | Assert on invalid state for easier debugging |
+
+### Core Systems
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Combat Math | Exact integer port | Bit operations, no floats for damage |
+| RNG | Verified LCG | Already validated against original |
+| Multiplayer | Architect from day 1 | All systems designed for deterministic lockstep |
+| Tick/Render | 15 FPS logic, 60 FPS display | Interpolation for smooth visuals |
+| Radio Messages | Synchronous | Immediate call/response like original |
+
+### Game Mechanics
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| AI Behavior | Exact replica | Include all quirks and exploits |
+| Tiberium Growth | Full system (Phase 4) | Blossom trees, growth, spread |
+| Building Placement | Full rules from start | Adjacency, foundation, terrain checks |
+| Fog of War | Original TD style | Explored stays visible, units hidden |
+| Fear System | Exact port | Infantry Fear value and panic behaviors |
+| Building Damage | Original formula | Match C++ damage state thresholds |
+
+### Unit Behaviors
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| MCV Deployment | Phase 2 | Core unit transformation mechanic |
+| Aircraft RTB | Auto-return | Return to helipad when ammo depleted |
+| Harvester AI | Match original | Exact replication of seek/return behavior |
+| Sell/Repair | Phase 4 | Part of economy system |
+
+### UI & Input
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| UI Design | Both classic + HD ready | Parallel development from start |
+| Keyboard Bindings | Original exact | Match original keybindings as default |
+| EVA Voice | With sidebar/HUD | Implement alongside UI development |
+
+### Assets & Scenarios
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Asset State | Partial extraction | Tools exist, some assets ready |
+| Scenario Format | Original INI/BIN | Parse original format directly |
+| Superweapons | Phase 6 | Ion Cannon, Nuke, Airstrike |
+
+### Testing & Debug
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Test Coverage | All levels | Unit, integration, replay verification |
+| Debug Overlays | Build from start | Visualize pathfinding, threat, AI decisions |
+| Phase 1 Goal | Map + selection + movement | Minimum viable demonstration |
+
 ---
 
 ## Architecture: C++ Class Hierarchy Port
@@ -862,21 +934,23 @@ end
 
 ## Migration Notes
 
-### Removing Current ECS
-The current `src/ecs/` implementation will be replaced by the class hierarchy. Files to remove:
-- `src/ecs/entity.lua`
-- `src/ecs/component.lua`
-- `src/ecs/system.lua`
-- `src/ecs/world.lua`
-- `src/ecs/init.lua`
-- `src/components/` (all files)
-- `src/systems/` (most files - some logic migrates to class methods)
+### Removing Legacy ECS Implementation
+The legacy ECS implementation must be **deleted immediately** (not deprecated). Remove these directories entirely:
+
+**Directories to Delete:**
+- `src/ecs/` - Entire directory (entity.lua, component.lua, system.lua, world.lua, init.lua)
+- `src/components/` - Entire directory (all ECS component definitions)
+- `src/systems/` - Entire directory (all ECS system implementations)
+
+**Criterion for Removal:**
+Any file that does not match the original C++ source structure in `temp/TIBERIANDAWN/` should be evaluated for removal or refactoring.
 
 ### Preserved Functionality
-- `src/debug/ipc.lua` - Keep IPC debugging system
-- `src/util/` - Keep utility modules
-- `src/map/theater.lua` - Adapt for CellClass
-- `src/graphics/sprite_loader.lua` - Keep asset loading
+These modules are architecture-agnostic and should be preserved:
+- `src/debug/ipc.lua` - IPC debugging system (adapt for class hierarchy if needed)
+- `src/util/` - Utility modules (paths, vector, direction, crc, serialize)
+- `src/graphics/sprite_loader.lua` - Asset loading infrastructure
+- `src/map/theater.lua` - Theater terrain sets (adapt for CellClass)
 
 ---
 
@@ -913,11 +987,28 @@ The original game source code is located at: `temp/CnC_Remastered_Collection/TIB
 
 ## Current Status
 
-- Basic game loop and menu system working
-- ECS framework implemented
-- Map grid and cell system implemented
-- Multiple systems scaffolded (combat, AI, production, harvest, power, fog, cloak)
+### Implemented
+- Class hierarchy foundation (AbstractClass → ObjectClass → MissionClass → RadioClass → TechnoClass)
+- All game object classes scaffolded (Infantry, Unit, Aircraft, Building, Bullet, Anim, Terrain, Overlay, Smudge)
+- Mixin system for multiple inheritance (Flasher, Stage, Cargo, Door, Crew)
+- Movement specializations (Drive, Fly, TarCom, Turret)
+- All type classes defined (InfantryTypeClass, UnitTypeClass, etc.)
+- Map grid and cell system
+- Core utilities (coord, target, random, constants)
 - IPC debugging system for CLI control
+- Custom metatable OOP system (`src/objects/class.lua`)
+
+### Needs Migration/Removal
+- Legacy ECS framework (`src/ecs/`, `src/components/`, `src/systems/`) - DELETE
+- Game loop currently ECS-based - REFACTOR to class hierarchy
+- Any files not matching original C++ structure - EVALUATE
+
+### Needs Implementation
+- Game loop integration with class AI() methods
+- HeapClass object pool management
+- Full method implementations in class stubs
+- Radio message protocol between objects
+- Save/load with Code_Pointers/Decode_Pointers
 
 ---
 
