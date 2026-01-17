@@ -511,3 +511,90 @@ The codebase appears to have a complete game logic layer but incomplete presenta
 This suggests the next major effort should focus on either:
 - Display hierarchy (GScreenClass, DisplayClass) to show what's already working
 - Scenario loading to test the complete systems with real game data
+
+---
+
+## 2026-01-16: Phase 1 Display Hierarchy Audit
+
+### Summary
+Audited Display Hierarchy section of Phase 1 in PROGRESS.md. Found the entire display class chain completely implemented (2585 lines across 5 files) but PROGRESS.md showed all items as `[ ]`.
+
+### What Was Discovered
+
+**GScreenClass** (`src/display/gscreen.lua` - 301 lines):
+- Base class with `IsToRedraw`/`IsToUpdate` flags
+- Button/gadget linked list management (`Add_A_Button`, `Remove_A_Button`)
+- Full initialization chain: `One_Time`, `Init`, `Init_Clear`, `Init_IO`, `Init_Theater`
+- `Input`, `AI`, `Render`, `Draw_It` framework
+- Mouse shape stubs for derived classes
+
+**DisplayClass** (`src/display/display.lua` - 709 lines):
+- Tactical viewport: `TacticalCoord`, `TacLeptonWidth/Height`, `TacPixelX/Y`
+- Theater support (TEMPERATE/DESERT/WINTER)
+- Full coordinate conversions: `Pixel_To_Coord`, `Coord_To_Pixel`, `Click_Cell_Calc`
+- Layer management via LayerClass integration
+- Cell dirty tracking: `Flag_Cell`, `Is_Cell_Flagged`, `Clear_Cell_Flags`
+- Repair/Sell mode toggles
+- Rubber band selection rendering
+- Object finding: `Cell_Object`, `Next_Object`, `Prev_Object`
+- Pending placement state for buildings
+
+**RadarClass** (`src/display/radar.lua` - 677 lines):
+- Full minimap with position/size configuration
+- Activation animation (22 frames to activate, 41 max)
+- Zoom mode with scale factor
+- Click-to-scroll: `Click_In_Radar`, `Set_Radar_Position`
+- Coordinate conversions: `Cell_XY_To_Radar_Pixel`, `Coord_To_Radar_Pixel`
+- Incremental pixel update queue (PIXELSTACK=200)
+- Player names display mode
+- Radar terrain/units/cursor rendering
+
+**ScrollClass** (`src/display/scroll.lua` - 434 lines):
+- Auto-scroll toggle with edge detection (EDGE_ZONE=16 pixels)
+- 5 scroll speed levels (64/128/192/256/384 leptons)
+- 8 directional scrolling with offset mapping
+- Scroll inertia system (builds up while scrolling)
+- Timing: INITIAL_DELAY=8, SEQUENCE_DELAY=4 ticks
+- Keyboard scrolling: `Handle_Scroll_Key`
+- Jump functions: `Jump_To_Cell`, `Jump_To_Coord`
+
+**MouseClass** (`src/display/mouse.lua` - 464 lines):
+- 42 cursor types including scroll, action, mode cursors
+- Animation data per cursor (start frame, count, rate, small variant, hotspot)
+- Override stack for temporary cursor changes
+- Position-based cursor updates (edges, modes)
+- Love2D system cursor integration
+- Custom cursor rendering support
+
+### Key Learnings
+
+1. **Display hierarchy complete**: GScreenClass→DisplayClass→RadarClass→ScrollClass→MouseClass chain fully implemented with proper inheritance via Class.extend().
+
+2. **Follows original C++ structure**: Each class extends the previous one exactly as in DISPLAY.H/RADAR.H/SCROLL.H/MOUSE.H.
+
+3. **Full coordinate conversion system**: Pixel↔Lepton↔Cell conversions working in DisplayClass, enabling mouse interaction with game world.
+
+4. **Integration with LayerClass**: DisplayClass uses LayerClass for object submission and Y-sorted rendering.
+
+5. **Modular mode handling**: Repair mode, sell mode, and targeting mode tracked in DisplayClass with cursor updates in MouseClass.
+
+### Updated Understanding of Project State
+
+With Display Hierarchy audit complete, the picture is now:
+- **Phase 1**: Mostly complete (display hierarchy, base classes, map system all implemented)
+- **Phase 2**: Complete (TechnoClass, game objects, type classes)
+- **Phase 3**: Mostly complete (combat, bullets, animations, pathfinding)
+- **Phase 4**: Mostly complete (economy, production, power, tiberium)
+
+**What's actually missing:**
+1. **Scenario loading** - INI/BIN parser to load mission maps
+2. **Sidebar UI** - Build icons, progress bars, buttons
+3. **Sprite rendering** - ObjectClass.Render() and Draw_It() implementations
+4. **Audio/EVA** - Sound effects and voice announcements
+5. **Unit tests** - Coverage for all systems
+6. **Input handling** - Selection, commands, hotkeys in game context
+
+The codebase is far more complete than PROGRESS.md indicated. The focus should shift to:
+1. Scenario loading to provide test data
+2. Sprite integration to visualize existing systems
+3. Connecting display hierarchy to game loop

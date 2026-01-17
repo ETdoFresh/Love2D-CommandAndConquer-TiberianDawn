@@ -288,34 +288,109 @@ Audit reveals extensive implementation (486 lines):
 - [x] Implement `Debug_Dump(layer_type)`
 - [ ] Write unit tests for LayerClass
 
-### Display Hierarchy (`src/display/`)
-- [ ] Implement `GScreenClass` base
-  - [ ] Screen dimensions
-  - [ ] Input handling hooks
-  - [ ] `One_Time()` initialization
-  - [ ] `Init()` per-game init
-- [ ] Implement `DisplayClass` tactical view
-  - [ ] Viewport position
-  - [ ] Cell-to-pixel conversion
-  - [ ] Pixel-to-cell conversion
-  - [ ] `Tactical_Cell()` - cell under cursor
-  - [ ] `Tactical_Coord()` - coordinate under cursor
-  - [ ] `Submit(cell)` - mark cell dirty
-  - [ ] `Refresh_Cells(coord, list)` - refresh area
-- [ ] Implement `RadarClass` minimap
-  - [ ] Minimap rendering
-  - [ ] Click-to-scroll
-  - [ ] Object blips
-- [ ] Implement `ScrollClass` scrolling
-  - [ ] Edge scrolling
-  - [ ] Keyboard scrolling
-  - [ ] Scroll limits
-- [ ] Implement `MouseClass` cursor
-  - [ ] Cursor shape selection
-  - [ ] Cursor animation
-  - [ ] Cursor coordinate tracking
-- [ ] Implement visual interpolation (15 FPS → 60 FPS)
+### Display Hierarchy (`src/display/`) - COMPLETE
+Audit reveals extensive implementation across 5 display classes (2585 lines total):
+
+**GScreenClass** (`src/display/gscreen.lua` - 301 lines):
+- [x] Base screen class for display hierarchy
+- [x] `IsToRedraw` / `IsToUpdate` - redraw state flags
+- [x] `Buttons` - linked list for UI gadget management
+- [x] `One_Time()` / `Init()` / `Init_Clear()` / `Init_IO()` / `Init_Theater()` - initialization
+- [x] `Input(key, x, y)` - player I/O routing
+- [x] `AI(key, x, y)` - logic processing per tick
+- [x] `Add_A_Button()` / `Remove_A_Button()` - gadget management
+- [x] `Flag_To_Redraw(complete)` - flag for redraw
+- [x] `Render()` - render maintenance (calls Draw_It)
+- [x] `Draw_It(complete)` - virtual render method
+- [x] Mouse shape stubs for derived classes
+- [x] `Code_Pointers()` / `Decode_Pointers()` / `Debug_Dump()`
+
+**DisplayClass** (`src/display/display.lua` - 709 lines):
+- [x] Extends GScreenClass for tactical map display
+- [x] `TacticalCoord` / `DesiredTacticalCoord` - viewport position
+- [x] `TacLeptonWidth` / `TacLeptonHeight` - viewport dimensions
+- [x] `TacPixelX` / `TacPixelY` - pixel offset
+- [x] `Theater` - terrain theater type
+- [x] `Set_View_Dimensions(x, y, width, height)` - set viewport size
+- [x] `Set_Tactical_Position(coord)` - set scroll position
+- [x] `Center_Map()` - center on map
+- [x] `Pixel_To_Coord(x, y)` - screen to game coordinate
+- [x] `Coord_To_Pixel(coord)` - game to screen coordinate
+- [x] `Click_Cell_Calc(x, y)` - cell under cursor
+- [x] `Submit(object, layer)` / `Remove(object, layer)` - layer management
+- [x] `In_View(cell)` - visibility check
+- [x] `Flag_Cell(cell)` / `Is_Cell_Flagged(cell)` / `Clear_Cell_Flags()` - dirty tracking
+- [x] `Repair_Mode_Control()` / `Sell_Mode_Control()` - mode toggles
+- [x] `Draw_It(complete)` - render with layer iteration
+- [x] `Draw_Layer(layer, layer_type)` - draw all objects in layer
+- [x] `Draw_Rubber_Band()` - selection box rendering
+- [x] `Select_These(coord1, coord2, additive)` - box selection
+- [x] `Cell_Object(cell)` / `Next_Object()` / `Prev_Object()` - object finding
+- [x] Pending object placement state (PendingObject, PendingHouse, etc.)
+- [x] `Code_Pointers()` / `Decode_Pointers()` / `Debug_Dump()`
+
+**RadarClass** (`src/display/radar.lua` - 677 lines):
+- [x] Extends DisplayClass for minimap
+- [x] `RadX` / `RadY` / `RadWidth` / `RadHeight` - radar position/size
+- [x] `DoesRadarExist` / `IsRadarActive` / `IsRadarActivating` / `IsRadarDeactivating` - state
+- [x] `RadarAnimFrame` - activation animation frame
+- [x] `IsZoomed` / `ZoomFactor` - zoom state
+- [x] `Set_Map_Dimensions(x, y, w, h)` - set map bounds
+- [x] `Calculate_Radar_Scale()` - fit map to radar
+- [x] `Radar_Activate(control)` - activate/deactivate with animation
+- [x] `Is_Radar_Active()` / `Is_Radar_Activating()` / `Is_Radar_Existing()` - queries
+- [x] `Zoom_Mode(cell)` - toggle zoom
+- [x] `Click_In_Radar(x, y, change)` - click-to-scroll
+- [x] `Set_Radar_Position(cell)` - center view on cell
+- [x] `Cell_XY_To_Radar_Pixel()` / `Coord_To_Radar_Pixel()` - conversions
+- [x] `Cell_On_Radar(cell)` - visibility check
+- [x] `Draw_Radar(complete)` - render radar (background, terrain, units, cursor)
+- [x] `Draw_Radar_Terrain()` / `Draw_Radar_Units()` / `Draw_Radar_Cursor()` - components
+- [x] `Player_Names(on)` / `Draw_Names()` - player name display
+- [x] `Plot_Radar_Pixel(cell)` / `Radar_Pixel(cell)` - incremental pixel updates
+- [x] `Code_Pointers()` / `Decode_Pointers()` / `Debug_Dump()`
+
+**ScrollClass** (`src/display/scroll.lua` - 434 lines):
+- [x] Extends RadarClass for map scrolling
+- [x] `IsAutoScroll` - automatic edge scrolling toggle
+- [x] `ScrollTimer` / `Inertia` / `LastScrollDir` - scroll state
+- [x] `ScrollSpeedIndex` - speed setting (5 levels)
+- [x] `SCROLL_SPEEDS` - speed constants (64/128/192/256/384 leptons)
+- [x] `DIR` enum (N/NE/E/SE/S/SW/W/NW) with `DIR_OFFSET` mapping
+- [x] `Set_Autoscroll(control)` / `Is_Autoscroll()` - auto-scroll control
+- [x] `Set_Scroll_Speed(index)` / `Get_Scroll_Speed()` - speed control
+- [x] `Get_Edge_Direction(x, y)` - edge detection (EDGE_ZONE=16 pixels)
+- [x] `Scroll_Map(facing, distance, really)` - perform scroll with bounds clamping
+- [x] `Process_Edge_Scroll(x, y)` - auto-scroll processing with inertia
+- [x] `Handle_Scroll_Key(key)` - arrow key scrolling
+- [x] `Jump_To_Cell(cell)` / `Jump_To_Coord(coord)` - instant jump
+- [x] `INITIAL_DELAY` / `SEQUENCE_DELAY` - scroll timing constants
+- [x] `Code_Pointers()` / `Decode_Pointers()` / `Debug_Dump()`
+
+**MouseClass** (`src/display/mouse.lua` - 464 lines):
+- [x] Extends ScrollClass - top of display hierarchy
+- [x] `MOUSE` enum - 42 cursor types (NORMAL, scroll dirs, CAN_SELECT, CAN_MOVE, NO_MOVE, CAN_ATTACK, SELL, GREPAIR, ENTER, ION_CANNON, NUCLEAR_BOMB, AIR_STRIKE, etc.)
+- [x] `MouseControl` - animation data per cursor (start, count, rate, small, hotspot)
+- [x] `CurrentMouseShape` / `NormalMouseShape` - current and default shape
+- [x] `IsSmall` - small cursor variant mode
+- [x] `Frame` / `AnimTimer` - animation state
+- [x] `OverrideStack` - temporary cursor stack
+- [x] `Set_Default_Mouse(mouse, wwsmall)` - set default cursor
+- [x] `Override_Mouse_Shape(mouse, wwsmall)` - push override
+- [x] `Revert_Mouse_Shape()` - pop override
+- [x] `Get_Mouse_Shape()` / `Set_Mouse_Shape(mouse)` - shape control
+- [x] `Mouse_Small(wwsmall)` - toggle small mode
+- [x] `Apply_Cursor()` - apply to system (uses Love2D system cursors)
+- [x] `Cursor_For_Direction(dir, can_scroll)` - scroll direction to cursor
+- [x] `Update_Cursor_Animation()` - advance animation frame
+- [x] `Update_Cursor_For_Position(x, y)` - position-based cursor (edges, modes)
+- [x] `Draw_Cursor(x, y)` - custom cursor rendering (optional)
+- [x] `Code_Pointers()` / `Decode_Pointers()` / `Debug_Dump()`
+
+Gaps:
+- [ ] Implement visual interpolation (15 FPS → 60 FPS) - frame smoothing not yet implemented
 - [ ] Write unit tests for display classes
+Note: Display hierarchy is complete; visual interpolation is polish for smoother rendering
 
 ### Game Loop Integration (`src/core/game.lua`)
 - [ ] Remove ECS world reference (deferred - shims still needed for rendering)
