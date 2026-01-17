@@ -198,3 +198,15 @@ Full infantry implementation discovered during audit:
 - Mission overrides: Mission_Attack (with engineer capture special case), Mission_Guard (with idle animations)
 - All flags: IsProne, IsStoked, IsTechnician, IsBoxing
 - Full save/load serialization and Debug_Dump
+
+### UnitClass - Complete (1000 lines)
+Full ground vehicle implementation discovered during audit:
+- Harvester system: Full state machine (LOOKING/HARVESTING/FINDHOME/HEADINGHOME/GOINGTOIDLE)
+  - Find_Tiberium with spiral search, Find_Refinery with radio contact
+  - On_Tiberium, Harvesting, Offload_Tiberium_Bail integration with CellClass
+- MCV deployment: Can_Deploy, Deploy, Complete_Deploy (creates Construction Yard)
+- Transport: Can_Transport, Max_Passengers via type class
+- Mission overrides: Mission_Harvest (full harvester AI), Mission_Unload, Mission_Guard (auto-harvest)
+- UNIT enum with 16 vehicle types (HTANK through GUNBOAT)
+- All timers: HarvestTimer, UnloadTimer, DeployTimer, AnimTimer
+- Full save/load serialization and Debug_Dump
