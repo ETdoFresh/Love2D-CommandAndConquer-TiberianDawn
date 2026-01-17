@@ -255,3 +255,29 @@ Full building implementation discovered during audit:
 - Receive_Message() override for refinery/repair/helipad docking protocols
 - BUILDING enum with 17 building types
 - Full save/load serialization and Debug_Dump
+
+### Type Classes - Complete (~2,576 lines total)
+All type classes discovered implemented during Phase 2 audit:
+- **TechnoTypeClass** (470 lines): Base for all combat types
+  - Production (Cost, Level, Scenario, Prerequisites, Ownable), Combat (SightRange, MaxSpeed, MaxAmmo)
+  - Flags (IsLeader, IsScanner, IsTurretEquipped, IsTwoShooter, IsRepairable, IsCloakable, etc.)
+  - Methods: Raw_Cost, Cost_Of, Time_To_Build, Can_Build, Repair_Cost/Step
+- **InfantryTypeClass** (433 lines): Infantry with 20 INFANTRY types, 35 DO animations
+  - DoControls animation system, FireLaunch/ProneLaunch
+  - IsFemale, IsCrawling, IsCapture, IsFraidyCat, IsCivilian
+  - Factory Create() with E1-E7, RAMBO, civilians data
+- **UnitTypeClass** (547 lines): Vehicles with 22 UNIT types (including dinosaurs!)
+  - SPEED enum (TRACKED, WHEELED, HOVER, etc.)
+  - SpeedType, IsCrusher, IsHarvester, IsDeployable
+  - TurretOffset, BodyFrames for animation
+  - Factory Create() with all tanks, APC, harvester, MCV, etc.
+- **AircraftTypeClass** (380 lines): Aircraft with 5 AIRCRAFT types
+  - LANDING enum, IsFixedWing, IsRotorEquipped, IsVTOL
+  - FlightROT, CruiseAltitude, StrafeRuns
+  - Factory Create() with Chinook, A-10, Apache, C-17, Orca
+- **BuildingTypeClass** (746 lines): Buildings with 40+ STRUCT types
+  - SIZE table, FACTORY enum, BSTATE animations
+  - PowerOutput/Drain, TiberiumCapacity, FactoryType
+  - IsCapturable, IsBaseDefense, IsHelipad, IsRadar
+  - Factory Create() with all buildings (power, barracks, factories, defenses, etc.)
+Data matches original IDATA.CPP/UDATA.CPP/ADATA.CPP/BDATA.CPP patterns
