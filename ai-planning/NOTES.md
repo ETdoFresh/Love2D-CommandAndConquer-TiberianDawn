@@ -229,3 +229,29 @@ Full aircraft implementation discovered during audit:
   - Rotor animation via BodyFrame
 - Full save/load serialization with FlyClass mixin data
 - Unit-specific behaviors (Orca/Apache/Chinook/A-10) via type class properties
+
+### BuildingClass - Complete (2340 lines)
+Full building implementation discovered during audit:
+- BState state machine with 7 states (NONE/CONSTRUCTION/IDLE/ACTIVE/FULL/AUX1/AUX2)
+- Begin_Mode() with animation control and state queuing
+- Grand_Opening() with power adjustment, storage, free unit spawning
+- Power system: Power_Output() (damage-scaled), Power_Drain(), Has_Power(), Power_Efficiency()
+- Tiberium storage: Store_Tiberium(), Remove_Tiberium() with state updates
+- Repair system: Can_Repair(), Start_Repair(), Stop_Repair(), Process_Repair()
+- Sell system: Sell_Back(), Complete_Sell(), Update_Sell() with credit refund
+- Capture system: Can_Capture(), Capture() with health reduction
+- Sabotage: Plant_C4(), Process_Sabotage()
+- Primary factory: Toggle_Primary(), Get_Factory_Type()
+- Building placement validation: Is_Adjacent_To_Building(), Can_Place_Building(), Get_Valid_Placement_Cells()
+- Mission implementations (7 total):
+  - Mission_Guard: defense threat scanning
+  - Mission_Attack: turret rotation and firing
+  - Mission_Construction: full build state machine
+  - Mission_Deconstruction: sell/demolition with survivor spawning
+  - Mission_Harvest: refinery tiberium processing (5 states)
+  - Mission_Repair: repair facility and helipad
+  - Mission_Missile: Temple of Nod nuke launch (5 states)
+  - Mission_Unload: factory unit delivery
+- Receive_Message() override for refinery/repair/helipad docking protocols
+- BUILDING enum with 17 building types
+- Full save/load serialization and Debug_Dump
